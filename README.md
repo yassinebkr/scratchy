@@ -16,7 +16,7 @@ Scratchy replaces generic messaging apps with an interface designed for AI. Inst
 
 Think of it as a frontend that makes your AI agent actually useful beyond chat.
 
-**Built for [OpenClaw](https://github.com/openclaw/openclaw)** — the open-source AI agent gateway.
+**Built for [OpenClaw](https://github.com/openclaw/openclaw)** — the open-source AI agent gateway. Uses a [custom OpenClaw fork](https://github.com/yassinebkr/openclaw) with [ClawOS](https://github.com/yassinebkr/clawos) — a defense-in-depth security stack for AI agents (session integrity, content tagging, signal detection, privilege separation, canary tokens).
 
 ## Features
 
