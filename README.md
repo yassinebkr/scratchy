@@ -100,10 +100,11 @@ User clicks button → widget-action frame → serve.js routes by prefix → Wid
 - Dynamic labels: 📄 Reading file, ⚡ Running command, 🔍 Searching the web
 - Elapsed timer + expandable tool call log
 
-### 🗜️ TOON Format (Token-Efficient)
-- `scratchy-toon` code blocks — alternative to JSON using [TOON](https://github.com/toon-format/toon)
-- ~18-40% token savings on structured data
+### 🗜️ TOON Format (Default)
+- `scratchy-toon` code blocks — default canvas format, preferred over JSON
+- [TOON](https://github.com/toon-format/toon) (Token-Oriented Object Notation) — ~18-40% token savings on structured data
 - Streaming parser with hash-based dedup
+- JSON fallback (`scratchy-canvas`) for deeply nested structures
 - Both formats coexist in the same response
 
 ### 📎 File Attachments
@@ -197,16 +198,9 @@ The gateway token **never reaches the browser**. Scratchy proxies all communicat
 
 ## GenUI Protocol
 
-Agents control the UI by emitting code blocks in their responses:
+Agents control the UI by emitting code blocks in their responses.
 
-````markdown
-```scratchy-canvas
-{"op":"upsert","id":"cpu-gauge","type":"gauge","data":{"label":"CPU","value":73,"max":100,"unit":"%","color":"orange"}}
-{"op":"upsert","id":"server-stats","type":"stats","data":{"title":"Status","items":[{"label":"Uptime","value":"14d"},{"label":"Requests","value":"1.2M"}]}}
-```
-````
-
-Or using TOON for ~30% token savings:
+**TOON (default):**
 
 ````markdown
 ```scratchy-toon
@@ -219,6 +213,24 @@ data:
   max: 100
   unit: %
   color: orange
+---
+op: upsert
+id: srv-stats
+type: stats
+data:
+  title: Status
+  items[2]{label,value}:
+    Uptime,14d
+    Requests,1.2M
+```
+````
+
+**JSON fallback:**
+
+````markdown
+```scratchy-canvas
+{"op":"upsert","id":"cpu-gauge","type":"gauge","data":{"label":"CPU","value":73,"max":100,"unit":"%","color":"orange"}}
+{"op":"upsert","id":"srv-stats","type":"stats","data":{"title":"Status","items":[{"label":"Uptime","value":"14d"},{"label":"Requests","value":"1.2M"}]}}
 ```
 ````
 
