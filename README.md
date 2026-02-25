@@ -24,13 +24,13 @@ Think of it as a frontend that makes your AI agent actually useful beyond chat.
 
 Scratchy implements two complementary protocols that define how AI agents communicate with frontends:
 
-**🔗 A2UI (Agent-to-UI Protocol)** — A structured envelope protocol for agent → client communication. Instead of agents dumping raw text, they emit typed operations (`upsert`, `patch`, `remove`, `clear`, `move`, `layout`, `toast`, `overlay`) that the client renders as interactive components. The protocol includes:
+**🔗 [A2UI](https://github.com/google/A2UI) (Agent-to-UI Protocol)** — A structured envelope protocol for agent → client communication, [created by Google](https://a2ui.org). Instead of agents dumping raw text, they emit typed operations (`upsert`, `patch`, `remove`, `clear`, `move`, `layout`, `toast`, `overlay`) that the client renders as interactive components. The protocol includes:
 - **Envelope routing** — messages are parsed, validated (JSON Schema), and routed to surface handlers by type
 - **Surface state management** — server tracks which components are on which surface (main grid, toasts, overlays, sidebar)
 - **v1 backward compatibility** — legacy flat ops are auto-translated to v2 envelopes
 - **UserAction protocol** — client → agent actions are structured with `surfaceId`, `componentId`, and typed payloads
 
-**⚡ AG-UI (Agent-Generated UI Lifecycle)** — A real-time event system that maps agent activity to 10 UI lifecycle events:
+**⚡ [AG-UI](https://github.com/ag-ui-protocol/ag-ui) (Agent-User Interaction Protocol)** — A real-time event system, [created by CopilotKit](https://docs.ag-ui.com), that maps agent activity to 10 UI lifecycle events:
 
 | Event | When |
 |-------|------|
