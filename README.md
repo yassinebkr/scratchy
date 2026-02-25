@@ -304,6 +304,9 @@ These operations are the A2UI protocol in action — the agent emits structured 
 - [x] Light/dark mode
 - [x] Command palette (⌘K)
 - [x] Gateway metadata stripping (clean message history)
+- [x] Agent ↔ widget interaction (agents can read/write widget data via trigger ops)
+- [x] Widget region auto-relocate (triggered widgets always appear at bottom of chat)
+- [ ] A2UI compatibility layer (render Google A2UI payloads as Scratchy components)
 - [ ] More widgets (weather, home automation, GitHub, 3D printer)
 - [ ] Message virtualization (500+ messages)
 - [ ] Push notifications (Service Worker)
