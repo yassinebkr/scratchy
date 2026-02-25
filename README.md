@@ -189,6 +189,7 @@ The gateway token **never reaches the browser**. Scratchy proxies all communicat
 - CSP headers (`script-src 'self'`)
 - WebSocket token-bucket rate limiter
 - File upload MIME + extension validation
+- Gateway metadata stripping — system-injected timestamps, internal tags, and metadata are automatically stripped from message history (3-layer defense: server, client data, client render)
 
 ## GenUI Protocol
 
@@ -266,6 +267,7 @@ Components persist until removed. Use `patch` for small updates, `upsert` for ne
 - [x] Streaming render (ops fire live during agent stream)
 - [x] Light/dark mode
 - [x] Command palette (⌘K)
+- [x] Gateway metadata stripping (clean message history)
 - [ ] More widgets (weather, home automation, GitHub, 3D printer)
 - [ ] Message virtualization (500+ messages)
 - [ ] Push notifications (Service Worker)
