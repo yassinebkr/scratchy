@@ -114,7 +114,21 @@ User clicks button → widget-action frame → serve.js routes by prefix → Wid
 
 ## Getting Started
 
-### Docker (recommended)
+> ⚠️ Scratchy requires the [OpenClaw fork](https://github.com/yassinebkr/openclaw) with [ClawOS](https://github.com/yassinebkr/clawos). The official OpenClaw repo may work partially, but some features depend on fork-specific APIs and the ClawOS security plugin. For the full experience, install the fork.
+
+### 1. Install OpenClaw (fork)
+
+```bash
+git clone https://github.com/yassinebkr/openclaw.git
+cd openclaw
+npm install --legacy-peer-deps
+openclaw setup        # follow the wizard
+openclaw gateway start
+```
+
+### 2. Install Scratchy
+
+**Docker (recommended):**
 
 ```bash
 git clone https://github.com/yassinebkr/scratchy.git
@@ -122,7 +136,7 @@ cd scratchy
 SCRATCHY_TOKEN=your-gateway-token docker compose up -d
 ```
 
-### Manual
+**Manual:**
 
 ```bash
 git clone https://github.com/yassinebkr/scratchy.git
