@@ -249,10 +249,10 @@ Widgets demonstrate the standalone app architecture. Build your own by implement
 
 ## Roadmap
 
+- [x] Drag-and-drop canvas reordering (partial)
 - [ ] More widgets (weather, home automation, GitHub, 3D printer)
 - [ ] Message virtualization (500+ messages)
 - [ ] Push notifications (Service Worker)
-- [ ] Drag-and-drop canvas reordering
 - [ ] Plugin system for custom components
 - [ ] Tauri desktop app (Rust backend)
 
