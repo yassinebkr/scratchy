@@ -21,7 +21,7 @@ Think of it as a frontend that makes your AI agent actually useful beyond chat.
 ## Features
 
 ### 💬 Chat
-- **Real-time streaming** — see the agent type live (two-phase: lightweight during stream, full markdown on finalize)
+- **Real-time streaming** — two-phase rendering: lightweight during stream, full markdown on finalize
 - **Markdown rendering** — tables, code blocks with syntax highlighting, lists, headers
 - **Collapsible thinking blocks** — see agent reasoning
 - **Full chat history** across session compactions
@@ -30,7 +30,7 @@ Think of it as a frontend that makes your AI agent actually useful beyond chat.
 
 ### 🎨 Generative UI (39 Components)
 
-Agents respond with `scratchy-canvas` or `scratchy-toon` code blocks. Scratchy renders them as interactive components:
+Agents respond with `scratchy-toon` (default) or `scratchy-canvas` (JSON) code blocks. Scratchy renders them as interactive components:
 
 | Category | Components |
 |----------|-----------|
@@ -44,9 +44,10 @@ Agents respond with `scratchy-canvas` or `scratchy-toon` code blocks. Scratchy r
 
 Components are **LiveComponents** — DOM-based with create/update lifecycle, rAF animations, zero innerHTML.
 
-### 🖼️ Canvas Mode
+### 🖼️ Unified Conversation Stream
 
-- Persistent spatial grid — components live across messages
+Components render **inline in the chat timeline** — no separate canvas view. Widgets, dashboards, and interactive elements flow naturally alongside messages.
+
 - JSON ops protocol: `upsert`, `patch`, `remove`, `clear`, `move`, `layout`, `toast`, `overlay`, `dismiss`, `trigger`
 - Tile entrance choreography — staggered spring animations
 - View Transitions API — smooth crossfade on widget navigation
@@ -56,7 +57,7 @@ Components are **LiveComponents** — DOM-based with create/update lifecycle, rA
 
 ### 🔌 Widget Architecture
 
-Widgets are **standalone apps** that run inside the canvas. They handle their own logic — no forwarding to the agent.
+Widgets are **standalone apps** that run inside the conversation. They handle their own logic — no forwarding to the agent.
 
 ```
 User clicks button → widget-action frame → serve.js routes by prefix → Widget processes locally → Canvas updates
@@ -75,17 +76,13 @@ User clicks button → widget-action frame → serve.js routes by prefix → Wid
 - Voice notes with Whisper transcription
 - Language-aware STT — retains original language
 
-### 📱 Multi-Device Sync
-- Open Scratchy on phone and desktop simultaneously
-- Messages, canvas ops, and activity indicators sync in real-time
-- WebSocket session continuity with 30s grace period
-- Event buffering with sequence numbers — no missed messages
-
 ### ⚡ Connection Reliability
 - Auto-reconnect with exponential backoff (1s → 15s cap)
 - Zombie socket detection (server-side pong timeout)
 - Streaming staleness watchdog (10s gap detection)
 - Offline message queue preserved across reconnects
+- WebSocket session continuity with 30s grace period
+- Event buffering with sequence numbers — no missed messages
 
 ### 🎯 Design System
 - **Geist font**, indigo accent (#6366f1)
@@ -99,6 +96,7 @@ User clicks button → widget-action frame → serve.js routes by prefix → Wid
 - Real-time tool event streaming from the gateway
 - Dynamic labels: 📄 Reading file, ⚡ Running command, 🔍 Searching the web
 - Elapsed timer + expandable tool call log
+- Context meter — real-time context window usage (color-coded)
 
 ### 🗜️ TOON Format (Default)
 - `scratchy-toon` code blocks — default canvas format, preferred over JSON
@@ -155,10 +153,10 @@ Browser / PWA
   │  WebSocket + HTTPS
   ▼
 serve.js (Node.js)
-  ├─ Auth + session management
+  ├─ Static files + session management
   ├─ WebSocket proxy → OpenClaw Gateway
   ├─ Widget-action handler (local routing)
-  ├─ REST API (sessions, history, search, attachments)
+  ├─ REST API (history, search, attachments)
   ├─ TTS (ElevenLabs) + STT (Whisper)
   │
   ▼
@@ -177,24 +175,6 @@ The gateway token **never reaches the browser**. Scratchy proxies all communicat
 - CSP headers (`script-src 'self'`)
 - WebSocket token-bucket rate limiter
 - File upload MIME + extension validation
-
-## Configuration
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `SCRATCHY_TOKEN` | OpenClaw gateway auth token | Auto-detected from ~/.openclaw |
-| `ELEVENLABS_API_KEY` | ElevenLabs API key for TTS | — |
-| `ELEVENLABS_VOICE_ID` | Voice ID | SAz9YHcvj6GT2YYXdXww |
-| `OPENAI_API_KEY` | OpenAI key for Whisper STT | — |
-| Port (arg) | `node serve.js [port]` | 3001 |
-
-## Tech Stack
-
-- **Frontend:** Vanilla HTML/CSS/JavaScript — zero frameworks, zero build step
-- **Server:** Node.js — static files, WebSocket proxy, REST APIs, widget routing
-- **Protocol:** OpenClaw gateway API (WebSocket, JSON frames)
-- **TTS:** ElevenLabs v3 with streaming audio
-- **STT:** OpenAI Whisper
 
 ## GenUI Protocol
 
@@ -238,17 +218,23 @@ Operations: `upsert`, `patch`, `remove`, `clear`, `move`, `layout`, `toast`, `ov
 
 Components persist until removed. Use `patch` for small updates, `upsert` for new components or full replacement.
 
-## Widgets (⚠️ Experimental)
+## Configuration
 
-Scratchy includes several built-in widget apps. These are **not fully tested** and may require additional setup (OAuth credentials, API keys):
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `SCRATCHY_TOKEN` | OpenClaw gateway auth token | Auto-detected from ~/.openclaw |
+| `ELEVENLABS_API_KEY` | ElevenLabs API key for TTS | — |
+| `ELEVENLABS_VOICE_ID` | Voice ID | SAz9YHcvj6GT2YYXdXww |
+| `OPENAI_API_KEY` | OpenAI key for Whisper STT | — |
+| Port (arg) | `node serve.js [port]` | 3001 |
 
-- **Standard Notes** — encrypted note-taking via sn-cli
-- **Google Calendar** — month grid, events + tasks CRUD
-- **Gmail** — email reader with HTML rendering, compose/reply
-- **Spotify** — search, playlists, playback controls
-- **YouTube** — search, trending, playlists, music
+## Tech Stack
 
-Widgets demonstrate the standalone app architecture. Build your own by implementing a widget class with `handleAction()` and registering it in `serve.js`.
+- **Frontend:** Vanilla HTML/CSS/JavaScript — zero frameworks, zero build step
+- **Server:** Node.js — static files, WebSocket proxy, REST APIs, widget routing
+- **Protocol:** OpenClaw gateway API (WebSocket, JSON frames)
+- **TTS:** ElevenLabs v3 with streaming audio
+- **STT:** OpenAI Whisper
 
 ## Docker Security
 
@@ -261,7 +247,11 @@ Widgets demonstrate the standalone app architecture. Build your own by implement
 
 ## Roadmap
 
-- [x] Drag-and-drop canvas reordering (partial)
+- [x] Unified conversation stream (widgets inline in chat)
+- [x] TOON format as default (18-40% token savings)
+- [x] Streaming render (ops fire live during agent stream)
+- [x] Light/dark mode
+- [x] Command palette (⌘K)
 - [ ] More widgets (weather, home automation, GitHub, 3D printer)
 - [ ] Message virtualization (500+ messages)
 - [ ] Push notifications (Service Worker)
