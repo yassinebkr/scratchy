@@ -99,6 +99,7 @@ User clicks button → widget-action frame → serve.js routes by prefix → Wid
 - **Optimistic UI** — mutations update instantly, background processing
 - **Session persistence** — widget state saved to file, auto-restores on reconnect
 - **Inter-widget communication** — EventBus + SharedContextStore
+- **Agent trigger ops** — agents can invoke widget actions programmatically via `{"op":"trigger","action":"...","context":{...}}`, enabling agent CRUD (read, edit, append) on widget data while keeping widget state in sync
 
 ### 🔊 Voice & TTS
 - Text-to-speech on any message (ElevenLabs v3)
