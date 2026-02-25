@@ -1,12 +1,14 @@
 # Scratchy
 
-A generative UI client for [OpenClaw](https://github.com/openclaw/openclaw) AI agents.
+A generative UI client for [OpenClaw](https://github.com/openclaw/openclaw) AI agents — built on **A2UI** and **AG-UI** principles.
 
 Real-time streaming. 39 interactive components. Standalone widget apps. Zero frameworks.
 
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Node](https://img.shields.io/badge/node-22%2B-green)
 ![Docker](https://img.shields.io/badge/docker-ready-blue)
+![A2UI](https://img.shields.io/badge/protocol-A2UI-6366f1)
+![AG-UI](https://img.shields.io/badge/lifecycle-AG--UI-22c55e)
 
 ---
 
@@ -17,6 +19,35 @@ Scratchy replaces generic messaging apps with an interface designed for AI. Inst
 Think of it as a frontend that makes your AI agent actually useful beyond chat.
 
 **Built for [OpenClaw](https://github.com/openclaw/openclaw)** — the open-source AI agent gateway. Uses a [custom OpenClaw fork](https://github.com/yassinebkr/openclaw) with [ClawOS](https://github.com/yassinebkr/clawos) — a defense-in-depth security stack for AI agents (session integrity, content tagging, signal detection, privilege separation, canary tokens).
+
+### A2UI + AG-UI Architecture
+
+Scratchy implements two complementary protocols that define how AI agents communicate with frontends:
+
+**🔗 A2UI (Agent-to-UI Protocol)** — A structured envelope protocol for agent → client communication. Instead of agents dumping raw text, they emit typed operations (`upsert`, `patch`, `remove`, `clear`, `move`, `layout`, `toast`, `overlay`) that the client renders as interactive components. The protocol includes:
+- **Envelope routing** — messages are parsed, validated (JSON Schema), and routed to surface handlers by type
+- **Surface state management** — server tracks which components are on which surface (main grid, toasts, overlays, sidebar)
+- **v1 backward compatibility** — legacy flat ops are auto-translated to v2 envelopes
+- **UserAction protocol** — client → agent actions are structured with `surfaceId`, `componentId`, and typed payloads
+
+**⚡ AG-UI (Agent-Generated UI Lifecycle)** — A real-time event system that maps agent activity to 10 UI lifecycle events:
+
+| Event | When |
+|-------|------|
+| `RUN_STARTED` | Agent begins processing |
+| `RUN_FINISHED` | Agent completes |
+| `RUN_ERROR` | Agent errors |
+| `STEP_STARTED` | Tool call begins |
+| `STEP_FINISHED` | Tool call completes |
+| `TEXT_DELTA` | Streaming text chunk |
+| `STATE_DELTA` | Incremental state update |
+| `STATE_SNAPSHOT` | Full state replace |
+| `TOOL_CALL_START` | Named tool invocation |
+| `TOOL_CALL_END` | Tool result received |
+
+This powers the live activity indicator (📄 Reading file, ⚡ Running command, 🔍 Searching web), the streaming progress bar, context meter, and compaction tracking — the user always knows exactly what the agent is doing and why.
+
+**Why this matters:** Most AI chat interfaces are glorified text boxes. A2UI + AG-UI turns the agent into a first-class UI participant — it can build dashboards, update gauges in real-time, show progress on long operations, and render interactive forms, all through a structured protocol instead of prompt hacking.
 
 ## Features
 
@@ -169,6 +200,8 @@ Browser / PWA
 serve.js (Node.js)
   ├─ Static files + session management
   ├─ WebSocket proxy → OpenClaw Gateway
+  ├─ A2UI envelope router + surface state
+  ├─ AG-UI run tracker (10 lifecycle events)
   ├─ Widget-action handler (local routing)
   ├─ REST API (history, search, attachments)
   ├─ TTS (ElevenLabs) + STT (Whisper)
@@ -191,9 +224,9 @@ The gateway token **never reaches the browser**. Scratchy proxies all communicat
 - File upload MIME + extension validation
 - Gateway metadata stripping — system-injected timestamps, internal tags, and metadata are automatically stripped from message history (3-layer defense: server, client data, client render)
 
-## GenUI Protocol
+## GenUI Protocol (A2UI in Practice)
 
-Agents control the UI by emitting code blocks in their responses.
+Agents control the UI by emitting structured A2UI operations in code blocks.
 
 **TOON (default):**
 
@@ -232,6 +265,8 @@ data:
 Operations: `upsert`, `patch`, `remove`, `clear`, `move`, `layout`, `toast`, `overlay`, `dismiss`, `trigger`
 
 Components persist until removed. Use `patch` for small updates, `upsert` for new components or full replacement.
+
+These operations are the A2UI protocol in action — the agent emits structured intents, not raw HTML. The client decides how to render them based on viewport, theme, and surface state.
 
 ## Configuration
 
