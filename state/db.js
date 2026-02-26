@@ -160,6 +160,50 @@ export function initSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_agents_userId ON agents(userId);
     CREATE INDEX IF NOT EXISTS idx_agent_conversations_agentId ON agent_conversations(agentId);
     CREATE INDEX IF NOT EXISTS idx_agent_conversations_userId ON agent_conversations(userId);
+
+    -- Notes (widget: notes)
+    CREATE TABLE IF NOT EXISTS notes (
+      id        TEXT PRIMARY KEY,
+      userId    TEXT NOT NULL,
+      title     TEXT NOT NULL DEFAULT 'Untitled',
+      content   TEXT NOT NULL DEFAULT '',
+      createdAt TEXT NOT NULL DEFAULT (datetime('now')),
+      updatedAt TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_notes_userId    ON notes(userId);
+    CREATE INDEX IF NOT EXISTS idx_notes_updatedAt ON notes(updatedAt);
+
+    -- Calendar events (widget: calendar)
+    CREATE TABLE IF NOT EXISTS calendar_events (
+      id        TEXT PRIMARY KEY,
+      userId    TEXT NOT NULL,
+      title     TEXT NOT NULL,
+      startTime TEXT NOT NULL,
+      endTime   TEXT,
+      allDay    INTEGER NOT NULL DEFAULT 0,
+      color     TEXT DEFAULT 'blue',
+      createdAt TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_calendar_events_userId    ON calendar_events(userId);
+    CREATE INDEX IF NOT EXISTS idx_calendar_events_startTime ON calendar_events(startTime);
+
+    -- Emails (widget: email)
+    CREATE TABLE IF NOT EXISTS emails (
+      id        TEXT PRIMARY KEY,
+      userId    TEXT NOT NULL,
+      "to"      TEXT NOT NULL,
+      subject   TEXT NOT NULL DEFAULT '(no subject)',
+      body      TEXT NOT NULL DEFAULT '',
+      sentAt    TEXT,
+      status    TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','sent','failed')),
+      resendId  TEXT,
+      createdAt TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_emails_userId ON emails(userId);
+    CREATE INDEX IF NOT EXISTS idx_emails_sentAt ON emails(sentAt);
   `);
 
   // Migrate existing memory_chunks tables to v2 schema (consolidation support)

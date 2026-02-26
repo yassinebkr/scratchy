@@ -94,3 +94,56 @@ export function setDefaults(defaults) {
     stmt.run(key, JSON.stringify(value), now);
   }
 }
+
+/**
+ * Set multiple config key-value pairs atomically.
+ * Uses a transaction to ensure all-or-nothing writes.
+ * @param {Object} entries - Object of key-value pairs to set
+ */
+export function setMany(entries) {
+  const stmt = d().prepare(`
+    INSERT INTO admin_config (key, value, updatedAt)
+    VALUES (?, ?, ?)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value, updatedAt = excluded.updatedAt
+  `);
+  const now = new Date().toISOString();
+  const tx = d().transaction(() => {
+    for (const [key, value] of Object.entries(entries)) {
+      stmt.run(key, JSON.stringify(value), now);
+    }
+  });
+  tx();
+}
+
+/**
+ * Get all config entries with metadata (key, value, updatedAt).
+ * Useful for admin UI to show when each key was last changed.
+ * @returns {Array<{key: string, value: any, updatedAt: string}>}
+ */
+export function getAllWithMeta() {
+  const rows = d().prepare('SELECT key, value, updatedAt FROM admin_config ORDER BY key').all();
+  return rows.map((row) => {
+    let parsed;
+    try { parsed = JSON.parse(row.value); } catch { parsed = row.value; }
+    return { key: row.key, value: parsed, updatedAt: row.updatedAt };
+  });
+}
+
+/**
+ * Check whether a config key exists.
+ * @param {string} key
+ * @returns {boolean}
+ */
+export function has(key) {
+  const row = d().prepare('SELECT 1 FROM admin_config WHERE key = ?').get(key);
+  return !!row;
+}
+
+/**
+ * Get the total number of config entries.
+ * @returns {number}
+ */
+export function count() {
+  const row = d().prepare('SELECT COUNT(*) as count FROM admin_config').get();
+  return row.count;
+}

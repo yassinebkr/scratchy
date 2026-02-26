@@ -16,6 +16,7 @@ import * as sessions from '../state/sessions.js';
 import * as agents from '../state/agents.js';
 import * as adminConfig from '../state/admin-config.js';
 import * as preferences from '../state/preferences.js';
+import { adminRoutes } from './routes/admin.js';
 
 /** @type {import('../lib/mcp-registry.js').McpRegistry|null} */
 let _mcpRegistry = null;
@@ -283,6 +284,9 @@ export function createRouter(opts = {}) {
 
   /** Track whether state modules have been initialized */
   let stateInitialized = false;
+
+  /** Lazily initialized admin route handlers */
+  let _adminHandlers = null;
 
   /**
    * Lazily initialize state modules when we have a db.
@@ -760,45 +764,32 @@ export function createRouter(opts = {}) {
         }
       }
 
-      /* ---------- Admin Config ---------- */
+      /* ---------- Admin Routes (comprehensive) ---------- */
 
-      // GET /api/admin/config
-      if (method === 'GET' && pathname === '/api/admin/config') {
-        const user = await requireAdmin(req, res);
-        if (!user) return;
-        return json(res, 200, adminConfig.getAll());
-      }
-
-      // PUT /api/admin/config
-      if (method === 'PUT' && pathname === '/api/admin/config') {
-        const user = await requireAdmin(req, res);
-        if (!user) return;
-
-        const body = await parseJsonBody(req);
-        for (const [key, value] of Object.entries(body)) {
-          adminConfig.set(key, value);
+      // Wire up admin routes from server/routes/admin.js
+      if (pathname.startsWith('/api/admin/')) {
+        if (!_adminHandlers) {
+          _adminHandlers = adminRoutes({
+            getDb: () => getDb ? getDb() : null,
+            requireAdmin,
+            usageTracker: opts.usageTracker ?? null,
+            wsState: opts.wsState ?? null,
+          });
         }
-        return json(res, 200, adminConfig.getAll());
+
+        // Match against admin route table
+        for (const route of _adminHandlers.routes) {
+          if (route.method !== method) continue;
+
+          const params = matchRoute(route.path, pathname);
+          if (params !== null) {
+            // Call handler — pass params.id as third argument if present
+            return route.handler(req, res, params.id);
+          }
+        }
       }
 
-      // GET /api/admin/users — list all users with quotas
-      if (method === 'GET' && pathname === '/api/admin/users') {
-        const user = await requireAdmin(req, res);
-        if (!user) return;
-
-        const db = getDb ? getDb() : null;
-        if (!db) return json(res, 200, []);
-
-        // Import listUsers dynamically to avoid circular deps at module level
-        const rows = db.prepare('SELECT id, username, displayName, role, plan, createdAt FROM users ORDER BY createdAt ASC').all();
-        const result = rows.map(r => {
-          const quotas = adminConfig.get(`user_quotas_${r.id}`);
-          return { ...r, quotas: quotas || null };
-        });
-        return json(res, 200, result);
-      }
-
-      // GET/PUT /api/admin/users/:id/quotas
+      // Legacy: GET/PUT /api/admin/users/:id/quotas (kept for backward compat)
       {
         const quotaMatch = matchRoute('/api/admin/users/:id/quotas', pathname);
         if (quotaMatch) {

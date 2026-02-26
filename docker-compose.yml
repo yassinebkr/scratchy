@@ -1,0 +1,74 @@
+version: "3.8"
+
+services:
+  # ─── Scratchy v2 — AI Chat Workbench ───────────────────────────────────────
+  scratchy:
+    build: .
+    container_name: scratchy
+    restart: unless-stopped
+    ports:
+      - "${SCRATCHY_PORT:-3002}:3002"
+    volumes:
+      - scratchy-data:/app/data
+    environment:
+      - PORT=3002
+      - DATABASE_PATH=/app/data/scratchy.db
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - RESEND_API_KEY=${RESEND_API_KEY}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+    networks:
+      - scratchy-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3002/api/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+
+  # ─── OpenClaw — AI Agent Runtime ───────────────────────────────────────────
+  openclaw:
+    image: ghcr.io/openclaw/openclaw:latest
+    container_name: openclaw
+    restart: unless-stopped
+    ports:
+      - "${OPENCLAW_PORT:-28945}:28945"
+    volumes:
+      - openclaw-data:/data
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    networks:
+      - scratchy-net
+
+  # ─── NullClaw — Per-User Agent Instances (optional) ────────────────────────
+  # Uncomment to enable NullClaw webhook bridge.
+  # Each user gets an isolated NullClaw process managed by the adapter.
+  #
+  # nullclaw:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile.nullclaw
+  #   container_name: nullclaw
+  #   restart: unless-stopped
+  #   ports:
+  #     - "29000-29099:29000-29099"
+  #   volumes:
+  #     - nullclaw-data:/data
+  #   environment:
+  #     - OPENAI_API_KEY=${OPENAI_API_KEY}
+  #     - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+  #     - NULLCLAW_PORT_MIN=29000
+  #     - NULLCLAW_PORT_MAX=29099
+  #   networks:
+  #     - scratchy-net
+
+networks:
+  scratchy-net:
+    driver: bridge
+
+volumes:
+  scratchy-data:
+  openclaw-data:
+  # nullclaw-data:
