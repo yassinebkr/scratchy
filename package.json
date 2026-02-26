@@ -15,8 +15,12 @@
   },
   "license": "ISC",
   "dependencies": {
+    "@mozilla/readability": "^0.6.0",
     "better-sqlite3": "^12.6.2",
+    "linkedom": "^0.18.12",
     "openai": "^6.25.0",
+    "robots-parser": "^3.0.1",
+    "tough-cookie": "^6.0.0",
     "ws": "^8.19.0"
   }
 }
