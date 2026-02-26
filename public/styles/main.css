@@ -8,10 +8,14 @@
   --text-muted: #71717a;
   --accent: #6366f1;
   --accent-hover: #4f46e5;
+  --danger: #f87171;
+  --success: #34d399;
+  --warning: #fbbf24;
   --radius: 8px;
   --font: 'Geist', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   --mono: 'Geist Mono', 'SF Mono', 'Fira Code', monospace;
   --font-size: 14px;
+  --topbar-h: 48px;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -23,6 +27,181 @@ html, body {
   background: var(--bg);
   color: var(--text);
   overflow: hidden;
+}
+
+/* ── Screens ── */
+.screen {
+  width: 100%;
+  height: 100%;
+}
+
+.screen.hidden {
+  display: none !important;
+}
+
+/* ── Auth Screen ── */
+#auth-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+}
+
+/* ── App Screen ── */
+#app-screen {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* ── Top Bar ── */
+.topbar {
+  height: var(--topbar-h);
+  min-height: var(--topbar-h);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  z-index: 10;
+}
+
+.topbar-left,
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.topbar-brand {
+  font-weight: 600;
+  font-size: 15px;
+  letter-spacing: -0.3px;
+}
+
+.topbar-user {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.topbar-logout {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  font-family: var(--font);
+  font-size: 12px;
+  padding: 5px 12px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.topbar-logout:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+/* ── Connection Status Badge ── */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: background 0.3s;
+}
+
+.status-dot.connected {
+  background: var(--success);
+  box-shadow: 0 0 6px var(--success);
+}
+
+.status-dot.disconnected {
+  background: var(--danger);
+  box-shadow: 0 0 6px var(--danger);
+}
+
+.status-dot.reconnecting {
+  background: var(--warning);
+  box-shadow: 0 0 6px var(--warning);
+  animation: pulse-dot 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.status-text {
+  user-select: none;
+}
+
+/* ── App Main ── */
+.app-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── Loading Spinner ── */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+/* ── Message Bubbles ── */
+.msg {
+  margin-bottom: 12px;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  font-size: 14px;
+  line-height: 1.5;
+  max-width: 85%;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+}
+
+.msg-user {
+  background: var(--accent);
+  color: #fff;
+  margin-left: auto;
+  border-bottom-right-radius: 2px;
+}
+
+.msg-assistant {
+  background: var(--surface-hover);
+  color: var(--text);
+  margin-right: auto;
+  border-bottom-left-radius: 2px;
+}
+
+.msg-system {
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: center;
+  margin: 4px auto;
+}
+
+.msg-error {
+  color: var(--danger);
 }
 
 #app {
