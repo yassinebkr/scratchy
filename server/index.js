@@ -9,6 +9,7 @@
 import { createServer } from 'node:http';
 import { createRouter } from './router.js';
 import { createWsHandler } from './ws.js';
+import { McpRegistry } from '../lib/mcp-registry.js';
 
 /** Default port — v2 runs on 3002 (v1 is on 3001) */
 const PORT = parseInt(process.env.PORT ?? '3002', 10);
@@ -48,6 +49,17 @@ async function main() {
     console.warn('[server] Auth module not available, running without auth:', err.message);
   }
 
+  /* -- MCP Registry -- */
+  const mcpRegistry = new McpRegistry();
+
+  /* -- Agent module for WS handler -- */
+  let agentsModule = null;
+  try {
+    agentsModule = await import('../state/agents.js');
+  } catch (err) {
+    console.warn('[server] Agents module not available:', err.message);
+  }
+
   /* -- HTTP server + router -- */
   const handler = createRouter({ auth, getDb, version: VERSION });
   const server = createServer(handler);
@@ -55,6 +67,8 @@ async function main() {
   /* -- WebSocket handler -- */
   const wsHandler = createWsHandler(server, {
     auth,
+    getAgents: agentsModule,
+    mcpRegistry,
     onChat: async (userId, msg, ws) => {
       // Placeholder — will be wired to agent proxy later
       console.log(`[chat] from ${userId}:`, msg.text ?? msg.content ?? '(empty)');
@@ -78,6 +92,11 @@ async function main() {
     if (shuttingDown) return;
     shuttingDown = true;
     console.log(`\n[server] ${signal} received — shutting down gracefully...`);
+
+    // Shut down MCP servers
+    mcpRegistry.shutdownAll().catch(() => {}).then(() => {
+      console.log('[server] MCP servers shut down');
+    });
 
     // Close WebSocket server (terminates all connections)
     wsHandler.wss.close(() => {

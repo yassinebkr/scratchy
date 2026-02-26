@@ -15,6 +15,19 @@ import * as agents from '../state/agents.js';
 import * as adminConfig from '../state/admin-config.js';
 import * as preferences from '../state/preferences.js';
 
+/** @type {import('../lib/mcp-registry.js').McpRegistry|null} */
+let _mcpRegistry = null;
+
+/** Lazily get or create the MCP registry. */
+function getMcpRegistry() {
+  if (!_mcpRegistry) {
+    // Lazy import to avoid circular deps at module level
+    // Will be overridden by opts.mcpRegistry if provided
+    return null;
+  }
+  return _mcpRegistry;
+}
+
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
 /** Root directory for static assets */
@@ -246,6 +259,7 @@ function matchRoute(pattern, pathname) {
  * @property {import('./auth.js')} [auth]      — auth module (login, signup, etc.)
  * @property {Function}            [getDb]     — database getter
  * @property {string}              [version]   — package version override
+ * @property {import('../lib/mcp-registry.js').McpRegistry} [mcpRegistry] — MCP registry instance
  */
 
 /**
@@ -259,6 +273,11 @@ export function createRouter(opts = {}) {
   const getDb = opts.getDb ?? null;
   const version = opts.version ?? PKG_VERSION;
   const startedAt = Date.now();
+
+  // Store MCP registry if provided
+  if (opts.mcpRegistry) {
+    _mcpRegistry = opts.mcpRegistry;
+  }
 
   /** Track whether state modules have been initialized */
   let stateInitialized = false;
@@ -656,6 +675,84 @@ export function createRouter(opts = {}) {
             agents.deleteAgent(agentMatch.id);
             return json(res, 200, { ok: true });
           }
+        }
+      }
+
+      /* ---------- MCP Server Management ---------- */
+
+      // POST /api/agents/:id/mcp/start — Start MCP servers for an agent (admin only)
+      {
+        const mcpStartMatch = matchRoute('/api/agents/:id/mcp/start', pathname);
+        if (mcpStartMatch && method === 'POST') {
+          const user = await requireAdmin(req, res);
+          if (!user) return;
+
+          const registry = getMcpRegistry();
+          if (!registry) return json(res, 503, { error: 'MCP registry not available' });
+
+          const agent = agents.getAgent(mcpStartMatch.id);
+          if (!agent) return json(res, 404, { error: 'Agent not found' });
+
+          try {
+            const result = await registry.activateAgent(agent);
+            return json(res, 200, {
+              ok: true,
+              agentId: result.agentId,
+              tools: result.tools.map(t => ({ name: t.name, description: t.description })),
+              pids: registry.getPids(mcpStartMatch.id),
+            });
+          } catch (err) {
+            return json(res, 500, { error: err.message });
+          }
+        }
+      }
+
+      // POST /api/agents/:id/mcp/stop — Stop MCP servers for an agent (admin only)
+      {
+        const mcpStopMatch = matchRoute('/api/agents/:id/mcp/stop', pathname);
+        if (mcpStopMatch && method === 'POST') {
+          const user = await requireAdmin(req, res);
+          if (!user) return;
+
+          const registry = getMcpRegistry();
+          if (!registry) return json(res, 503, { error: 'MCP registry not available' });
+
+          const agent = agents.getAgent(mcpStopMatch.id);
+          if (!agent) return json(res, 404, { error: 'Agent not found' });
+
+          try {
+            await registry.deactivateAgent(mcpStopMatch.id);
+            return json(res, 200, { ok: true, agentId: mcpStopMatch.id });
+          } catch (err) {
+            return json(res, 500, { error: err.message });
+          }
+        }
+      }
+
+      // GET /api/agents/:id/mcp/tools — List discovered MCP tools for an agent
+      {
+        const mcpToolsMatch = matchRoute('/api/agents/:id/mcp/tools', pathname);
+        if (mcpToolsMatch && method === 'GET') {
+          const user = await requireAuth(req, res);
+          if (!user) return;
+
+          const registry = getMcpRegistry();
+          if (!registry) return json(res, 503, { error: 'MCP registry not available' });
+
+          const agent = agents.getAgent(mcpToolsMatch.id);
+          if (!agent) return json(res, 404, { error: 'Agent not found' });
+
+          // Check access: owner or admin
+          if (agent.userId !== user.id && user.role !== 'admin') {
+            return json(res, 403, { error: 'Access denied' });
+          }
+
+          const tools = registry.getAvailableTools(mcpToolsMatch.id);
+          return json(res, 200, {
+            agentId: mcpToolsMatch.id,
+            active: registry.isActive(mcpToolsMatch.id),
+            tools,
+          });
         }
       }
 

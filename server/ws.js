@@ -187,6 +187,8 @@ function unregisterClient(ws) {
  * @property {Object}   auth            — auth module (validateSession)
  * @property {Function} [onChat]        — handler for chat messages: (userId, payload) => void
  * @property {Function} [onWidgetAction] — handler for widget actions: (userId, payload) => void
+ * @property {Function} [getAgents]     — agent state module (getAgent, listAgents)
+ * @property {Object}   [mcpRegistry]   — McpRegistry instance for MCP tool calls
  */
 
 /**
@@ -260,6 +262,81 @@ async function handleMessage(ws, state, msg, opts) {
       if (idx !== -1) {
         state.surfaces.splice(idx, 1);
         sendJson(ws, { type: 'surface-unsubscribed', surface: msg.surface });
+      }
+      break;
+    }
+
+    /* -- Agent switching -- */
+    case 'agent-switch': {
+      const agentId = msg.agentId;
+      if (!agentId || typeof agentId !== 'string') {
+        sendJson(ws, { type: 'error', message: 'agentId is required' });
+        break;
+      }
+
+      // Get agent module from opts
+      const getAgentFn = opts.getAgents?.getAgent;
+      if (!getAgentFn) {
+        sendJson(ws, { type: 'error', message: 'Agent module not available' });
+        break;
+      }
+
+      const agent = getAgentFn(agentId);
+      if (!agent) {
+        sendJson(ws, { type: 'error', message: 'Agent not found' });
+        break;
+      }
+
+      // Check access: owner, admin, or enabled builtin
+      if (agent.userId !== state.userId && !(agent.isBuiltin && agent.enabled)) {
+        sendJson(ws, { type: 'error', message: 'Access denied' });
+        break;
+      }
+
+      // Store active agent on session state
+      state.activeAgentId = agentId;
+
+      // Activate MCP servers if registry is available
+      if (opts.mcpRegistry && agent.mcpServers && agent.mcpServers.length > 0) {
+        try {
+          await opts.mcpRegistry.activateAgent(agent);
+        } catch (err) {
+          console.error('[ws] MCP activation error:', err.message);
+        }
+      }
+
+      sendJson(ws, { type: 'agent-switched', agent });
+
+      // Broadcast to all connections of this user
+      const otherSockets = userSockets.get(state.userId);
+      if (otherSockets) {
+        for (const otherWs of otherSockets) {
+          if (otherWs !== ws && otherWs.readyState === otherWs.OPEN) {
+            sendJson(otherWs, { type: 'agent-switched', agent });
+          }
+        }
+      }
+      break;
+    }
+
+    /* -- MCP tool call -- */
+    case 'mcp-tool-call': {
+      const { agentId: mcpAgentId, toolName, args: toolArgs } = msg;
+      if (!mcpAgentId || !toolName) {
+        sendJson(ws, { type: 'error', message: 'agentId and toolName are required' });
+        break;
+      }
+
+      if (!opts.mcpRegistry) {
+        sendJson(ws, { type: 'error', message: 'MCP registry not available' });
+        break;
+      }
+
+      try {
+        const result = await opts.mcpRegistry.callTool(mcpAgentId, toolName, toolArgs || {});
+        sendJson(ws, { type: 'mcp-tool-result', toolName, result, requestId: msg.requestId });
+      } catch (err) {
+        sendJson(ws, { type: 'mcp-tool-error', toolName, error: err.message, requestId: msg.requestId });
       }
       break;
     }

@@ -16,6 +16,11 @@
     <sc-auth></sc-auth>
   </div>
 
+  <!-- Setup wizard screen (shown on first run) -->
+  <div id="wizard-screen" class="screen hidden">
+    <sc-setup-wizard></sc-setup-wizard>
+  </div>
+
   <!-- App screen (shown when logged in) -->
   <div id="app-screen" class="screen hidden">
     <!-- Top bar -->
@@ -35,6 +40,10 @@
 
     <!-- Main app area -->
     <div id="app" class="app-main">
+      <!-- Sidebar with agent switcher -->
+      <aside id="sidebar" class="app-sidebar">
+        <sc-agent-switcher></sc-agent-switcher>
+      </aside>
       <div id="surfaces" class="surface-container">
         <!-- Surfaces render here dynamically -->
       </div>
@@ -49,10 +58,12 @@
   </div>
 
   <!-- Scripts (ESM) -->
-  <script type="module" src="components/sc-auth.js?v=2.0.0a2"></script>
-  <script type="module" src="lib/ws-client.js?v=2.0.0a2"></script>
-  <script type="module" src="lib/surface-manager.js?v=2.0.0a2"></script>
-  <script type="module" src="components/sc-chat.js?v=2.0.0a2"></script>
-  <script type="module" src="lib/app.js?v=2.0.0a2"></script>
+  <script type="module" src="components/sc-auth.js?v=2.0.0a3"></script>
+  <script type="module" src="components/sc-agent-switcher.js?v=2.0.0a3"></script>
+  <script type="module" src="components/sc-setup-wizard.js?v=2.0.0a3"></script>
+  <script type="module" src="lib/ws-client.js?v=2.0.0a3"></script>
+  <script type="module" src="lib/surface-manager.js?v=2.0.0a3"></script>
+  <script type="module" src="components/sc-chat.js?v=2.0.0a3"></script>
+  <script type="module" src="lib/app.js?v=2.0.0a3"></script>
 </body>
 </html>

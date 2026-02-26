@@ -3,7 +3,7 @@
  * Manages auth state, WS connection, and UI routing.
  */
 
-import { connect, disconnect, on, sendChat, emit } from './ws-client.js';
+import { connect, disconnect, on, send, sendChat, emit } from './ws-client.js';
 
 /* ------------------------------------------------------------------ */
 /*  State                                                             */
@@ -23,19 +23,22 @@ export function getToken() { return state.token; }
 /*  DOM refs (resolved after DOMContentLoaded)                        */
 /* ------------------------------------------------------------------ */
 
-let $authScreen, $appScreen, $messages, $msgInput, $sendBtn;
+let $authScreen, $appScreen, $wizardScreen, $messages, $msgInput, $sendBtn;
 let $statusDot, $statusText, $topbarUser, $logoutBtn;
+let $agentSwitcher;
 
 function resolveDOM() {
-  $authScreen  = document.getElementById('auth-screen');
-  $appScreen   = document.getElementById('app-screen');
-  $messages    = document.getElementById('messages');
-  $msgInput    = document.getElementById('msg-input');
-  $sendBtn     = document.getElementById('send-btn');
-  $statusDot   = document.getElementById('status-dot');
-  $statusText  = document.getElementById('status-text');
-  $topbarUser  = document.getElementById('topbar-user');
-  $logoutBtn   = document.getElementById('logout-btn');
+  $authScreen   = document.getElementById('auth-screen');
+  $appScreen    = document.getElementById('app-screen');
+  $wizardScreen = document.getElementById('wizard-screen');
+  $messages     = document.getElementById('messages');
+  $msgInput     = document.getElementById('msg-input');
+  $sendBtn      = document.getElementById('send-btn');
+  $statusDot    = document.getElementById('status-dot');
+  $statusText   = document.getElementById('status-text');
+  $topbarUser   = document.getElementById('topbar-user');
+  $logoutBtn    = document.getElementById('logout-btn');
+  $agentSwitcher = document.querySelector('sc-agent-switcher');
 }
 
 /* ------------------------------------------------------------------ */
@@ -45,10 +48,18 @@ function resolveDOM() {
 function showAuth() {
   $authScreen.classList.remove('hidden');
   $appScreen.classList.add('hidden');
+  if ($wizardScreen) $wizardScreen.classList.add('hidden');
+}
+
+function showWizard() {
+  $authScreen.classList.add('hidden');
+  $appScreen.classList.add('hidden');
+  if ($wizardScreen) $wizardScreen.classList.remove('hidden');
 }
 
 function showApp() {
   $authScreen.classList.add('hidden');
+  if ($wizardScreen) $wizardScreen.classList.add('hidden');
   $appScreen.classList.remove('hidden');
   $msgInput?.focus();
 }
@@ -132,6 +143,13 @@ function wireWsEvents() {
     emit('canvas-update', msg);
   });
 
+  on('agent-switched', (msg) => {
+    // Update the agent switcher UI when agent changes (e.g. from another device)
+    if ($agentSwitcher && msg.agent) {
+      $agentSwitcher.activeAgentId = msg.agent.id;
+    }
+  });
+
   on('error', (msg) => {
     console.error('[app] WS error:', msg);
     if (msg.text) {
@@ -172,10 +190,25 @@ function onAuthSuccess(e) {
   enterApp();
 }
 
-function enterApp() {
+async function enterApp() {
   if ($topbarUser) {
     $topbarUser.textContent = state.user?.displayName || state.user?.username || '';
   }
+
+  // Check if setup wizard needs to be shown
+  try {
+    const res = await fetch('/api/setup/status');
+    if (res.ok) {
+      const data = await res.json();
+      if (!data.complete) {
+        showWizard();
+        return;
+      }
+    }
+  } catch {
+    // If we can't check, proceed to app
+  }
+
   showApp();
   setConnectionStatus('reconnecting');
   connect(state.token);
@@ -214,6 +247,21 @@ async function init() {
 
   // Listen for auth success from <sc-auth>
   document.addEventListener('auth-success', onAuthSuccess);
+
+  // Listen for setup wizard completion
+  document.addEventListener('setup-complete', () => {
+    showApp();
+    setConnectionStatus('reconnecting');
+    connect(state.token);
+  });
+
+  // Listen for agent switch from the switcher component
+  document.addEventListener('agent-switch', (e) => {
+    const { agentId } = e.detail;
+    if (agentId) {
+      send('agent-switch', { agentId });
+    }
+  });
 
   // Logout button
   if ($logoutBtn) {
