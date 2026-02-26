@@ -9,6 +9,11 @@
 import { readFile, stat } from 'node:fs/promises';
 import { join, extname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import crypto from 'node:crypto';
+
+import * as agents from '../state/agents.js';
+import * as adminConfig from '../state/admin-config.js';
+import * as preferences from '../state/preferences.js';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
@@ -207,6 +212,32 @@ async function serveStatic(req, res, pathname) {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Route matching helper                                             */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Simple path-param matcher.
+ * Pattern: /api/foo/:id/bar → matches /api/foo/abc/bar and returns { id: 'abc' }
+ * @param {string} pattern
+ * @param {string} pathname
+ * @returns {Record<string,string>|null}
+ */
+function matchRoute(pattern, pathname) {
+  const patternParts = pattern.split('/');
+  const pathParts = pathname.split('/');
+  if (patternParts.length !== pathParts.length) return null;
+  const params = {};
+  for (let i = 0; i < patternParts.length; i++) {
+    if (patternParts[i].startsWith(':')) {
+      params[patternParts[i].slice(1)] = decodeURIComponent(pathParts[i]);
+    } else if (patternParts[i] !== pathParts[i]) {
+      return null;
+    }
+  }
+  return params;
+}
+
+/* ------------------------------------------------------------------ */
 /*  Route handler                                                     */
 /* ------------------------------------------------------------------ */
 
@@ -225,8 +256,25 @@ async function serveStatic(req, res, pathname) {
  */
 export function createRouter(opts = {}) {
   const auth = opts.auth ?? null;
+  const getDb = opts.getDb ?? null;
   const version = opts.version ?? PKG_VERSION;
   const startedAt = Date.now();
+
+  /** Track whether state modules have been initialized */
+  let stateInitialized = false;
+
+  /**
+   * Lazily initialize state modules when we have a db.
+   */
+  function ensureStateInit() {
+    if (stateInitialized || !getDb) return;
+    const db = getDb();
+    if (!db) return;
+    agents.init(db);
+    adminConfig.init(db);
+    preferences.init(db);
+    stateInitialized = true;
+  }
 
   /**
    * Extract bearer token from Authorization header or cookie.
@@ -251,7 +299,7 @@ export function createRouter(opts = {}) {
   /**
    * Authenticate a request. Returns user object or null.
    * @param {import('node:http').IncomingMessage} req
-   * @returns {Promise<{id:string, username:string, displayName:string}|null>}
+   * @returns {Promise<{id:string, username:string, displayName:string, role:string}|null>}
    */
   async function authenticate(req) {
     if (!auth) return null;
@@ -268,7 +316,7 @@ export function createRouter(opts = {}) {
    * Require authentication — sends 401 if not authenticated.
    * @param {import('node:http').IncomingMessage} req
    * @param {import('node:http').ServerResponse} res
-   * @returns {Promise<{id:string, username:string, displayName:string}|null>}
+   * @returns {Promise<{id:string, username:string, displayName:string, role:string}|null>}
    */
   async function requireAuth(req, res) {
     const user = await authenticate(req);
@@ -277,6 +325,32 @@ export function createRouter(opts = {}) {
       return null;
     }
     return user;
+  }
+
+  /**
+   * Require admin role — sends 401 or 403 if not authenticated or not admin.
+   * @param {import('node:http').IncomingMessage} req
+   * @param {import('node:http').ServerResponse} res
+   * @returns {Promise<{id:string, username:string, displayName:string, role:string}|null>}
+   */
+  async function requireAdmin(req, res) {
+    const user = await requireAuth(req, res);
+    if (!user) return null; // 401 already sent
+    if (user.role !== 'admin') {
+      json(res, 403, { error: 'Admin access required' });
+      return null;
+    }
+    return user;
+  }
+
+  /**
+   * Get the encryption key from env, or null.
+   * @returns {Buffer|null}
+   */
+  function getEncryptionKey() {
+    const hex = process.env.ENCRYPTION_KEY;
+    if (!hex) return null;
+    return Buffer.from(hex, 'hex');
   }
 
   /* -- Main request handler -- */
@@ -290,6 +364,9 @@ export function createRouter(opts = {}) {
     const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
     const pathname = url.pathname;
     const method = req.method ?? 'GET';
+
+    // Ensure state modules are initialized
+    ensureStateInit();
 
     try {
       /* ---------- API routes ---------- */
@@ -366,12 +443,418 @@ export function createRouter(opts = {}) {
         return json(res, 200, { ok: true });
       }
 
+      // OAuth stubs
+      {
+        const oauthMatch = matchRoute('/api/auth/oauth/:provider', pathname);
+        if (oauthMatch) {
+          if (method === 'GET') {
+            return json(res, 501, {
+              error: 'OAuth not yet configured',
+              provider: oauthMatch.provider,
+              supportedProviders: ['google', 'github'],
+            });
+          }
+        }
+        const oauthCbMatch = matchRoute('/api/auth/oauth/:provider/callback', pathname);
+        if (oauthCbMatch) {
+          if (method === 'GET') {
+            return json(res, 501, {
+              error: 'OAuth not yet configured',
+              provider: oauthCbMatch.provider,
+              supportedProviders: ['google', 'github'],
+            });
+          }
+        }
+      }
+
       // Chat history (placeholder)
       if (method === 'GET' && pathname === '/api/history') {
         const user = await requireAuth(req, res);
         if (!user) return;
         // TODO: wire up to real history store
         return json(res, 200, []);
+      }
+
+      /* ---------- Agent CRUD ---------- */
+
+      // GET /api/agents — list agents
+      if (method === 'GET' && pathname === '/api/agents') {
+        const user = await requireAuth(req, res);
+        if (!user) return;
+
+        let agentList;
+        if (user.role === 'admin') {
+          agentList = agents.listAgents();
+        } else {
+          // User sees own agents + enabled builtins
+          const own = agents.listByUser(user.id);
+          const builtins = agents.getBuiltinAgents().filter(a => a.enabled);
+          // Deduplicate (in case user owns a builtin)
+          const seen = new Set(own.map(a => a.id));
+          agentList = [...own];
+          for (const b of builtins) {
+            if (!seen.has(b.id)) agentList.push(b);
+          }
+        }
+
+        return json(res, 200, agentList);
+      }
+
+      // POST /api/agents — create agent
+      if (method === 'POST' && pathname === '/api/agents') {
+        const user = await requireAuth(req, res);
+        if (!user) return;
+
+        const body = await parseJsonBody(req);
+        if (!body.name) {
+          return json(res, 400, { error: 'name is required' });
+        }
+
+        try {
+          const agent = agents.createAgent(String(body.name), {
+            systemPrompt: body.systemPrompt != null ? String(body.systemPrompt) : undefined,
+            model: body.model != null ? String(body.model) : undefined,
+            temperature: body.temperature != null ? Number(body.temperature) : undefined,
+            surfaces: body.surfaces,
+            mcpServers: body.mcpServers,
+            skills: body.skills,
+            avatar: body.avatar != null ? String(body.avatar) : undefined,
+            enabled: body.enabled != null ? Boolean(body.enabled) : undefined,
+            userId: user.id,
+          });
+          return json(res, 201, agent);
+        } catch (err) {
+          return json(res, 400, { error: err.message });
+        }
+      }
+
+      // Routes with :id param for agents
+      {
+        // GET /api/agents/:id/conversations
+        const convMatch = matchRoute('/api/agents/:id/conversations', pathname);
+        if (convMatch) {
+          if (method === 'GET') {
+            const user = await requireAuth(req, res);
+            if (!user) return;
+
+            const agent = agents.getAgent(convMatch.id);
+            if (!agent) return json(res, 404, { error: 'Agent not found' });
+
+            // Check access: owner or admin
+            if (agent.userId !== user.id && user.role !== 'admin') {
+              return json(res, 403, { error: 'Access denied' });
+            }
+
+            const db = getDb ? getDb() : null;
+            if (!db) return json(res, 200, []);
+
+            const rows = db.prepare(
+              'SELECT * FROM agent_conversations WHERE agentId = ? AND userId = ? ORDER BY updatedAt DESC'
+            ).all(convMatch.id, user.id);
+
+            // Parse messages JSON
+            const convs = rows.map(r => ({
+              ...r,
+              messages: typeof r.messages === 'string' ? JSON.parse(r.messages) : r.messages,
+            }));
+
+            return json(res, 200, convs);
+          }
+
+          // POST /api/agents/:id/conversations — create conversation
+          if (method === 'POST') {
+            const user = await requireAuth(req, res);
+            if (!user) return;
+
+            const agent = agents.getAgent(convMatch.id);
+            if (!agent) return json(res, 404, { error: 'Agent not found' });
+
+            if (agent.userId !== user.id && user.role !== 'admin') {
+              return json(res, 403, { error: 'Access denied' });
+            }
+
+            const body = await parseJsonBody(req);
+            const db = getDb ? getDb() : null;
+            if (!db) return json(res, 500, { error: 'Database not available' });
+
+            const id = crypto.randomUUID();
+            const now = new Date().toISOString();
+            const title = body.title ? String(body.title) : 'New conversation';
+            const messages = JSON.stringify(body.messages || []);
+
+            db.prepare(`
+              INSERT INTO agent_conversations (id, agentId, userId, title, messages, createdAt, updatedAt)
+              VALUES (?, ?, ?, ?, ?, ?, ?)
+            `).run(id, convMatch.id, user.id, title, messages, now, now);
+
+            const row = db.prepare('SELECT * FROM agent_conversations WHERE id = ?').get(id);
+            const conv = {
+              ...row,
+              messages: JSON.parse(row.messages),
+            };
+
+            return json(res, 201, conv);
+          }
+        }
+
+        // GET/PUT/DELETE /api/agents/:id
+        const agentMatch = matchRoute('/api/agents/:id', pathname);
+        if (agentMatch) {
+          if (method === 'GET') {
+            const user = await requireAuth(req, res);
+            if (!user) return;
+
+            const agent = agents.getAgent(agentMatch.id);
+            if (!agent) return json(res, 404, { error: 'Agent not found' });
+
+            // Owner or admin can view; also visible if it's an enabled builtin
+            if (agent.userId !== user.id && user.role !== 'admin') {
+              if (!(agent.isBuiltin && agent.enabled)) {
+                return json(res, 403, { error: 'Access denied' });
+              }
+            }
+
+            return json(res, 200, agent);
+          }
+
+          if (method === 'PUT') {
+            const user = await requireAuth(req, res);
+            if (!user) return;
+
+            const agent = agents.getAgent(agentMatch.id);
+            if (!agent) return json(res, 404, { error: 'Agent not found' });
+
+            if (agent.userId !== user.id && user.role !== 'admin') {
+              return json(res, 403, { error: 'Access denied' });
+            }
+
+            const body = await parseJsonBody(req);
+            try {
+              const updated = agents.updateAgent(agentMatch.id, body);
+              return json(res, 200, updated);
+            } catch (err) {
+              return json(res, 400, { error: err.message });
+            }
+          }
+
+          if (method === 'DELETE') {
+            const user = await requireAuth(req, res);
+            if (!user) return;
+
+            const agent = agents.getAgent(agentMatch.id);
+            if (!agent) return json(res, 404, { error: 'Agent not found' });
+
+            if (agent.userId !== user.id && user.role !== 'admin') {
+              return json(res, 403, { error: 'Access denied' });
+            }
+
+            // Don't allow deleting builtins (unless admin)
+            if (agent.isBuiltin && user.role !== 'admin') {
+              return json(res, 403, { error: 'Cannot delete builtin agents' });
+            }
+
+            agents.deleteAgent(agentMatch.id);
+            return json(res, 200, { ok: true });
+          }
+        }
+      }
+
+      /* ---------- Admin Config ---------- */
+
+      // GET /api/admin/config
+      if (method === 'GET' && pathname === '/api/admin/config') {
+        const user = await requireAdmin(req, res);
+        if (!user) return;
+        return json(res, 200, adminConfig.getAll());
+      }
+
+      // PUT /api/admin/config
+      if (method === 'PUT' && pathname === '/api/admin/config') {
+        const user = await requireAdmin(req, res);
+        if (!user) return;
+
+        const body = await parseJsonBody(req);
+        for (const [key, value] of Object.entries(body)) {
+          adminConfig.set(key, value);
+        }
+        return json(res, 200, adminConfig.getAll());
+      }
+
+      // GET /api/admin/users — list all users with quotas
+      if (method === 'GET' && pathname === '/api/admin/users') {
+        const user = await requireAdmin(req, res);
+        if (!user) return;
+
+        const db = getDb ? getDb() : null;
+        if (!db) return json(res, 200, []);
+
+        // Import listUsers dynamically to avoid circular deps at module level
+        const rows = db.prepare('SELECT id, username, displayName, role, plan, createdAt FROM users ORDER BY createdAt ASC').all();
+        const result = rows.map(r => {
+          const quotas = adminConfig.get(`user_quotas_${r.id}`);
+          return { ...r, quotas: quotas || null };
+        });
+        return json(res, 200, result);
+      }
+
+      // GET/PUT /api/admin/users/:id/quotas
+      {
+        const quotaMatch = matchRoute('/api/admin/users/:id/quotas', pathname);
+        if (quotaMatch) {
+          if (method === 'GET') {
+            const user = await requireAdmin(req, res);
+            if (!user) return;
+            const quotas = adminConfig.get(`user_quotas_${quotaMatch.id}`);
+            return json(res, 200, quotas || {});
+          }
+
+          if (method === 'PUT') {
+            const user = await requireAdmin(req, res);
+            if (!user) return;
+            const body = await parseJsonBody(req);
+            adminConfig.set(`user_quotas_${quotaMatch.id}`, body);
+            return json(res, 200, body);
+          }
+        }
+      }
+
+      /* ---------- User Preferences ---------- */
+
+      // GET /api/users/me/preferences
+      if (method === 'GET' && pathname === '/api/users/me/preferences') {
+        const user = await requireAuth(req, res);
+        if (!user) return;
+        const prefs = preferences.get(user.id) || {
+          userId: user.id,
+          locale: 'en',
+          theme: 'system',
+          defaultAgentId: null,
+          onboardingComplete: false,
+        };
+        return json(res, 200, prefs);
+      }
+
+      // PUT /api/users/me/preferences
+      if (method === 'PUT' && pathname === '/api/users/me/preferences') {
+        const user = await requireAuth(req, res);
+        if (!user) return;
+        const body = await parseJsonBody(req);
+        const prefs = preferences.set(user.id, body);
+        return json(res, 200, prefs);
+      }
+
+      // POST /api/users/me/apikeys — store an API key
+      if (method === 'POST' && pathname === '/api/users/me/apikeys') {
+        const user = await requireAuth(req, res);
+        if (!user) return;
+
+        const encKey = getEncryptionKey();
+        if (!encKey) {
+          return json(res, 503, { error: 'Encryption not configured (ENCRYPTION_KEY missing)' });
+        }
+
+        const body = await parseJsonBody(req);
+        if (!body.provider || !body.key) {
+          return json(res, 400, { error: 'provider and key are required' });
+        }
+
+        preferences.setApiKey(user.id, String(body.provider), String(body.key), encKey);
+        return json(res, 201, { ok: true, provider: body.provider });
+      }
+
+      // DELETE /api/users/me/apikeys/:provider
+      {
+        const apikeyMatch = matchRoute('/api/users/me/apikeys/:provider', pathname);
+        if (apikeyMatch && method === 'DELETE') {
+          const user = await requireAuth(req, res);
+          if (!user) return;
+
+          const encKey = getEncryptionKey();
+          if (!encKey) {
+            return json(res, 503, { error: 'Encryption not configured (ENCRYPTION_KEY missing)' });
+          }
+
+          // To "delete" a key, we read the encrypted object, remove the provider, re-encrypt
+          const db = getDb ? getDb() : null;
+          if (!db) return json(res, 500, { error: 'Database not available' });
+
+          const row = db.prepare('SELECT apiKeys FROM user_preferences WHERE userId = ?').get(user.id);
+          if (!row || !row.apiKeys || row.apiKeys === '{}') {
+            return json(res, 404, { error: 'API key not found' });
+          }
+
+          let keys;
+          try {
+            if (row.apiKeys.includes(':')) {
+              keys = JSON.parse(preferences.decrypt(row.apiKeys, encKey));
+            } else {
+              keys = JSON.parse(row.apiKeys);
+            }
+          } catch {
+            keys = {};
+          }
+
+          if (!(apikeyMatch.provider in keys)) {
+            return json(res, 404, { error: 'API key not found' });
+          }
+
+          delete keys[apikeyMatch.provider];
+
+          const encrypted = Object.keys(keys).length > 0
+            ? preferences.encrypt(JSON.stringify(keys), encKey)
+            : '{}';
+          const now = new Date().toISOString();
+          db.prepare('UPDATE user_preferences SET apiKeys = ?, updatedAt = ? WHERE userId = ?')
+            .run(encrypted, now, user.id);
+
+          return json(res, 200, { ok: true });
+        }
+      }
+
+      /* ---------- Setup Wizard ---------- */
+
+      // GET /api/setup/status
+      if (method === 'GET' && pathname === '/api/setup/status') {
+        const setupComplete = adminConfig.get('setup_complete') || false;
+        const currentStep = adminConfig.get('setup_step') || 1;
+        return json(res, 200, {
+          complete: !!setupComplete,
+          currentStep,
+          totalSteps: 5,
+        });
+      }
+
+      // POST /api/setup/complete
+      if (method === 'POST' && pathname === '/api/setup/complete') {
+        const user = await requireAdmin(req, res);
+        if (!user) return;
+        adminConfig.set('setup_complete', true);
+        adminConfig.set('setup_step', 5);
+        return json(res, 200, { ok: true, complete: true });
+      }
+
+      /* ---------- i18n ---------- */
+      {
+        const i18nMatch = matchRoute('/api/i18n/:locale', pathname);
+        if (i18nMatch && method === 'GET') {
+          const locale = i18nMatch.locale.replace(/[^a-zA-Z0-9_-]/g, ''); // sanitize
+          const filePath = resolve(PUBLIC_DIR, 'i18n', `${locale}.json`);
+
+          // Ensure we stay inside the i18n directory
+          if (!filePath.startsWith(resolve(PUBLIC_DIR, 'i18n'))) {
+            return json(res, 403, { error: 'Forbidden' });
+          }
+
+          try {
+            const data = await readFile(filePath, 'utf-8');
+            return json(res, 200, JSON.parse(data));
+          } catch (err) {
+            if (err.code === 'ENOENT') {
+              return json(res, 404, { error: `Locale '${locale}' not found` });
+            }
+            throw err;
+          }
+        }
       }
 
       // Unknown API route

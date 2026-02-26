@@ -523,3 +523,69 @@ function serializeArray(key, arr, depth) {
 function pad(depth) {
   return '  '.repeat(depth);
 }
+
+// ─── Public serialize API ───────────────────────────────────────────────────
+
+/**
+ * Serialize a JavaScript value to TOON format.
+ * Handles: primitives, objects (nested via indentation), arrays (inline or tabular).
+ *
+ * For arrays of uniform objects (all items have same keys), uses tabular format:
+ *   key[N]{field1,field2}:
+ *     value1,value2
+ *     value3,value4
+ *
+ * For simple arrays of primitives, uses inline format:
+ *   key[N]: val1,val2,val3
+ *
+ * For nested objects, uses indentation (2 spaces per level).
+ *
+ * Strings containing commas, colons, or leading/trailing whitespace are quoted.
+ *
+ * @param {any} value - JavaScript value to serialize
+ * @param {Object} [opts]
+ * @param {number} [opts.indent=0] - Starting indentation level
+ * @param {string} [opts.rootKey] - Key for the root value (if part of a larger structure)
+ * @returns {string} TOON-encoded string
+ */
+export function serialize(value, opts = {}) {
+  const { indent: startIndent = 0, rootKey } = opts;
+
+  if (rootKey) {
+    // Wrap as a keyed value within a larger structure
+    if (value === null || value === undefined || typeof value !== 'object') {
+      return `${pad(startIndent)}${rootKey}: ${quote(value)}`;
+    }
+    if (Array.isArray(value)) {
+      return serializeArray(rootKey, value, startIndent).join('\n');
+    }
+    const lines = [`${pad(startIndent)}${rootKey}:`];
+    lines.push(serializeObject(value, startIndent + 1));
+    return lines.join('\n');
+  }
+
+  if (value === null || value === undefined) return 'null';
+  if (typeof value !== 'object') return String(quote(value));
+
+  if (Array.isArray(value)) {
+    if (startIndent > 0) {
+      // Arrays at a specific indent — serialize each item
+      return value.map(item => serializeObject(item, startIndent)).join(`\n${pad(startIndent - 1)}---\n`);
+    }
+    return value.map(item => serializeObject(item, 0)).join('\n---\n');
+  }
+
+  return serializeObject(value, startIndent);
+}
+
+/**
+ * Convenience: serialize and wrap as a tool/context injection for LLM prompts.
+ * Returns TOON with a header comment identifying the source.
+ * @param {any} value - JavaScript value to serialize
+ * @param {string} label - Label identifying the source (e.g. "recalled memories", "tool docs")
+ * @returns {string} TOON-encoded string with header
+ */
+export function serializeForPrompt(value, label) {
+  const body = serialize(value);
+  return `# ${label}\n${body}`;
+}
