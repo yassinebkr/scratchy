@@ -84,6 +84,8 @@ export function deleteSession(token) {
  * @returns {number} Number of sessions cleaned up
  */
 export function cleanExpired() {
-  const result = d().prepare('DELETE FROM sessions WHERE expiresAt <= datetime(\'now\')').run();
+  // Use JS ISO format for comparison since sessions are stored with ISO timestamps
+  const now = new Date().toISOString();
+  const result = d().prepare('DELETE FROM sessions WHERE expiresAt <= ?').run(now);
   return result.changes;
 }
