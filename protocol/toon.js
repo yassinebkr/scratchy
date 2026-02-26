@@ -50,6 +50,25 @@ function unquote(s) {
 }
 
 /**
+ * Check if a raw string is quoted (has balanced double quotes).
+ * @param {string} s
+ * @returns {boolean}
+ */
+function isQuoted(s) {
+  return s.length >= 2 && s[0] === '"' && s[s.length - 1] === '"';
+}
+
+/**
+ * Auto-type a value, but respect quotes: quoted values stay as strings.
+ * @param {string} raw - The raw string (may be quoted).
+ * @returns {string|number|boolean|null}
+ */
+function smartType(raw) {
+  if (isQuoted(raw)) return unquote(raw);
+  return autoType(raw);
+}
+
+/**
  * Split a comma-separated value list respecting quoted strings.
  * E.g. `a,"b,c",d` → ['a', 'b,c', 'd']
  * @param {string} line
@@ -58,6 +77,7 @@ function unquote(s) {
 function splitCSV(line) {
   const parts = [];
   let current = '';
+  let wasQuoted = false;
   let inQuotes = false;
   for (let i = 0; i < line.length; i++) {
     const ch = line[i];
@@ -72,15 +92,18 @@ function splitCSV(line) {
         }
       } else {
         inQuotes = true;
+        wasQuoted = true;
       }
     } else if (ch === ',' && !inQuotes) {
-      parts.push(current);
+      // Wrap quoted values back in quotes so smartType preserves them as strings
+      parts.push(wasQuoted ? `"${current}"` : current);
       current = '';
+      wasQuoted = false;
     } else {
       current += ch;
     }
   }
-  parts.push(current);
+  parts.push(wasQuoted ? `"${current}"` : current);
   return parts;
 }
 
@@ -199,7 +222,7 @@ function parseBlock(lines, baseIndent) {
         const rowObj = {};
         for (let f = 0; f < fields.length; f++) {
           const raw = f < values.length ? values[f].trim() : '';
-          rowObj[fields[f]] = autoType(unquote(raw));
+          rowObj[fields[f]] = smartType(raw);
         }
         rows.push(rowObj);
         i++;
@@ -213,7 +236,7 @@ function parseBlock(lines, baseIndent) {
       if (rest && rest.trim().length > 0) {
         // Inline array: key[N]: v1,v2,v3
         const parts = splitCSV(rest.trim());
-        obj[key] = parts.map(p => autoType(unquote(p.trim())));
+        obj[key] = parts.map(p => smartType(p.trim()));
         i++;
       } else {
         // Multi-line array
@@ -250,14 +273,14 @@ function parseBlock(lines, baseIndent) {
                 && subMatch[2] === undefined && subMatch[3] === null) {
               // Simple value like "  Deploy API,In Progress,Feb 22"
               // Actually this matched KEY_RE, so it's "key: value" — treat as single-line value
-              items.push(autoType(unquote(itemTrimmed)));
+              items.push(smartType(itemTrimmed));
             } else {
               items.push(parseBlock(subLines, subBaseIndent));
             }
             i = j;
           } else {
             // Plain value line
-            items.push(autoType(unquote(itemTrimmed)));
+            items.push(smartType(itemTrimmed));
             i++;
           }
         }
@@ -269,7 +292,7 @@ function parseBlock(lines, baseIndent) {
     // ── Simple key: value or nested object ──────────────────────────────
     if (rest && rest.trim().length > 0) {
       // Value on the same line
-      obj[key] = autoType(unquote(rest.trim()));
+      obj[key] = smartType(rest.trim());
       i++;
     } else {
       // No value on line → nested object (children are indented)
