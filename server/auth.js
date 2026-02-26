@@ -5,8 +5,8 @@
  */
 
 import crypto from 'node:crypto';
-import { getSession } from '../state/sessions.js';
-import { getUser } from '../state/users.js';
+import { getSession, createSession, deleteSession } from '../state/sessions.js';
+import { getUser, getUserByUsername, createUser } from '../state/users.js';
 
 /** scrypt parameters */
 const SCRYPT_KEYLEN = 64;
@@ -60,6 +60,88 @@ export function verifyPassword(plain, hash) {
 export function generateToken(bytes = 32) {
   return crypto.randomBytes(bytes).toString('hex');
 }
+
+/* ------------------------------------------------------------------ */
+/*  High-level auth API (used by router.js and ws.js)                 */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Validate a session token and return the associated user.
+ * @param {string} token
+ * @returns {Promise<{id:string, username:string, displayName:string|null, role:string}>}
+ * @throws {Error} If session is invalid or user not found
+ */
+export async function validateSession(token) {
+  const session = getSession(token);
+  if (!session) {
+    throw Object.assign(new Error('Invalid or expired session'), { status: 401 });
+  }
+  const user = getUser(session.userId);
+  if (!user) {
+    throw Object.assign(new Error('User not found'), { status: 401 });
+  }
+  return { id: user.id, username: user.username, displayName: user.displayName, role: user.role };
+}
+
+/**
+ * Log in with username and password. Returns token + user info.
+ * @param {string} username
+ * @param {string} password
+ * @returns {Promise<{token:string, user:{id:string, username:string, displayName:string|null}}>}
+ * @throws {Error} If credentials are invalid
+ */
+export async function login(username, password) {
+  const user = getUserByUsername(username);
+  if (!user) {
+    throw Object.assign(new Error('Invalid credentials'), { status: 401 });
+  }
+  const valid = await verifyPassword(password, user.passwordHash);
+  if (!valid) {
+    throw Object.assign(new Error('Invalid credentials'), { status: 401 });
+  }
+  const token = generateToken();
+  createSession(user.id, token);
+  return {
+    token,
+    user: { id: user.id, username: user.username, displayName: user.displayName },
+  };
+}
+
+/**
+ * Sign up a new user. Returns token + user info.
+ * @param {string} username
+ * @param {string} password
+ * @param {string} [displayName]
+ * @returns {Promise<{token:string, user:{id:string, username:string, displayName:string|null}}>}
+ * @throws {Error} If username already exists
+ */
+export async function signup(username, password, displayName) {
+  const existing = getUserByUsername(username);
+  if (existing) {
+    throw Object.assign(new Error('Username already taken'), { status: 409 });
+  }
+  const hash = await hashPassword(password);
+  const user = createUser(username, hash, { displayName: displayName || null });
+  const token = generateToken();
+  createSession(user.id, token);
+  return {
+    token,
+    user: { id: user.id, username: user.username, displayName: user.displayName },
+  };
+}
+
+/**
+ * Log out — delete the session.
+ * @param {string} token
+ * @returns {Promise<boolean>}
+ */
+export async function logout(token) {
+  return deleteSession(token);
+}
+
+/* ------------------------------------------------------------------ */
+/*  Middleware (Express/Connect style)                                 */
+/* ------------------------------------------------------------------ */
 
 /**
  * Express/Connect auth middleware.

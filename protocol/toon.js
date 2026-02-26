@@ -214,6 +214,7 @@ function parseBlock(lines, baseIndent) {
         // Inline array: key[N]: v1,v2,v3
         const parts = splitCSV(rest.trim());
         obj[key] = parts.map(p => autoType(unquote(p.trim())));
+        i++;
       } else {
         // Multi-line array
         const items = [];
