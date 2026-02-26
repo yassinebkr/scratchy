@@ -217,15 +217,19 @@ html, body {
   gap: 1px;
   background: var(--border);
   overflow: hidden;
+  position: relative;
   /* Default: single surface fills everything */
   grid-template-columns: 1fr;
   grid-template-rows: 1fr;
+  transition: grid-template-columns 0.25s ease, grid-template-rows 0.25s ease;
 }
 
 .surface {
   background: var(--surface);
   overflow: auto;
   position: relative;
+  min-width: 0;
+  min-height: 0;
 }
 
 /* ── Chat Surface ── */
@@ -281,69 +285,26 @@ html, body {
 
 #send-btn:hover { background: var(--accent-hover); }
 
-/* ── Multi-surface layouts ── */
-.surface-container.layout-split {
-  grid-template-columns: 1fr 1fr;
+/* ── Multi-surface layouts (applied by surface-manager.js via inline styles) ── */
+
+/* ── Surface type overrides ── */
+.terminal-surface { background: #0d1117; }
+.explorer-surface { background: var(--surface); }
+.editor-surface   { background: #0d1117; }
+.search-surface   { background: var(--surface); }
+
+/* ── Mobile: stack vertically ── */
+@media (max-width: 768px) {
+  .surface-container {
+    grid-template-columns: 1fr !important;
+    grid-template-rows: auto !important;
+  }
+
+  .surface-container > * {
+    grid-area: auto !important;
+    min-height: 200px;
+  }
 }
-
-.surface-container.layout-chat-plus {
-  grid-template-columns: 3fr 2fr;
-}
-
-.surface-container.layout-grid {
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: 1fr 1fr;
-}
-
-/* ── Terminal Surface ── */
-.terminal-surface {
-  background: #0d1117;
-  font-family: var(--mono);
-  font-size: 13px;
-  padding: 12px;
-  white-space: pre-wrap;
-  word-break: break-all;
-  color: #c9d1d9;
-}
-
-.terminal-surface .cmd { color: #58a6ff; }
-.terminal-surface .stdout { color: #c9d1d9; }
-.terminal-surface .stderr { color: #f85149; }
-
-/* ── File Explorer Surface ── */
-.explorer-surface {
-  font-size: 13px;
-  padding: 8px;
-}
-
-.explorer-surface .file-item {
-  padding: 4px 8px;
-  border-radius: 4px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.explorer-surface .file-item:hover {
-  background: var(--surface-hover);
-}
-
-/* ── Editor Surface ── */
-.editor-surface {
-  font-family: var(--mono);
-  font-size: 13px;
-  padding: 0;
-}
-
-.editor-surface .line {
-  padding: 0 12px;
-  min-height: 20px;
-  line-height: 20px;
-}
-
-.editor-surface .line.added { background: rgba(63, 185, 80, 0.1); }
-.editor-surface .line.removed { background: rgba(248, 81, 73, 0.1); }
 
 /* ── Scrollbar ── */
 ::-webkit-scrollbar { width: 6px; }

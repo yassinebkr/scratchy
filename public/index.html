@@ -44,26 +44,35 @@
       <aside id="sidebar" class="app-sidebar">
         <sc-agent-switcher></sc-agent-switcher>
       </aside>
+      <!-- Surface container: dynamic grid of contextual panels -->
       <div id="surfaces" class="surface-container">
-        <!-- Surfaces render here dynamically -->
-      </div>
-      <div id="chat-surface" class="surface chat-surface">
-        <div id="messages" class="messages"></div>
-        <div id="input-area" class="input-area">
-          <textarea id="msg-input" placeholder="Message..." rows="1"></textarea>
-          <button id="send-btn" aria-label="Send">↑</button>
+        <!-- Surfaces injected dynamically by surface-manager.js -->
+        <!-- Chat surface is always present -->
+        <div id="chat-surface" class="surface chat-surface">
+          <div id="messages" class="messages"></div>
+          <div id="input-area" class="input-area">
+            <textarea id="msg-input" placeholder="Message..." rows="1"></textarea>
+            <button id="send-btn" aria-label="Send">↑</button>
+          </div>
         </div>
       </div>
+      <!-- Surface toggle toolbar -->
+      <sc-surface-toolbar></sc-surface-toolbar>
     </div>
   </div>
 
   <!-- Scripts (ESM) -->
-  <script type="module" src="components/sc-auth.js?v=2.0.0a3"></script>
-  <script type="module" src="components/sc-agent-switcher.js?v=2.0.0a3"></script>
-  <script type="module" src="components/sc-setup-wizard.js?v=2.0.0a3"></script>
-  <script type="module" src="lib/ws-client.js?v=2.0.0a3"></script>
-  <script type="module" src="lib/surface-manager.js?v=2.0.0a3"></script>
-  <script type="module" src="components/sc-chat.js?v=2.0.0a3"></script>
-  <script type="module" src="lib/app.js?v=2.0.0a3"></script>
+  <script type="module" src="components/sc-auth.js?v=2.0.3a"></script>
+  <script type="module" src="components/sc-agent-switcher.js?v=2.0.3a"></script>
+  <script type="module" src="components/sc-setup-wizard.js?v=2.0.3a"></script>
+  <script type="module" src="components/sc-terminal.js?v=2.0.3a"></script>
+  <script type="module" src="components/sc-filetree.js?v=2.0.3a"></script>
+  <script type="module" src="components/sc-editor.js?v=2.0.3a"></script>
+  <script type="module" src="components/sc-search.js?v=2.0.3a"></script>
+  <script type="module" src="components/sc-surface-toolbar.js?v=2.0.3a"></script>
+  <script type="module" src="lib/ws-client.js?v=2.0.3a"></script>
+  <script type="module" src="lib/surface-manager.js?v=2.0.3a"></script>
+  <script type="module" src="components/sc-chat.js?v=2.0.3a"></script>
+  <script type="module" src="lib/app.js?v=2.0.3a"></script>
 </body>
 </html>

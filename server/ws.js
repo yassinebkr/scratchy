@@ -319,6 +319,16 @@ async function handleMessage(ws, state, msg, opts) {
       break;
     }
 
+    /* -- Tool event forwarding (for surface activation) -- */
+    case 'tool_call':
+    case 'tool_stream':
+    case 'tool_result': {
+      // Forward tool events to all connections of this user (multi-device)
+      // These come from the agent backend and drive contextual surfaces
+      broadcastToUser(state.userId, msg);
+      break;
+    }
+
     /* -- MCP tool call -- */
     case 'mcp-tool-call': {
       const { agentId: mcpAgentId, toolName, args: toolArgs } = msg;
