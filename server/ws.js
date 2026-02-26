@@ -286,7 +286,10 @@ export function createWsHandler(server, opts = {}) {
 
   const wss = new WebSocketServer({ noServer: true, maxPayload: 64 * 1024 });
 
-  /* -- Upgrade handler (authentication) -- */
+  /** @type {Set<import('ws').WebSocket>} pending-auth connections */
+  const pendingAuth = new Set();
+
+  /* -- Upgrade handler (allow unauthenticated — auth happens in-band) -- */
   server.on('upgrade', async (req, socket, head) => {
     // Only handle /ws path
     const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
@@ -296,68 +299,27 @@ export function createWsHandler(server, opts = {}) {
       return;
     }
 
-    // Extract token from query param or cookie
-    let token = url.searchParams.get('token');
-    if (!token) {
-      const cookie = req.headers.cookie;
-      if (cookie) {
-        const match = cookie.match(/(?:^|;\s*)token=([^\s;]+)/);
-        if (match) token = match[1];
-      }
-    }
-
-    if (!token || !auth) {
-      socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
-      socket.destroy();
-      return;
-    }
-
-    // Validate the session
-    let user;
-    try {
-      user = await auth.validateSession(token);
-    } catch {
-      user = null;
-    }
-
-    if (!user) {
-      socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
-      socket.destroy();
-      return;
-    }
-
-    // Complete the WebSocket upgrade
+    // Complete the WebSocket upgrade without authentication —
+    // auth will happen as the first message (token-in-body).
     wss.handleUpgrade(req, socket, head, (ws) => {
-      wss.emit('connection', ws, req, user, token);
+      wss.emit('connection', ws, req);
     });
   });
 
   /* -- Connection handler -- */
-  wss.on('connection', (ws, _req, user, token) => {
-    registerClient(ws, user, token);
-
-    // Send welcome message
-    sendJson(ws, {
-      type: 'connected',
-      userId: user.id,
-      username: user.username,
-      displayName: user.displayName,
-      ts: Date.now(),
-    });
-
-    console.log(`[ws] Client connected: ${user.username} (${user.id}), total: ${clients.size}`);
-
-    /* -- Keepalive pong tracking -- */
-    const state = clients.get(ws);
-    ws.on('pong', () => {
-      if (state) state.alive = true;
-    });
+  wss.on('connection', (ws, _req) => {
+    // Track as pending auth — must authenticate within 5 seconds
+    pendingAuth.add(ws);
+    const authTimeout = setTimeout(() => {
+      if (pendingAuth.has(ws)) {
+        console.log('[ws] Auth timeout — closing connection');
+        pendingAuth.delete(ws);
+        ws.close(4001, 'Auth timeout');
+      }
+    }, 5000);
 
     /* -- Incoming messages -- */
     ws.on('message', async (raw) => {
-      const currentState = clients.get(ws);
-      if (!currentState) return;
-
       /* Rate limiting */
       const count = (messageCounters.get(ws) ?? 0) + 1;
       messageCounters.set(ws, count);
@@ -379,6 +341,61 @@ export function createWsHandler(server, opts = {}) {
         return;
       }
 
+      /* -- If still pending auth, expect auth message first -- */
+      if (pendingAuth.has(ws)) {
+        if (msg.type !== 'auth' || typeof msg.token !== 'string') {
+          sendJson(ws, { type: 'error', message: 'First message must be auth' });
+          ws.close(4002, 'Auth required');
+          pendingAuth.delete(ws);
+          clearTimeout(authTimeout);
+          return;
+        }
+
+        // Validate the session token
+        let user;
+        try {
+          user = auth ? await auth.validateSession(msg.token) : null;
+        } catch {
+          user = null;
+        }
+
+        if (!user) {
+          sendJson(ws, { type: 'error', message: 'Invalid token' });
+          ws.close(4003, 'Invalid token');
+          pendingAuth.delete(ws);
+          clearTimeout(authTimeout);
+          return;
+        }
+
+        // Auth succeeded — register client
+        pendingAuth.delete(ws);
+        clearTimeout(authTimeout);
+        registerClient(ws, user, msg.token);
+
+        // Send welcome message
+        sendJson(ws, {
+          type: 'connected',
+          userId: user.id,
+          username: user.username,
+          displayName: user.displayName,
+          ts: Date.now(),
+        });
+
+        console.log(`[ws] Client connected: ${user.username} (${user.id}), total: ${clients.size}`);
+
+        /* -- Keepalive pong tracking -- */
+        const state = clients.get(ws);
+        ws.on('pong', () => {
+          if (state) state.alive = true;
+        });
+
+        return;
+      }
+
+      /* -- Authenticated message handling -- */
+      const currentState = clients.get(ws);
+      if (!currentState) return;
+
       /* 30-second timeout wrapper */
       const timeout = new Promise((_, reject) =>
         setTimeout(() => reject(new Error('__timeout__')), 30_000),
@@ -396,6 +413,8 @@ export function createWsHandler(server, opts = {}) {
 
     /* -- Disconnect -- */
     ws.on('close', (code, reason) => {
+      clearTimeout(authTimeout);
+      pendingAuth.delete(ws);
       const st = clients.get(ws);
       const label = st ? `${st.userId}` : 'unknown';
       console.log(`[ws] Client disconnected: ${label} (code=${code}), total: ${clients.size - 1}`);
@@ -405,6 +424,8 @@ export function createWsHandler(server, opts = {}) {
 
     ws.on('error', (err) => {
       console.error('[ws] Socket error:', err.message);
+      clearTimeout(authTimeout);
+      pendingAuth.delete(ws);
       unregisterClient(ws);
       messageCounters.delete(ws);
     });
