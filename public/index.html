@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scratchy v2</title>
+  <link rel="stylesheet" href="styles/main.css?v=2.0.0a1">
+</head>
+<body>
+  <div id="app">
+    <div id="surfaces" class="surface-container">
+      <!-- Surfaces render here dynamically -->
+    </div>
+    <div id="chat-surface" class="surface chat-surface">
+      <div id="messages" class="messages"></div>
+      <div id="input-area" class="input-area">
+        <textarea id="msg-input" placeholder="Message..." rows="1" autofocus></textarea>
+        <button id="send-btn" aria-label="Send">↑</button>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="lib/ws-client.js?v=2.0.0a1"></script>
+  <script type="module" src="lib/surface-manager.js?v=2.0.0a1"></script>
+  <script type="module" src="components/sc-chat.js?v=2.0.0a1"></script>
+</body>
+</html>
