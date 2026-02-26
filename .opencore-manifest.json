@@ -1,0 +1,129 @@
+{
+  "version": 1,
+  "description": "Scratchy v2 open-core manifest — defines public/private file boundaries",
+
+  "public": [
+    "server/index.js",
+    "server/router.js",
+    "server/ws.js",
+
+    "protocol/genui.js",
+    "protocol/toon.js",
+    "protocol/a2ui.js",
+    "protocol/surfaces.js",
+
+    "public/index.html",
+    "public/app.css",
+    "public/styles/chat.css",
+    "public/styles/main.css",
+    "public/styles/tiles.css",
+    "public/lib/app.js",
+    "public/lib/surface-manager.js",
+    "public/lib/ws-client.js",
+    "public/components/sc-chat.js",
+    "public/components/sc-canvas.js",
+    "public/components/sc-tile.js",
+    "public/components/sc-editor.js",
+    "public/components/sc-filetree.js",
+    "public/components/sc-search.js",
+    "public/components/sc-terminal.js",
+    "public/components/sc-surface-toolbar.js",
+
+    "state/db.js",
+    "state/sessions.js",
+    "state/canvas.js",
+
+    "lib/compaction.js",
+    "lib/context-search.js",
+    "lib/embeddings.js",
+    "lib/indexer.js",
+    "lib/observation-masking.js",
+
+    "docs/protocol/toon-format.md",
+    "docs/components/card.md",
+    "docs/components/gauge.md",
+
+    "test/genui.test.js",
+    "test/toon.test.js",
+    "test/a2ui.test.js",
+    "test/surfaces.test.js",
+    "test/phase3a.test.js",
+
+    "Dockerfile",
+    "docker-compose.yml",
+    "package.json",
+    ".env.example",
+    ".gitignore",
+    "PROTOCOL.md",
+    "COMPONENTS.md",
+    "README.md"
+  ],
+
+  "private": [
+    "server/auth.js",
+    "server/routes/admin.js",
+    "server/routes/billing.js",
+    "server/widgets.js",
+    "server/agents/",
+
+    "public/components/sc-admin.js",
+    "public/components/sc-auth.js",
+    "public/components/sc-setup-wizard.js",
+    "public/components/sc-agent-switcher.js",
+    "public/i18n/",
+
+    "lib/widgets/",
+    "lib/billing/",
+    "lib/crawler/",
+    "lib/mcp-client.js",
+    "lib/mcp-registry.js",
+    "lib/memory-consolidation.js",
+    "lib/memory-scheduler.js",
+    "lib/memory-extraction.js",
+    "lib/nullclaw-adapter.js",
+
+    "state/users.js",
+    "state/agents.js",
+    "state/admin-config.js",
+    "state/preferences.js",
+    "state/context-index.js",
+    "state/memory.js",
+
+    "test/auth.test.js",
+    "test/context-engine.test.js",
+    "test/phase2a.test.js",
+    "test/phase2b.test.js",
+    "test/phase2d.test.js",
+    "test/phase3b.test.js",
+    "test/phase3b-hardened.test.js",
+    "test/phase3b-hardened2.test.js",
+    "test/phase4.test.js",
+    "test/state.test.js",
+    "test/fixtures/"
+  ],
+
+  "stub": {
+    "state/users.js": "// OSS stub — single-user mode (no auth)\nexport function init() {}\nexport function getUser() { return { id: 'default', username: 'default', displayName: 'User', role: 'admin', plan: 'free', passwordHash: '', apiKey: null, capabilities: '{}', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }; }\nexport function getUserByUsername() { return null; }\nexport function createUser() { return getUser(); }\nexport function updateUser() { return getUser(); }\nexport function listUsers() { return [getUser()]; }\nexport function deleteUser() {}\n",
+    "state/agents.js": "// OSS stub — no agent management\nexport function init() {}\nexport function getAgent() { return undefined; }\nexport function listAgents() { return []; }\nexport function createAgent() { return {}; }\nexport function updateAgent() { return {}; }\nexport function deleteAgent() {}\nexport function listByUser() { return []; }\nexport function getBuiltinAgents() { return []; }\n",
+    "state/admin-config.js": "// OSS stub — in-memory config\nconst _store = new Map();\nexport function init() {}\nexport function get(key) { return _store.has(key) ? JSON.parse(_store.get(key)) : undefined; }\nexport function set(key, value) { _store.set(key, JSON.stringify(value)); return value; }\nexport function getAll() { const o = {}; for (const [k,v] of _store) o[k] = JSON.parse(v); return o; }\nfunction deleteKey(key) { _store.delete(key); }\nexport { deleteKey as delete };\nexport function setDefaults(defaults) { for (const [k,v] of Object.entries(defaults)) { if (!_store.has(k)) set(k,v); } }\nexport function setMany(entries) { for (const [k,v] of Object.entries(entries)) set(k,v); }\nexport function getAllWithMeta() { return []; }\nexport function has(key) { return _store.has(key); }\nexport function count() { return _store.size; }\n",
+    "state/preferences.js": "// OSS stub — no user preferences\nexport function init() {}\nexport function encrypt(s) { return s; }\nexport function decrypt(s) { return s; }\nexport function get() { return { userId: 'default', locale: 'en', theme: 'system', defaultAgentId: null, onboardingComplete: true }; }\nexport function set(userId, patch) { return { userId, ...patch }; }\nexport function getLocale() { return 'en'; }\nexport function setLocale() {}\nexport function setApiKey() {}\nexport function getApiKey() { return null; }\nexport function setOAuthToken() {}\nexport function getOAuthToken() { return null; }\n",
+    "server/routes/admin.js": "// OSS stub — no admin routes\nexport function adminRoutes() { return { routes: [] }; }\n",
+    "lib/mcp-registry.js": "// OSS stub — no MCP integration\nexport class McpRegistry {\n  async activateAgent() { return { agentId: null, tools: [] }; }\n  async deactivateAgent() {}\n  getAvailableTools() { return []; }\n  getPids() { return []; }\n  isActive() { return false; }\n  async callTool() { return null; }\n  async shutdownAll() {}\n}\n"
+  },
+
+  "strip": {
+    "docker-compose.yml": {
+      "description": "Remove openclaw and nullclaw services, keep only scratchy + volumes",
+      "removeServices": ["openclaw"],
+      "removeEnvVars": ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "RESEND_API_KEY"]
+    },
+    "package.json": {
+      "removeDependencies": ["@mozilla/readability", "linkedom", "robots-parser", "tough-cookie"],
+      "setName": "scratchy-oss",
+      "setLicense": "MIT"
+    },
+    ".env.example": {
+      "removeLines": ["STRIPE_", "RESEND_", "NULLCLAW_"]
+    }
+  }
+}
