@@ -416,8 +416,8 @@ describe('Phase 2b — API Routes', () => {
       assert.equal(typeof res.data, 'object');
     });
 
-    it('PUT /api/admin/config — sets config keys', async () => {
-      const res = await request(baseUrl, 'PUT', '/api/admin/config', {
+    it('PATCH /api/admin/config — sets config keys', async () => {
+      const res = await request(baseUrl, 'PATCH', '/api/admin/config', {
         token: adminToken,
         body: { siteName: 'Scratchy', maxUsers: 100 },
       });
@@ -426,8 +426,8 @@ describe('Phase 2b — API Routes', () => {
       assert.equal(res.data.maxUsers, 100);
     });
 
-    it('PUT /api/admin/config — requires admin', async () => {
-      const res = await request(baseUrl, 'PUT', '/api/admin/config', {
+    it('PATCH /api/admin/config — requires admin', async () => {
+      const res = await request(baseUrl, 'PATCH', '/api/admin/config', {
         token: normalToken,
         body: { hack: true },
       });
@@ -439,10 +439,11 @@ describe('Phase 2b — API Routes', () => {
         token: adminToken,
       });
       assert.equal(res.status, 200);
-      assert.ok(Array.isArray(res.data));
-      assert.ok(res.data.length >= 2);
+      const users = res.data.users ?? res.data;
+      assert.ok(Array.isArray(users));
+      assert.ok(users.length >= 2);
       // Should not include passwordHash
-      for (const u of res.data) {
+      for (const u of users) {
         assert.equal(u.passwordHash, undefined);
       }
     });

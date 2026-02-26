@@ -8,12 +8,21 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Scratchy v2</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/geist@1.3.1/dist/fonts/geist-sans/style.css">
-  <link rel="stylesheet" href="styles/main.css?v=2.0.0a2">
+  <link rel="stylesheet" href="styles/main.css?v=2.0.6a">
+  <link rel="stylesheet" href="styles/chat.css?v=2.0.6a">
+  <link rel="stylesheet" href="styles/tiles.css?v=2.0.6a">
+  <link rel="stylesheet" href="app.css?v=2.0.6a">
+  <link rel="stylesheet" href="css/mobile.css?v=2.0.6a">
 </head>
 <body>
   <!-- Auth screen (shown when logged out) -->
   <div id="auth-screen" class="screen">
     <sc-auth></sc-auth>
+  </div>
+
+  <!-- Plan selection screen (shown after auth for new users) -->
+  <div id="plans-screen" class="screen hidden">
+    <sc-plans></sc-plans>
   </div>
 
   <!-- Setup wizard screen (shown on first run) -->
@@ -62,17 +71,25 @@
   </div>
 
   <!-- Scripts (ESM) -->
-  <script type="module" src="components/sc-auth.js?v=2.0.3a"></script>
-  <script type="module" src="components/sc-agent-switcher.js?v=2.0.3a"></script>
-  <script type="module" src="components/sc-setup-wizard.js?v=2.0.3a"></script>
-  <script type="module" src="components/sc-terminal.js?v=2.0.3a"></script>
-  <script type="module" src="components/sc-filetree.js?v=2.0.3a"></script>
-  <script type="module" src="components/sc-editor.js?v=2.0.3a"></script>
-  <script type="module" src="components/sc-search.js?v=2.0.3a"></script>
-  <script type="module" src="components/sc-surface-toolbar.js?v=2.0.3a"></script>
-  <script type="module" src="lib/ws-client.js?v=2.0.3a"></script>
-  <script type="module" src="lib/surface-manager.js?v=2.0.3a"></script>
-  <script type="module" src="components/sc-chat.js?v=2.0.3a"></script>
-  <script type="module" src="lib/app.js?v=2.0.3a"></script>
+  <script type="module" src="components/sc-auth.js?v=2.0.6a"></script>
+  <script type="module" src="components/sc-plans.js?v=2.0.6a"></script>
+  <script type="module" src="components/sc-agent-switcher.js?v=2.0.6a"></script>
+  <script type="module" src="components/sc-setup-wizard.js?v=2.0.6a"></script>
+  <script type="module" src="components/sc-chat.js?v=2.0.6a"></script>
+  <script type="module" src="components/sc-canvas.js?v=2.0.6a"></script>
+  <script type="module" src="components/sc-tile.js?v=2.0.6a"></script>
+  <script type="module" src="components/sc-admin.js?v=2.0.6a"></script>
+  <script type="module" src="components/sc-terminal.js?v=2.0.6a"></script>
+  <script type="module" src="components/sc-filetree.js?v=2.0.6a"></script>
+  <script type="module" src="components/sc-editor.js?v=2.0.6a"></script>
+  <script type="module" src="components/sc-search.js?v=2.0.6a"></script>
+  <script type="module" src="components/sc-surface-toolbar.js?v=2.0.6a"></script>
+  <script type="module" src="lib/ws-client.js?v=2.0.6a"></script>
+  <script type="module" src="lib/surface-manager.js?v=2.0.6a"></script>
+  <script type="module" src="lib/virtual-scroller.js?v=2.0.6a"></script>
+  <script type="module" src="lib/mobile-ux.js?v=2.0.6a"></script>
+  <script type="module" src="lib/agent-orchestrator.js?v=2.0.6a"></script>
+  <script type="module" src="lib/performance.js?v=2.0.6a"></script>
+  <script type="module" src="lib/app.js?v=2.0.6a"></script>
 </body>
 </html>
