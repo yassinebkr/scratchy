@@ -12,6 +12,19 @@ import { WebSocketServer } from 'ws';
 import { URL } from 'node:url';
 
 /* ------------------------------------------------------------------ */
+/*  Rate limiter — per-client message counter, resets every second    */
+/* ------------------------------------------------------------------ */
+
+const MAX_MESSAGES_PER_SECOND = 10;
+
+/** @type {Map<import('ws').WebSocket, number>} */
+const messageCounters = new Map();
+
+setInterval(() => {
+  messageCounters.clear();
+}, 1_000);
+
+/* ------------------------------------------------------------------ */
 /*  Client registry — tracks every connected WebSocket by userId      */
 /* ------------------------------------------------------------------ */
 
@@ -230,7 +243,11 @@ async function handleMessage(ws, state, msg, opts) {
     /* -- Surface subscription -- */
     case 'surface-subscribe': {
       const surface = msg.surface;
-      if (typeof surface === 'string' && !state.surfaces.includes(surface)) {
+      if (typeof surface !== 'string' || surface.length === 0 || surface.length > 64 || !/^[a-zA-Z0-9-]+$/.test(surface)) {
+        sendJson(ws, { type: 'error', message: 'Invalid surface: must be 1-64 alphanumeric/dash characters' });
+        break;
+      }
+      if (!state.surfaces.includes(surface)) {
         state.surfaces.push(surface);
         sendJson(ws, { type: 'surface-subscribed', surface });
       }
@@ -267,7 +284,7 @@ async function handleMessage(ws, state, msg, opts) {
 export function createWsHandler(server, opts = {}) {
   const { auth } = opts;
 
-  const wss = new WebSocketServer({ noServer: true });
+  const wss = new WebSocketServer({ noServer: true, maxPayload: 64 * 1024 });
 
   /* -- Upgrade handler (authentication) -- */
   server.on('upgrade', async (req, socket, head) => {
@@ -341,6 +358,14 @@ export function createWsHandler(server, opts = {}) {
       const currentState = clients.get(ws);
       if (!currentState) return;
 
+      /* Rate limiting */
+      const count = (messageCounters.get(ws) ?? 0) + 1;
+      messageCounters.set(ws, count);
+      if (count > MAX_MESSAGES_PER_SECOND) {
+        sendJson(ws, { type: 'error', message: 'Rate limit exceeded — max 10 messages per second' });
+        return;
+      }
+
       let msg;
       try {
         msg = JSON.parse(raw.toString('utf-8'));
@@ -354,7 +379,19 @@ export function createWsHandler(server, opts = {}) {
         return;
       }
 
-      await handleMessage(ws, currentState, msg, opts);
+      /* 30-second timeout wrapper */
+      const timeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('__timeout__')), 30_000),
+      );
+      try {
+        await Promise.race([handleMessage(ws, currentState, msg, opts), timeout]);
+      } catch (err) {
+        if (err.message === '__timeout__') {
+          sendJson(ws, { type: 'error', message: 'Request timed out (30s limit)' });
+        } else {
+          throw err;
+        }
+      }
     });
 
     /* -- Disconnect -- */
@@ -363,11 +400,13 @@ export function createWsHandler(server, opts = {}) {
       const label = st ? `${st.userId}` : 'unknown';
       console.log(`[ws] Client disconnected: ${label} (code=${code}), total: ${clients.size - 1}`);
       unregisterClient(ws);
+      messageCounters.delete(ws);
     });
 
     ws.on('error', (err) => {
       console.error('[ws] Socket error:', err.message);
       unregisterClient(ws);
+      messageCounters.delete(ws);
     });
   });
 
