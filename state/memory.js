@@ -6,6 +6,7 @@
  */
 
 import crypto from 'node:crypto';
+import { cosineSimilarity, deserializeEmbedding } from '../lib/embeddings.js';
 
 /** @type {import('better-sqlite3').Database} */
 let db;
@@ -39,6 +40,8 @@ function parseRow(row) {
       try { parsed[field] = JSON.parse(parsed[field]); } catch { parsed[field] = []; }
     }
   }
+  // Ensure accessCount is numeric (may be missing on pre-migration rows)
+  if (parsed.accessCount == null) parsed.accessCount = 0;
   return parsed;
 }
 
@@ -141,7 +144,7 @@ export function get(id) {
  * @returns {Object|undefined}
  */
 export function update(id, patch) {
-  const allowed = ['content', 'category', 'tags', 'confidence', 'sourceRef', 'source', 'embedding', 'agentId'];
+  const allowed = ['content', 'category', 'tags', 'confidence', 'sourceRef', 'source', 'embedding', 'agentId', 'consolidatedInto'];
   const sets = [];
   const values = [];
 
@@ -185,13 +188,15 @@ export function deleteByUser(userId) {
 }
 
 /**
- * Update the accessedAt timestamp for a chunk.
+ * Update the accessedAt timestamp and increment access count for a chunk.
  * @param {string} id
  * @returns {boolean}
  */
 export function touchAccessed(id) {
   const now = new Date().toISOString();
-  const result = d().prepare('UPDATE memory_chunks SET accessedAt = ? WHERE id = ?').run(now, id);
+  const result = d().prepare(
+    'UPDATE memory_chunks SET accessedAt = ?, accessCount = COALESCE(accessCount, 0) + 1 WHERE id = ?'
+  ).run(now, id);
   return result.changes > 0;
 }
 
@@ -203,4 +208,162 @@ export function touchAccessed(id) {
 export function countByUser(userId) {
   const row = d().prepare('SELECT COUNT(*) as count FROM memory_chunks WHERE userId = ?').get(userId);
   return row.count;
+}
+
+// ---------------------------------------------------------------------------
+// Consolidation support methods (Phase 4)
+// ---------------------------------------------------------------------------
+
+/**
+ * Find memory chunks matching any of the specified topic tags.
+ * @param {string} userId
+ * @param {string[]} tags - Tags to match (any match)
+ * @returns {Object[]} Matching chunks
+ */
+export function getChunksByTopic(userId, tags) {
+  if (!tags || tags.length === 0) return [];
+  return search(userId, { tags, limit: 10000 });
+}
+
+/**
+ * Group chunks by embedding cosine similarity using union-find clustering.
+ * Only considers non-stale, non-consolidated chunks that have embeddings.
+ * @param {string} userId
+ * @param {number} [threshold=0.85] - Minimum cosine similarity to group together
+ * @returns {Object[][]} Array of clusters (each cluster is an array of chunk objects)
+ */
+export function getChunkClusters(userId, threshold = 0.85) {
+  const rows = d().prepare(`
+    SELECT * FROM memory_chunks
+    WHERE userId = ? AND category != 'stale' AND consolidatedInto IS NULL AND embedding IS NOT NULL
+    ORDER BY createdAt DESC
+  `).all(userId);
+
+  const chunks = rows.map(parseRow);
+  if (chunks.length < 2) return chunks.length === 1 ? [chunks] : [];
+
+  // Deserialize embeddings
+  const embeddings = chunks.map(c => deserializeEmbedding(c.embedding));
+
+  // Union-Find with path compression and union by rank
+  const parent = chunks.map((_, i) => i);
+  const rank = new Array(chunks.length).fill(0);
+
+  function find(x) {
+    while (parent[x] !== x) {
+      parent[x] = parent[parent[x]];
+      x = parent[x];
+    }
+    return x;
+  }
+
+  function union(a, b) {
+    const ra = find(a), rb = find(b);
+    if (ra === rb) return;
+    if (rank[ra] < rank[rb]) parent[ra] = rb;
+    else if (rank[ra] > rank[rb]) parent[rb] = ra;
+    else { parent[rb] = ra; rank[ra]++; }
+  }
+
+  // Compute pairwise similarities and union similar chunks
+  for (let i = 0; i < chunks.length; i++) {
+    for (let j = i + 1; j < chunks.length; j++) {
+      const sim = cosineSimilarity(embeddings[i], embeddings[j]);
+      if (sim >= threshold) {
+        union(i, j);
+      }
+    }
+  }
+
+  // Group by root
+  const groups = new Map();
+  for (let i = 0; i < chunks.length; i++) {
+    const root = find(i);
+    if (!groups.has(root)) groups.set(root, []);
+    groups.get(root).push(chunks[i]);
+  }
+
+  return [...groups.values()];
+}
+
+/**
+ * Flag source chunks as consolidated into a merged chunk.
+ * Uses a transaction for atomicity.
+ * @param {string[]} chunkIds - IDs of source chunks to flag
+ * @param {string} mergedChunkId - ID of the merged chunk they were consolidated into
+ */
+export function markConsolidated(chunkIds, mergedChunkId) {
+  if (!chunkIds || chunkIds.length === 0) return;
+  const stmt = d().prepare('UPDATE memory_chunks SET consolidatedInto = ? WHERE id = ?');
+  const tx = d().transaction(() => {
+    for (const id of chunkIds) {
+      stmt.run(mergedChunkId, id);
+    }
+  });
+  tx();
+}
+
+/**
+ * Soft-delete a chunk by setting its category to 'stale' (recoverable).
+ * @param {string} chunkId
+ * @returns {boolean} True if a row was updated
+ */
+export function softDelete(chunkId) {
+  const result = d().prepare("UPDATE memory_chunks SET category = 'stale' WHERE id = ?").run(chunkId);
+  return result.changes > 0;
+}
+
+/**
+ * Get unconsolidated chunks with confidence above 0.5 (consolidation candidates).
+ * Excludes stale chunks.
+ * @param {string} userId
+ * @returns {Object[]} Candidate chunks sorted by confidence descending
+ */
+export function getConsolidationCandidates(userId) {
+  const rows = d().prepare(`
+    SELECT * FROM memory_chunks
+    WHERE userId = ? AND consolidatedInto IS NULL AND category != 'stale' AND confidence > 0.5
+    ORDER BY confidence DESC
+  `).all(userId);
+  return rows.map(parseRow);
+}
+
+/**
+ * Return access frequency and recency statistics per chunk.
+ * @param {string} userId
+ * @returns {Array<{id: string, accessedAt: string, accessCount: number, createdAt: string}>}
+ */
+export function getAccessStats(userId) {
+  const rows = d().prepare(`
+    SELECT id, accessedAt, accessCount, createdAt FROM memory_chunks
+    WHERE userId = ? AND category != 'stale'
+  `).all(userId);
+
+  return rows.map(r => ({
+    id: r.id,
+    accessedAt: r.accessedAt,
+    accessCount: r.accessCount || 0,
+    createdAt: r.createdAt,
+  }));
+}
+
+/**
+ * Update the confidence score for a chunk (clamped to [0, 1]).
+ * @param {string} chunkId
+ * @param {number} newConfidence
+ * @returns {boolean} True if a row was updated
+ */
+export function updateConfidence(chunkId, newConfidence) {
+  const clamped = Math.max(0, Math.min(1, newConfidence));
+  const result = d().prepare('UPDATE memory_chunks SET confidence = ? WHERE id = ?').run(clamped, chunkId);
+  return result.changes > 0;
+}
+
+/**
+ * Get all distinct user IDs that have memory chunks.
+ * @returns {string[]}
+ */
+export function getAllUserIds() {
+  const rows = d().prepare('SELECT DISTINCT userId FROM memory_chunks').all();
+  return rows.map(r => r.userId);
 }

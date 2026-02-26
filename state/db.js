@@ -94,18 +94,20 @@ export function initSchema(db) {
 
     -- Memory chunks (auto-extracted facts + semantic memories)
     CREATE TABLE IF NOT EXISTS memory_chunks (
-      id          TEXT PRIMARY KEY,
-      userId      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      agentId     TEXT REFERENCES agents(id) ON DELETE SET NULL,
-      source      TEXT NOT NULL DEFAULT 'extraction',
-      content     TEXT NOT NULL,
-      embedding   BLOB,
-      category    TEXT NOT NULL DEFAULT 'semantic' CHECK (category IN ('core','episodic','semantic','procedural')),
-      tags        TEXT NOT NULL DEFAULT '[]',
-      confidence  REAL NOT NULL DEFAULT 1.0,
-      sourceRef   TEXT,
-      createdAt   TEXT NOT NULL DEFAULT (datetime('now')),
-      accessedAt  TEXT NOT NULL DEFAULT (datetime('now'))
+      id               TEXT PRIMARY KEY,
+      userId           TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      agentId          TEXT REFERENCES agents(id) ON DELETE SET NULL,
+      source           TEXT NOT NULL DEFAULT 'extraction',
+      content          TEXT NOT NULL,
+      embedding        BLOB,
+      category         TEXT NOT NULL DEFAULT 'semantic' CHECK (category IN ('core','episodic','semantic','procedural','stale')),
+      tags             TEXT NOT NULL DEFAULT '[]',
+      confidence       REAL NOT NULL DEFAULT 1.0,
+      sourceRef        TEXT,
+      consolidatedInto TEXT DEFAULT NULL,
+      accessCount      INTEGER NOT NULL DEFAULT 0,
+      createdAt        TEXT NOT NULL DEFAULT (datetime('now')),
+      accessedAt       TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
     -- Context index (indexed docs)
@@ -152,10 +154,64 @@ export function initSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_memory_chunks_userId ON memory_chunks(userId);
     CREATE INDEX IF NOT EXISTS idx_memory_chunks_agentId ON memory_chunks(agentId);
     CREATE INDEX IF NOT EXISTS idx_memory_chunks_category ON memory_chunks(category);
+    CREATE INDEX IF NOT EXISTS idx_memory_chunks_consolidated ON memory_chunks(consolidatedInto);
     CREATE INDEX IF NOT EXISTS idx_context_index_category ON context_index(category);
     CREATE INDEX IF NOT EXISTS idx_context_index_source ON context_index(source);
     CREATE INDEX IF NOT EXISTS idx_agents_userId ON agents(userId);
     CREATE INDEX IF NOT EXISTS idx_agent_conversations_agentId ON agent_conversations(agentId);
     CREATE INDEX IF NOT EXISTS idx_agent_conversations_userId ON agent_conversations(userId);
+  `);
+
+  // Migrate existing memory_chunks tables to v2 schema (consolidation support)
+  _migrateMemoryChunksV2(db);
+}
+
+/**
+ * Migrate memory_chunks table to v2: add consolidatedInto, accessCount columns
+ * and expand category CHECK to include 'stale'.
+ * Safe to call multiple times (idempotent).
+ * @param {import('better-sqlite3').Database} db
+ */
+function _migrateMemoryChunksV2(db) {
+  const cols = db.pragma('table_info(memory_chunks)');
+  const colNames = cols.map(c => c.name);
+
+  // Already migrated if consolidatedInto column exists
+  if (colNames.includes('consolidatedInto')) return;
+
+  // Recreate table with expanded schema (only way to update CHECK constraint in SQLite)
+  db.exec(`
+    PRAGMA foreign_keys = OFF;
+
+    CREATE TABLE memory_chunks_v2 (
+      id               TEXT PRIMARY KEY,
+      userId           TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      agentId          TEXT REFERENCES agents(id) ON DELETE SET NULL,
+      source           TEXT NOT NULL DEFAULT 'extraction',
+      content          TEXT NOT NULL,
+      embedding        BLOB,
+      category         TEXT NOT NULL DEFAULT 'semantic' CHECK (category IN ('core','episodic','semantic','procedural','stale')),
+      tags             TEXT NOT NULL DEFAULT '[]',
+      confidence       REAL NOT NULL DEFAULT 1.0,
+      sourceRef        TEXT,
+      consolidatedInto TEXT DEFAULT NULL,
+      accessCount      INTEGER NOT NULL DEFAULT 0,
+      createdAt        TEXT NOT NULL DEFAULT (datetime('now')),
+      accessedAt       TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    INSERT INTO memory_chunks_v2 (id, userId, agentId, source, content, embedding, category, tags, confidence, sourceRef, createdAt, accessedAt)
+      SELECT id, userId, agentId, source, content, embedding, category, tags, confidence, sourceRef, createdAt, accessedAt
+      FROM memory_chunks;
+
+    DROP TABLE memory_chunks;
+    ALTER TABLE memory_chunks_v2 RENAME TO memory_chunks;
+
+    CREATE INDEX IF NOT EXISTS idx_memory_chunks_userId ON memory_chunks(userId);
+    CREATE INDEX IF NOT EXISTS idx_memory_chunks_agentId ON memory_chunks(agentId);
+    CREATE INDEX IF NOT EXISTS idx_memory_chunks_category ON memory_chunks(category);
+    CREATE INDEX IF NOT EXISTS idx_memory_chunks_consolidated ON memory_chunks(consolidatedInto);
+
+    PRAGMA foreign_keys = ON;
   `);
 }
