@@ -11,6 +11,8 @@ import { join, extname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
 
+import * as users from '../state/users.js';
+import * as sessions from '../state/sessions.js';
 import * as agents from '../state/agents.js';
 import * as adminConfig from '../state/admin-config.js';
 import * as preferences from '../state/preferences.js';
@@ -289,6 +291,8 @@ export function createRouter(opts = {}) {
     if (stateInitialized || !getDb) return;
     const db = getDb();
     if (!db) return;
+    users.init(db);
+    sessions.init(db);
     agents.init(db);
     adminConfig.init(db);
     preferences.init(db);
