@@ -6,10 +6,13 @@
  * initializes the database, and handles graceful shutdown.
  */
 
+import 'dotenv/config';
 import { createServer } from 'node:http';
 import { createRouter } from './router.js';
-import { createWsHandler } from './ws.js';
+import { createWsHandler, broadcastToUser } from './ws.js';
+import { initWidgets, destroyWidgets } from './widgets.js';
 import { McpRegistry } from '../lib/mcp-registry.js';
+import { init as initChat, handleChat } from './chat-handler.js';
 
 /** Default port — v2 runs on 3002 (v1 is on 3001) */
 const PORT = parseInt(process.env.PORT ?? '3002', 10);
@@ -60,6 +63,25 @@ async function main() {
     console.warn('[server] Agents module not available:', err.message);
   }
 
+  /* -- Chat handler (NullClaw backend) -- */
+  if (db) {
+    initChat(db);
+    console.log('[server] Chat handler initialized (NullClaw backend)');
+  } else {
+    console.warn('[server] Chat handler not initialized (missing DB)');
+  }
+
+  /* -- Widget system -- */
+  let handleWidgetAction = async (userId, msg, ws) => {
+    console.log(`[widget] from ${userId}:`, msg.action ?? '(unknown)');
+  };
+  if (db) {
+    handleWidgetAction = await initWidgets(db, broadcastToUser, {});
+    console.log('[server] Widget system initialized');
+  } else {
+    console.warn('[server] Widget system not initialized (missing DB)');
+  }
+
   /* -- HTTP server + router -- */
   const handler = createRouter({ auth, getDb, version: VERSION });
   const server = createServer(handler);
@@ -69,13 +91,8 @@ async function main() {
     auth,
     getAgents: agentsModule,
     mcpRegistry,
-    onChat: async (userId, msg, ws) => {
-      // Placeholder — will be wired to agent proxy later
-      console.log(`[chat] from ${userId}:`, msg.text ?? msg.content ?? '(empty)');
-    },
-    onWidgetAction: async (userId, msg, ws) => {
-      console.log(`[widget] from ${userId}:`, msg.action ?? '(unknown)');
-    },
+    onChat: handleChat,
+    onWidgetAction: handleWidgetAction,
   });
 
   /* -- Start listening -- */
@@ -92,6 +109,11 @@ async function main() {
     if (shuttingDown) return;
     shuttingDown = true;
     console.log(`\n[server] ${signal} received — shutting down gracefully...`);
+
+    // Shut down widgets
+    destroyWidgets().catch(() => {}).then(() => {
+      console.log('[server] Widgets shut down');
+    });
 
     // Shut down MCP servers
     mcpRegistry.shutdownAll().catch(() => {}).then(() => {
