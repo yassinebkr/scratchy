@@ -12,7 +12,9 @@ import { createRouter } from './router.js';
 import { createWsHandler, broadcastToUser } from './ws.js';
 import { initWidgets, destroyWidgets } from './widgets.js';
 import { McpRegistry } from '../lib/mcp-registry.js';
-import { init as initChat, handleChat } from './chat-handler.js';
+import { init as initChat, handleChat, shutdown as shutdownChat } from './chat-handler.js';
+import { init as initOrchestrator, routeMessage, shutdown as shutdownOrchestrator } from './agent-orchestrator.js';
+import { createSurfaceEventHandler } from './surface-events.js';
 
 /** Default port — v2 runs on 3002 (v1 is on 3001) */
 const PORT = parseInt(process.env.PORT ?? '3002', 10);
@@ -71,6 +73,18 @@ async function main() {
     console.warn('[server] Chat handler not initialized (missing DB)');
   }
 
+  /* -- Agent orchestrator -- */
+  if (db) {
+    initOrchestrator(db, mcpRegistry);
+    console.log('[server] Agent orchestrator initialized');
+  } else {
+    console.warn('[server] Agent orchestrator not initialized (missing DB)');
+  }
+
+  /* -- Surface events -- */
+  const surfaceHandler = createSurfaceEventHandler();
+  console.log('[server] Surface event handler initialized');
+
   /* -- Widget system -- */
   let handleWidgetAction = async (userId, msg, ws) => {
     console.log(`[widget] from ${userId}:`, msg.action ?? '(unknown)');
@@ -91,7 +105,15 @@ async function main() {
     auth,
     getAgents: agentsModule,
     mcpRegistry,
-    onChat: handleChat,
+    onChat: async (userId, msg, ws) => {
+      // Route through orchestrator if agentId specified, else direct chat handler
+      if (msg.agentId) {
+        await routeMessage(userId, msg.agentId, msg, ws);
+      } else {
+        await handleChat(userId, msg, ws);
+      }
+    },
+    surfaceHandler,
     onWidgetAction: handleWidgetAction,
   });
 
@@ -109,6 +131,14 @@ async function main() {
     if (shuttingDown) return;
     shuttingDown = true;
     console.log(`\n[server] ${signal} received — shutting down gracefully...`);
+
+    // Shut down chat handler + orchestrator (NullClaw adapter pools)
+    shutdownChat().catch(() => {}).then(() => {
+      console.log('[server] Chat handler shut down');
+    });
+    shutdownOrchestrator().catch(() => {}).then(() => {
+      console.log('[server] Agent orchestrator shut down');
+    });
 
     // Shut down widgets
     destroyWidgets().catch(() => {}).then(() => {
