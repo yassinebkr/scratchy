@@ -174,6 +174,55 @@ function sendMessage() {
   $msgInput.focus();
 }
 
+/**
+ * Upload a file to the server and send it as a chat message with the image/file.
+ * @param {File} file
+ */
+async function uploadFile(file) {
+  const token = localStorage.getItem('scratchy_token') || '';
+  if (!token) return;
+
+  // Show a preview bubble for images
+  const isImage = file.type.startsWith('image/');
+  if (isImage) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      appendMessage('user', `<img src="${reader.result}" alt="${escapeHtml(file.name)}" style="max-width:300px;max-height:200px;border-radius:8px">`);
+    };
+    reader.readAsDataURL(file);
+  } else {
+    appendMessage('user', `📎 ${escapeHtml(file.name)} (${(file.size / 1024).toFixed(1)} KB)`);
+  }
+
+  try {
+    const form = new FormData();
+    form.append('file', file);
+
+    const res = await fetch('/api/upload', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` },
+      body: form,
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Upload failed' }));
+      appendMessage('system', `❌ Upload failed: ${err.error}`);
+      return;
+    }
+
+    const { file: uploaded } = await res.json();
+
+    // Send a chat message referencing the uploaded file
+    const activeAgentId = $agentSwitcher?._activeAgentId || null;
+    const msg = isImage
+      ? `[Uploaded image: ${uploaded.filename}](${uploaded.url})`
+      : `[Uploaded file: ${uploaded.filename}](${uploaded.url}) (${uploaded.mimeType}, ${(uploaded.size / 1024).toFixed(1)} KB)`;
+    sendChat(msg, activeAgentId);
+  } catch (err) {
+    appendMessage('system', `❌ Upload error: ${err.message}`);
+  }
+}
+
 function escapeHtml(s) {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
@@ -881,6 +930,57 @@ async function init() {
   // Send button
   if ($sendBtn) {
     $sendBtn.addEventListener('click', sendMessage);
+  }
+
+  // Attach file button
+  const $attachBtn = document.getElementById('attach-btn');
+  const $fileInput = document.getElementById('file-input');
+  if ($attachBtn && $fileInput) {
+    $attachBtn.addEventListener('click', () => $fileInput.click());
+    $fileInput.addEventListener('change', () => {
+      for (const file of $fileInput.files) {
+        uploadFile(file);
+      }
+      $fileInput.value = ''; // reset for re-upload
+    });
+  }
+
+  // Drag & drop on chat area
+  const $chatSurface = document.getElementById('chat-surface');
+  if ($chatSurface) {
+    let dragCounter = 0;
+    $chatSurface.addEventListener('dragenter', (e) => {
+      e.preventDefault();
+      dragCounter++;
+      if (dragCounter === 1) {
+        let overlay = $chatSurface.querySelector('.drag-overlay');
+        if (!overlay) {
+          overlay = document.createElement('div');
+          overlay.className = 'drag-overlay';
+          overlay.textContent = 'Drop files here';
+          $chatSurface.style.position = 'relative';
+          $chatSurface.appendChild(overlay);
+        }
+      }
+    });
+    $chatSurface.addEventListener('dragleave', (e) => {
+      e.preventDefault();
+      dragCounter--;
+      if (dragCounter === 0) {
+        const overlay = $chatSurface.querySelector('.drag-overlay');
+        if (overlay) overlay.remove();
+      }
+    });
+    $chatSurface.addEventListener('dragover', (e) => e.preventDefault());
+    $chatSurface.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dragCounter = 0;
+      const overlay = $chatSurface.querySelector('.drag-overlay');
+      if (overlay) overlay.remove();
+      for (const file of e.dataTransfer.files) {
+        uploadFile(file);
+      }
+    });
   }
 
   // Textarea: Enter to send, Shift+Enter for newline, auto-resize

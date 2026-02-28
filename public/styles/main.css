@@ -595,6 +595,27 @@ sc-workspace-bar {
   color: var(--text-muted);
 }
 
+.attach-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all var(--transition);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px;
+}
+
+.attach-btn:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
 #send-btn {
   width: 48px;
   height: 48px;
@@ -609,6 +630,23 @@ sc-workspace-bar {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* Drag & drop overlay */
+.drag-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(249, 166, 2, 0.1);
+  border: 2px dashed var(--accent);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 500;
+  z-index: 100;
+  pointer-events: none;
 }
 
 #send-btn:hover {

@@ -1112,6 +1112,117 @@ export function createRouter(opts = {}) {
         }
       }
 
+      /* ---------- File Upload ---------- */
+      if (method === 'POST' && pathname === '/api/upload') {
+        const user = await authenticate(req);
+        if (!user) return json(res, 401, { error: 'Unauthorized' });
+
+        const contentType = req.headers['content-type'] || '';
+        if (!contentType.startsWith('multipart/form-data')) {
+          return json(res, 400, { error: 'Expected multipart/form-data' });
+        }
+
+        // Parse multipart boundary
+        const boundaryMatch = contentType.match(/boundary=(.+)/);
+        if (!boundaryMatch) return json(res, 400, { error: 'Missing boundary' });
+        const boundary = boundaryMatch[1];
+
+        // Collect body (limit 20MB)
+        const MAX_SIZE = 20 * 1024 * 1024;
+        const chunks = [];
+        let totalSize = 0;
+        for await (const chunk of req) {
+          totalSize += chunk.length;
+          if (totalSize > MAX_SIZE) return json(res, 413, { error: 'File too large (max 20MB)' });
+          chunks.push(chunk);
+        }
+        const body = Buffer.concat(chunks);
+
+        // Simple multipart parser — find the first file part
+        const boundaryBuf = Buffer.from(`--${boundary}`);
+        const parts = [];
+        let pos = 0;
+        while (pos < body.length) {
+          const start = body.indexOf(boundaryBuf, pos);
+          if (start === -1) break;
+          const nextStart = body.indexOf(boundaryBuf, start + boundaryBuf.length + 2);
+          if (nextStart === -1) break;
+          const partData = body.subarray(start + boundaryBuf.length + 2, nextStart - 2);
+          parts.push(partData);
+          pos = nextStart;
+        }
+
+        if (parts.length === 0) return json(res, 400, { error: 'No file found in upload' });
+
+        // Parse the first part's headers and content
+        const part = parts[0];
+        const headerEndIdx = part.indexOf('\r\n\r\n');
+        if (headerEndIdx === -1) return json(res, 400, { error: 'Malformed multipart part' });
+        const headerStr = part.subarray(0, headerEndIdx).toString();
+        const fileContent = part.subarray(headerEndIdx + 4);
+
+        // Extract filename and content-type
+        const filenameMatch = headerStr.match(/filename="([^"]+)"/);
+        const ctMatch = headerStr.match(/Content-Type:\s*(.+)/i);
+        const filename = filenameMatch ? filenameMatch[1] : 'upload';
+        const fileMimeType = ctMatch ? ctMatch[1].trim() : 'application/octet-stream';
+
+        // Save to uploads directory
+        const { mkdir, writeFile } = await import('node:fs/promises');
+        const uploadsDir = join(resolve(fileURLToPath(import.meta.url), '../../'), '.scratchy-data', 'uploads', user.id);
+        await mkdir(uploadsDir, { recursive: true });
+        const fileId = crypto.randomUUID();
+        const ext = extname(filename) || '.bin';
+        const savedFilename = `${fileId}${ext}`;
+        await writeFile(join(uploadsDir, savedFilename), fileContent);
+
+        // Return the file info
+        const fileUrl = `/api/uploads/${user.id}/${savedFilename}`;
+        return json(res, 200, {
+          ok: true,
+          file: {
+            id: fileId,
+            filename,
+            mimeType: fileMimeType,
+            size: fileContent.length,
+            url: fileUrl,
+          },
+        });
+      }
+
+      // Serve uploaded files
+      if (method === 'GET' && pathname.startsWith('/api/uploads/')) {
+        const parts = pathname.split('/').filter(Boolean); // ['api', 'uploads', userId, filename]
+        if (parts.length !== 4) return json(res, 404, { error: 'Not found' });
+        const [, , fileUserId, filename] = parts;
+
+        // Validate filename to prevent path traversal
+        if (filename.includes('..') || filename.includes('/')) {
+          return json(res, 400, { error: 'Invalid filename' });
+        }
+
+        const uploadsDir = join(resolve(fileURLToPath(import.meta.url), '../../'), '.scratchy-data', 'uploads', fileUserId);
+        const filePath = join(uploadsDir, filename);
+
+        try {
+          const { readFile } = await import('node:fs/promises');
+          const content = await readFile(filePath);
+          const mimeTypes = {
+            '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+            '.gif': 'image/gif', '.webp': 'image/webp', '.svg': 'image/svg+xml',
+            '.pdf': 'application/pdf', '.txt': 'text/plain',
+            '.json': 'application/json', '.csv': 'text/csv',
+          };
+          const ext = extname(filename).toLowerCase();
+          const mime = mimeTypes[ext] || 'application/octet-stream';
+          res.writeHead(200, { 'Content-Type': mime, 'Cache-Control': 'public, max-age=31536000' });
+          res.end(content);
+          return;
+        } catch {
+          return json(res, 404, { error: 'File not found' });
+        }
+      }
+
       // Unknown API route
       if (pathname.startsWith('/api/')) {
         return json(res, 404, { error: 'Not found' });
