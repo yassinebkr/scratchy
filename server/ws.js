@@ -53,7 +53,7 @@ const userSockets = new Map();
  * @param {import('ws').WebSocket} ws
  * @param {Record<string, unknown>} msg
  */
-function sendJson(ws, msg) {
+export function sendJson(ws, msg) {
   if (ws.readyState === ws.OPEN) {
     ws.send(JSON.stringify(msg));
   }
@@ -469,6 +469,13 @@ export function createWsHandler(server, opts = {}) {
         });
 
         console.log(`[ws] Client connected: ${user.username} (${user.id}), total: ${clients.size}`);
+
+        // Notify server of new authenticated connection (canvas restore, etc.)
+        if (typeof opts.onConnect === 'function') {
+          try { await opts.onConnect(user.id, ws); } catch (err) {
+            console.warn('[ws] onConnect error:', err.message);
+          }
+        }
 
         /* -- Keepalive pong tracking -- */
         const state = clients.get(ws);

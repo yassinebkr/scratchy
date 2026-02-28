@@ -921,6 +921,24 @@ export async function routeMessage(userId, agentId, message, ws) {
           ts: Date.now(),
         });
         console.log(`[orchestrator] GenUI: ${ops.length} canvas ops extracted for ${userId}`);
+
+        // Persist canvas ops for restore on reconnect
+        try {
+          const canvasMod = await import('../state/canvas.js');
+          const existing = canvasMod.getCanvasState(userId);
+          // Apply ops: upsert/patch merge, remove deletes, clear wipes
+          let merged = [...existing];
+          for (const op of ops) {
+            if (op.op === 'clear') { merged = []; continue; }
+            if (op.op === 'remove') { merged = merged.filter(o => o.id !== op.id); continue; }
+            const idx = merged.findIndex(o => o.id === op.id);
+            if (idx >= 0) { merged[idx] = { ...merged[idx], ...op }; } else { merged.push(op); }
+          }
+          canvasMod.setCanvasState(userId, merged);
+        } catch (err) {
+          console.warn('[orchestrator] Failed to persist canvas state:', err.message);
+        }
+
         // Use cleaned text (without code blocks) for history storage
         response = cleanText;
       }

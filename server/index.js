@@ -16,6 +16,7 @@ import { init as initChat, handleChat, shutdown as shutdownChat } from './chat-h
 import { init as initOrchestrator, routeMessage, shutdown as shutdownOrchestrator } from './agent-orchestrator.js';
 import { createSurfaceEventHandler } from './surface-events.js';
 import { seedAgents } from './seed-agents.js';
+import * as canvasState from '../state/canvas.js';
 
 /** Default port — v2 runs on 3002 (v1 is on 3001) */
 const PORT = parseInt(process.env.PORT ?? '3002', 10);
@@ -104,6 +105,12 @@ async function main() {
   const handler = createRouter({ auth, getDb, version: VERSION });
   const server = createServer(handler);
 
+  /* -- Canvas state -- */
+  if (db) {
+    canvasState.init(db);
+    console.log('[server] Canvas state persistence initialized');
+  }
+
   /* -- WebSocket handler -- */
   const wsHandler = createWsHandler(server, {
     auth,
@@ -115,6 +122,15 @@ async function main() {
     },
     surfaceHandler,
     onWidgetAction: handleWidgetAction,
+    // Restore canvas state when a client connects
+    onConnect: async (userId, ws) => {
+      if (!db) return;
+      const ops = canvasState.getCanvasState(userId);
+      if (ops && ops.length > 0) {
+        const { sendJson } = await import('./ws.js');
+        sendJson(ws, { type: 'canvas-ops', ops, restored: true, ts: Date.now() });
+      }
+    },
   });
 
   /* -- Start listening -- */
