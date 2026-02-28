@@ -500,13 +500,16 @@ function buildAugmentedPrompt(userMessage, agentConfig, history, contextBlock, t
     parts.push(`[System]\n${agentConfig.systemPrompt}\n`);
   }
 
-  // ── MCP tool definitions (so the LLM knows what's available) ──
-  if (tools.length > 0) {
-    const toolLines = tools.map(t =>
-      `- ${t.name}: ${t.description || '(no description)'}`
-    );
-    parts.push(`[Available tools]\n${toolLines.join('\n')}\n`);
-  }
+  // ── MCP tool definitions ──
+  // NOTE: Only list MCP tools here, NOT built-in tools. NullClaw has its own
+  // built-in tools (shell, file_read, file_write, file_edit, git, web_search,
+  // web_fetch, memory_recall, etc.) that are already registered at the provider
+  // level. Listing Scratchy's builtin-tools.js definitions here causes the LLM
+  // to call phantom tools that NullClaw doesn't recognize.
+  // MCP tools (from external servers) are the only ones NullClaw doesn't know
+  // about — but even those need to be registered via NullClaw's tool system,
+  // not just described in the prompt. For now, skip tool listing entirely.
+  // TODO: When MCP bridge is implemented, register tools in NullClaw and list here.
 
   // ── Retrieved context ──
   if (contextBlock) {
