@@ -886,10 +886,27 @@ export async function routeMessage(userId, agentId, message, ws) {
                 ts: Date.now(),
               });
             } else if (evt.type === 'tool_call_result') {
+              // Build result object — include output for surface rendering
+              const toolResult = { success: evt.success, duration_ms: evt.duration_ms };
+              if (evt.output) {
+                // Parse tool output into structured form for surfaces
+                toolResult.content = evt.output;
+                // Try to parse directory listings (NullClaw list_dir returns text lines)
+                if (evt.name === 'list_dir' || evt.name === 'read_dir' || evt.name === 'list_files') {
+                  try {
+                    const entries = evt.output.split('\n').filter(Boolean).map(line => {
+                      const isDir = line.endsWith('/');
+                      return { name: line.replace(/\/$/, ''), isDir };
+                    });
+                    toolResult.entries = entries;
+                  } catch {}
+                }
+              }
               sendJson(ws, {
                 type: 'tool_result',
                 tool: evt.name,
-                result: { success: evt.success, duration_ms: evt.duration_ms },
+                args: safeParseJson(evt.arguments),
+                result: toolResult,
                 requestId: evt.id || `tr-${Date.now()}`,
                 iteration: evt.iteration,
                 agentId: effectiveAgentId,

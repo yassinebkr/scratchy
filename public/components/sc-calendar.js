@@ -68,6 +68,14 @@ class ScCalendar extends HTMLElement {
         this.selectedDate = null;
         this.render();
     }
+    if (target.closest('.delete-event-btn')) {
+        const eventId = target.closest('.delete-event-btn').dataset.id;
+        this.deleteEvent(eventId);
+    }
+    if (target.closest('.edit-event-btn')) {
+        const eventId = target.closest('.edit-event-btn').dataset.id;
+        this.editEvent(eventId);
+    }
     if (target.id === 'save-event') {
         this.saveEvent(e);
     }
@@ -75,6 +83,29 @@ class ScCalendar extends HTMLElement {
         this.selectedDate = null;
         this.render();
     }
+  }
+
+  async deleteEvent(eventId) {
+      if (!confirm('Are you sure you want to delete this event?')) return;
+
+      try {
+        const response = await fetch(`/api/calendar/${eventId}`, {
+            method: 'DELETE',
+            credentials: 'same-origin'
+        });
+        if (response.ok) {
+            this.selectedDate = null;
+            this.fetchEvents();
+        }
+      } catch (err) {
+          console.error('Failed to delete event', err);
+      }
+  }
+
+  editEvent(eventId) {
+    const event = this.events.find(e => e.id === eventId);
+    this.selectedDate = new Date(event.startTime);
+    this.renderForm(event);
   }
   
   async saveEvent(e){
@@ -221,7 +252,7 @@ class ScCalendar extends HTMLElement {
           <button class="day-events-close">X</button>
           <h4>Events on ${this.selectedDate.toLocaleDateString()}</h4>
           ${dayEvents.length > 0 ? 
-            `<ul>${dayEvents.map(e => `<li>${e.allDay ? 'All Day' : new Date(e.startTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - ${e.title}</li>`).join('')}</ul>`
+            `<ul>${dayEvents.map(e => `<li><div>${e.allDay ? 'All Day' : new Date(e.startTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - ${e.title}</div><div><button class="edit-event-btn" data-id="${e.id}">Edit</button><button class="delete-event-btn" data-id="${e.id}">Delete</button></div></li>`).join('')}</ul>`
             : `<p>No events. <button class="add-event-btn" data-date="${this.selectedDate.toISOString()}">Add one?</button></p>`
           }
         </div>

@@ -115,10 +115,38 @@ export function initSurfaceManager() {
 /*  Public API                                                        */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Surface groups — surfaces in the same group are mutually exclusive
+ * when auto-activated by tool events. Manual toggles bypass this.
+ */
+const SURFACE_GROUPS = {
+  terminal: 'primary',
+  explorer: 'primary',
+  editor: 'secondary',
+  search: 'secondary',
+  canvas: 'canvas',
+};
+
+/** Set of surfaces that were manually toggled (not auto-activated) */
+const _manualSurfaces = new Set();
+
 /** Activate a surface by type */
-export function activateSurface(type) {
+export function activateSurface(type, { manual = false } = {}) {
   const s = _surfaces.get(type);
   if (!s || s.active) return;
+
+  // Track whether this was manually activated
+  if (manual) _manualSurfaces.add(type);
+
+  // Soft exclusive: deactivate other auto-activated surfaces in same group
+  const group = SURFACE_GROUPS[type];
+  if (group && !manual) {
+    for (const [otherType, otherState] of _surfaces) {
+      if (otherType !== type && otherState.active && SURFACE_GROUPS[otherType] === group && !_manualSurfaces.has(otherType)) {
+        deactivateSurface(otherType);
+      }
+    }
+  }
 
   s.active = true;
   s.el.style.display = '';
@@ -145,6 +173,7 @@ export function deactivateSurface(type) {
   if (!s || !s.active) return;
 
   s.active = false;
+  _manualSurfaces.delete(type);
   _clearIdleTimer(type);
 
   // Exit animation: scale-down + fade, then remove from DOM
@@ -173,12 +202,12 @@ export function deactivateSurface(type) {
   emit('surface:deactivated', { type });
 }
 
-/** Toggle a surface */
+/** Toggle a surface (always treated as manual) */
 export function toggleSurface(type) {
   const s = _surfaces.get(type);
   if (!s) return;
   if (s.active) deactivateSurface(type);
-  else activateSurface(type);
+  else activateSurface(type, { manual: true });
 }
 
 /** Get active surface types */
@@ -518,8 +547,9 @@ function _pushToolCallData(surfaceType, msg) {
       const el = /** @type {import('../components/sc-filetree.js').ScFiletree} */ (s.el);
       // NullClaw file_read uses "file_path" or "path" arg
       const path = msg.args?.file_path || msg.args?.path || msg.args?.directory || '';
-      if (path && el.highlightPath) {
-        el.highlightPath?.(path);
+      if (path) {
+        // Show loading state for file read operations
+        el.showFile?.(path, '// Loading…');
       }
       break;
     }
@@ -565,21 +595,26 @@ function _pushToolResultData(surfaceType, msg) {
     case 'terminal': {
       const el = /** @type {import('../components/sc-terminal.js').ScTerminal} */ (s.el);
       // Push the command output text before marking complete
-      const output = msg.result?.content || msg.result?.text || '';
+      const output = msg.result?.content || msg.result?.text || msg.result?.output || '';
       if (output && el.appendOutput) {
         el.appendOutput(msg.requestId || msg.id || '', output, 'stdout');
       }
       if (el.completeCommand) {
-        el.completeCommand(msg.requestId || msg.id || '', msg.exitCode ?? msg.exit_code);
+        // NullClaw doesn't send exit_code separately — infer from success flag
+        const exitCode = msg.exitCode ?? msg.exit_code ?? (msg.result?.success === false ? 1 : msg.result?.success === true ? 0 : undefined);
+        el.completeCommand(msg.requestId || msg.id || '', exitCode);
       }
       break;
     }
     case 'explorer': {
       const el = /** @type {import('../components/sc-filetree.js').ScFiletree} */ (s.el);
+      const path = msg.args?.file_path || msg.args?.path || msg.args?.directory || '.';
       if (msg.result?.entries) {
-        el.addDirectory?.(msg.args?.path || '.', msg.result.entries);
+        // Structured directory listing (pre-parsed by orchestrator)
+        el.addDirectory?.(path, msg.result.entries);
       } else if (msg.result?.content !== undefined) {
-        el.showFile?.(msg.args?.path || msg.args?.file_path || 'unknown', msg.result.content);
+        // File content or raw text output
+        el.showFile?.(path, msg.result.content);
       }
       break;
     }
