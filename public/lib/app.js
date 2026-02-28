@@ -155,6 +155,18 @@ function autoResize(textarea) {
   textarea.style.height = Math.min(textarea.scrollHeight, max) + 'px';
 }
 
+/** Open a widget panel (notes, calendar, email) — creates on first use */
+function _openWidget(tagName, name) {
+  let el = document.querySelector(tagName);
+  if (!el) {
+    el = document.createElement(tagName);
+    document.body.appendChild(el);
+  }
+  el.setAttribute('open', '');
+  // Listen for close event
+  el.addEventListener(`${name}-close`, () => el.removeAttribute('open'), { once: true });
+}
+
 /* ------------------------------------------------------------------ */
 /*  Send logic                                                        */
 /* ------------------------------------------------------------------ */
@@ -545,9 +557,18 @@ function wireWsEvents() {
       if (placeholder) placeholder.remove();
     }
 
+    // Handle trigger ops (open widgets, navigate, etc.)
+    const triggerOps = msg.ops.filter(op => op.op === 'trigger');
+    for (const op of triggerOps) {
+      const action = op.action || op.data?.action || '';
+      if (action === 'open-notes' || action === 'sn-list') _openWidget('sc-notes', 'notes');
+      else if (action === 'open-calendar' || action === 'cal-month') _openWidget('sc-calendar', 'calendar');
+      else if (action === 'open-email' || action === 'mail-inbox') _openWidget('sc-email', 'email');
+    }
+
     // Check for webapp ops (open_webapp tool results or agent-generated)
     const webappOps = msg.ops.filter(op => op.type === 'webapp' || op.op === 'webapp');
-    const canvasOps = msg.ops.filter(op => op.type !== 'webapp' && op.op !== 'webapp');
+    const canvasOps = msg.ops.filter(op => op.type !== 'webapp' && op.op !== 'webapp' && op.op !== 'trigger');
 
     // Open webapp surfaces
     for (const op of webappOps) {
@@ -761,6 +782,12 @@ function wireNewUIModules() {
 
   // --- Workspace Bar events ---
   // Surface pill toggle — mobile uses exclusive stack, desktop uses grid
+  // Widget open events from workspace bar
+  document.addEventListener('widget-open', (e) => {
+    const { widget, tag } = e.detail || {};
+    if (tag && widget) _openWidget(tag, widget);
+  });
+
   document.addEventListener('surface-toggle', (e) => {
     const type = e.detail?.type;
     if (!type) return;
@@ -847,6 +874,18 @@ function wireNewUIModules() {
         if (url) {
           import('./surface-manager.js').then(sm => sm.openWebApp(url));
         }
+        break;
+      }
+      case 'open-notes': {
+        _openWidget('sc-notes', 'notes');
+        break;
+      }
+      case 'open-calendar': {
+        _openWidget('sc-calendar', 'calendar');
+        break;
+      }
+      case 'open-email': {
+        _openWidget('sc-email', 'email');
         break;
       }
     }

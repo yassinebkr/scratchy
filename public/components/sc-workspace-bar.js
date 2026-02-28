@@ -439,6 +439,22 @@ template.innerHTML = /* html */ `
     </button>
   </div>
 
+  <!-- Widget pills -->
+  <div class="surfaces widgets" role="group" aria-label="Widgets">
+    <button class="pill widget-pill" data-widget="notes" title="Notes">
+      <span style="font-size:12px">📝</span>
+      <span class="pill-label">Notes</span>
+    </button>
+    <button class="pill widget-pill" data-widget="calendar" title="Calendar">
+      <span style="font-size:12px">📅</span>
+      <span class="pill-label">Calendar</span>
+    </button>
+    <button class="pill widget-pill" data-widget="email" title="Email">
+      <span style="font-size:12px">📧</span>
+      <span class="pill-label">Email</span>
+    </button>
+  </div>
+
   <!-- Divider -->
   <div class="divider" aria-hidden="true"></div>
 
@@ -586,6 +602,23 @@ class ScWorkspaceBar extends HTMLElement {
             detail: { type },
           })
         );
+      });
+    });
+
+    // Widget pills
+    const widgetPills = this.#shadow.querySelectorAll('.widget-pill');
+    widgetPills.forEach((pill) => {
+      pill.addEventListener('click', () => {
+        const widget = pill.dataset.widget;
+        const tagMap = { notes: 'sc-notes', calendar: 'sc-calendar', email: 'sc-email' };
+        const tag = tagMap[widget];
+        if (tag) {
+          this.dispatchEvent(new CustomEvent('widget-open', {
+            bubbles: true,
+            composed: true,
+            detail: { widget, tag },
+          }));
+        }
       });
     });
 

@@ -59,6 +59,9 @@ function defaultGetSearchItems() {
     { type: 'action', id: 'close-all', title: 'Close All Surfaces', subtitle: 'Return to chat-only view', action: 'close-all-surfaces', icon: ACTION_ICONS['close-all-surfaces'] },
     { type: 'action', id: 'settings', title: 'Open Settings', subtitle: 'Configure preferences', action: 'open-settings', icon: ACTION_ICONS['open-settings'] },
     { type: 'action', id: 'open-webapp', title: 'Open Web App', subtitle: 'Embed a website in the workspace', action: 'open-webapp', icon: '🌐' },
+    { type: 'action', id: 'open-notes', title: 'Open Notes', subtitle: 'View and edit your notes', action: 'open-notes', icon: '📝' },
+    { type: 'action', id: 'open-calendar', title: 'Open Calendar', subtitle: 'View upcoming events', action: 'open-calendar', icon: '📅' },
+    { type: 'action', id: 'open-email', title: 'Open Email', subtitle: 'Check your inbox', action: 'open-email', icon: '📧' },
   );
 
   return items;

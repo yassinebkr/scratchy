@@ -184,25 +184,32 @@ class ScCalendar extends HTMLElement {
     }
   }
   
-  renderForm() {
+  renderForm(event = null) {
+    const isEdit = event !== null;
+    const title = isEdit ? event.title : '';
+    const allDay = isEdit ? event.allDay : false;
+    const startTime = isEdit && !event.allDay ? new Date(event.startTime).toTimeString().substring(0,5) : '';
+    const endTime = isEdit && event.endTime && !event.allDay ? new Date(event.endTime).toTimeString().substring(0,5) : '';
+    const color = isEdit ? event.color : this.colorPresets[0];
+
     const formHtml = `
       <div class="form-modal">
-        <form id="event-form">
-          <h3>Add Event on ${this.selectedDate.toDateString()}</h3>
-          <input type="text" name="title" placeholder="Event Title" required>
+        <form id="event-form" data-id="${isEdit ? event.id : ''}">
+          <h3>${isEdit ? 'Edit' : 'Add'} Event on ${this.selectedDate.toDateString()}</h3>
+          <input type="text" name="title" placeholder="Event Title" value="${title}" required>
           <div>
-            <label><input type="checkbox" name="allDay" onchange="this.getRootNode().host.shadowRoot.querySelector('.time-inputs').style.display = this.checked ? 'none' : 'flex'"> All-day</label>
+            <label><input type="checkbox" name="allDay" ${allDay ? 'checked' : ''} onchange="this.getRootNode().host.shadowRoot.querySelector('.time-inputs').style.display = this.checked ? 'none' : 'flex'"> All-day</label>
           </div>
-          <div class="time-inputs" style="display: flex;">
-            <input type="time" name="startTime">
-            <input type="time" name="endTime">
+          <div class="time-inputs" style="display: ${allDay ? 'none' : 'flex'};">
+            <input type="time" name="startTime" value="${startTime}">
+            <input type="time" name="endTime" value="${endTime}">
           </div>
           <div class="color-picker">
-            ${this.colorPresets.map(color => `<label><input type="radio" name="color" value="${color}" ${this.colorPresets[0] === color ? 'checked' : ''}><span class="color-dot" style="background:${color}"></span></label>`).join('')}
+            ${this.colorPresets.map(c => `<label><input type="radio" name="color" value="${c}" ${c === color ? 'checked' : ''}><span class="color-dot" style="background:${c}"></span></label>`).join('')}
           </div>
           <div class="form-actions">
             <button type="button" id="cancel-event">Cancel</button>
-            <button type="submit" id="save-event">Save</button>
+            <button type="submit" id="save-event">${isEdit ? 'Update' : 'Save'}</button>
           </div>
         </form>
       </div>
