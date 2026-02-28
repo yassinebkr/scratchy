@@ -233,130 +233,78 @@ function escapeHtml(s) {
 /**
  * Create an empty state element for the chat messages area.
  * @param {string} agentName - Name of the active agent
- * @param {string} agentType - Type/role of the agent (code, designer, researcher, writer)
- * @returns {HTMLElement} The empty state container
+ * @param {string} agentType - Type/role of the agent (e.g. 'code', 'designer')
+ * @returns {HTMLElement} The empty state container element
  */
-function renderEmptyState(agentName, agentType = 'code') {
-  // Agent suggestions based on type
-  const suggestions = {
-    code: ['Review my code', 'Explain this error', 'Write a function'],
-    designer: ['Design a landing page', 'Suggest colors', 'Review my UI'],
-    researcher: ['Summarize this article', 'Compare X vs Y', 'Find papers on...'],
-    writer: ['Draft an email', 'Improve this text', 'Write docs'],
-  };
+function renderEmptyState(agentName, agentType = 'default') {
+    const suggestionsMap = {
+        code: ["Review my code", "Explain this error", "Write a function"],
+        designer: ["Design a landing page", "Suggest colors", "Review my UI"],
+        researcher: ["Summarize this article", "Compare X vs Y", "Find papers on..."],
+        writer: ["Draft an email", "Improve this text", "Write docs"],
+        default: ["Review my code", "Explain this error", "Write a function"],
+    };
 
-  // Get agent from switcher to find emoji and type
-  const agent = $agentSwitcher?._agents?.find(a => a.name === agentName);
-  const agentEmoji = agent?.emoji || '🤖';
-  const effectiveType = (agent?.role?.toLowerCase() === 'designer') ? 'designer' :
-                       (agent?.role?.toLowerCase() === 'researcher') ? 'researcher' :
-                       (agent?.role?.toLowerCase() === 'writer') ? 'writer' : 'code';
-  
-  const chips = suggestions[effectiveType] || suggestions.code;
+    const agent = $agentSwitcher?._agents?.find(a => a.name === agentName);
+    const agentEmoji = agent?.emoji || '✨';
+    const effectiveType = agent?.role?.toLowerCase() || agentType;
+    const suggestions = suggestionsMap[effectiveType] || suggestionsMap.default;
 
-  const container = document.createElement('div');
-  container.className = 'empty-state';
-  container.style.cssText = `
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 100%;
-    min-height: 300px;
-    padding: 48px 24px;
-    text-align: center;
-    font-family: 'Geist', system-ui, sans-serif;
-  `;
-
-  const emoji = document.createElement('div');
-  emoji.style.cssText = `
-    font-size: 48px;
-    opacity: 0.3;
-    margin-bottom: 16px;
-  `;
-  emoji.textContent = agentEmoji;
-
-  const text = document.createElement('p');
-  text.style.cssText = `
-    font-size: 18px;
-    color: #8a7e6a;
-    margin: 0 0 24px 0;
-    font-weight: 500;
-  `;
-  text.textContent = `Ask ${agentName} anything`;
-
-  const chipsContainer = document.createElement('div');
-  chipsContainer.style.cssText = `
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    justify-content: center;
-    max-width: 400px;
-  `;
-
-  chips.forEach(chipText => {
-    const chip = document.createElement('button');
-    chip.className = 'suggestion-chip';
-    chip.style.cssText = `
-      background: rgba(26, 22, 16, 0.85);
-      backdrop-filter: blur(20px);
-      border: 1px solid rgba(240, 234, 214, 0.15);
-      color: #f0ead6;
-      padding: 8px 16px;
-      border-radius: 8px;
-      font-family: inherit;
-      font-size: 14px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      white-space: nowrap;
+    const container = document.createElement('div');
+    container.id = 'empty-state';
+    container.style.cssText = `
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        flex-grow: 1; height: 100%; text-align: center; color: #f0ead6;
+        font-family: 'Geist', sans-serif;
     `;
-    chip.textContent = chipText;
-    
-    // Hover styles
-    chip.addEventListener('mouseenter', () => {
-      chip.style.borderColor = '#F9A602';
-      chip.style.background = 'rgba(249, 166, 2, 0.1)';
-      chip.style.color = '#F9A602';
+
+    const emojiDiv = document.createElement('div');
+    emojiDiv.textContent = agentEmoji;
+    emojiDiv.style.cssText = `font-size: 48px; opacity: 0.3; margin-bottom: 16px;`;
+
+    const textP = document.createElement('p');
+    textP.textContent = `Ask ${agentName} anything`;
+    textP.style.cssText = `color: #8a7e6a; font-size: 1.1em; margin: 0 0 24px;`;
+
+    const chipsContainer = document.createElement('div');
+    chipsContainer.style.cssText = `display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;`;
+
+    suggestions.forEach(text => {
+        const chip = document.createElement('button');
+        chip.textContent = text;
+        chip.style.cssText = `
+            background: #1a1610; border: 1px solid rgba(240, 234, 214, 0.1);
+            color: #f0ead6; padding: 8px 16px; border-radius: 8px;
+            cursor: pointer; transition: all 0.2s ease; font-family: 'Geist', sans-serif;
+            font-size: 14px;
+        `;
+        chip.onmouseenter = () => { chip.style.borderColor = '#F9A602'; chip.style.color = '#F9A602'; };
+        chip.onmouseleave = () => { chip.style.borderColor = 'rgba(240, 234, 214, 0.1)'; chip.style.color = '#f0ead6'; };
+        chip.onclick = () => {
+            if ($msgInput) {
+                $msgInput.value = text;
+                $msgInput.focus();
+                autoResize($msgInput);
+            }
+            sendMessage();
+        };
+        chipsContainer.appendChild(chip);
     });
-    chip.addEventListener('mouseleave', () => {
-      chip.style.borderColor = 'rgba(240, 234, 214, 0.15)';
-      chip.style.background = 'rgba(26, 22, 16, 0.85)';
-      chip.style.color = '#f0ead6';
-    });
 
-    // Click handler
-    chip.addEventListener('click', () => {
-      // Remove empty state
-      removeEmptyState();
-      // Put text in textarea
-      if ($msgInput) {
-        $msgInput.value = chipText;
-        autoResize($msgInput);
-        $msgInput.focus();
-      }
-      // Send the message
-      sendMessage();
-    });
-
-    chipsContainer.appendChild(chip);
-  });
-
-  container.appendChild(emoji);
-  container.appendChild(text);
-  container.appendChild(chipsContainer);
-
-  return container;
+    container.appendChild(emojiDiv);
+    container.appendChild(textP);
+    container.appendChild(chipsContainer);
+    return container;
 }
+
 
 /**
  * Remove empty state from messages container
  */
 function removeEmptyState() {
-  if ($messages) {
-    const emptyState = $messages.querySelector('.empty-state');
-    if (emptyState) {
-      emptyState.remove();
-    }
+  const emptyState = $messages?.querySelector('#empty-state');
+  if (emptyState) {
+    emptyState.remove();
   }
 }
 
@@ -366,26 +314,18 @@ function removeEmptyState() {
 function showEmptyStateIfNeeded() {
   if (!$messages) return;
   
-  // Only show if messages container has no children or only typing indicators/placeholders
-  const realMessages = Array.from($messages.children).filter(child => 
-    !child.classList.contains('typing-indicator') && 
-    !child.classList.contains('genui-rendering') &&
-    !child.classList.contains('empty-state')
-  );
-
-  if (realMessages.length === 0) {
-    // Get current agent info
-    const activeAgent = $agentSwitcher?._agents?.find(a => a.id === $agentSwitcher?._activeAgentId);
-    const agentName = activeAgent?.name || 'Atlas';
-    const agentType = activeAgent?.role?.toLowerCase() || 'code';
-    
-    // Remove any existing empty state first
-    removeEmptyState();
-    
-    // Add new empty state
-    const emptyState = renderEmptyState(agentName, agentType);
-    $messages.appendChild(emptyState);
-  }
+  // Defer to ensure DOM is updated after potential innerHTML clear
+  setTimeout(() => {
+    const hasMessages = $messages.querySelector('.msg-user, .msg-assistant');
+    if (!hasMessages) {
+      removeEmptyState(); // Clear any existing one first
+      const activeAgent = $agentSwitcher?._agents?.find(a => a.id === $agentSwitcher?._activeAgentId);
+      const agentName = activeAgent?.name || 'Atlas';
+      const agentType = activeAgent?.role?.toLowerCase() || 'default';
+      const emptyStateEl = renderEmptyState(agentName, agentType);
+      $messages.appendChild(emptyStateEl);
+    }
+  }, 0);
 }
 
 /** Basic markdown → HTML (bold, italic, inline code, code blocks, newlines) */
@@ -424,7 +364,10 @@ async function loadChatHistory(agentId) {
     const res = await fetch(`/api/chat/history?${params}`, {
       headers: { 'Authorization': `Bearer ${token}` },
     });
-    if (!res.ok) return;
+    if (!res.ok) {
+        showEmptyStateIfNeeded();
+        return;
+    }
 
     const { messages } = await res.json();
     if (messages && messages.length > 0 && $messages) {
@@ -721,7 +664,7 @@ export function logout() {
   state.user = null;
   state.token = null;
   state.connected = false;
-  _historyLoaded = false;
+  _historyLoadedForAgent = null;
   localStorage.removeItem('scratchy_token');
   disconnect();
 
@@ -874,6 +817,7 @@ function wireNewUIModules() {
       case 'new-chat':
       case 'clear-chat':
         if ($messages) $messages.innerHTML = '';
+        showEmptyStateIfNeeded();
         break;
       case 'close-all-surfaces':
         import('./surface-manager.js').then(sm => sm.deactivateAll());
@@ -1063,10 +1007,10 @@ async function init() {
       // Clear chat and load per-agent conversation history
       if ($messages) $messages.innerHTML = '';
       _historyLoadedForAgent = null; // force reload
-      loadChatHistory(agentId);
       
-      // Show empty state for new agent immediately (will be updated after history loads)
+      // Show empty state for new agent immediately, then load history over it
       showEmptyStateIfNeeded();
+      loadChatHistory(agentId);
     }
   });
 
