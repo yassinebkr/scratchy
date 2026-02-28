@@ -111,6 +111,9 @@ class ScCalendar extends HTMLElement {
   async saveEvent(e){
     e.preventDefault();
     const form = this.shadowRoot.querySelector('#event-form');
+    const eventId = form.dataset.id;
+    const isEdit = eventId !== '';
+
     const title = form.title.value;
     const allDay = form.allDay.checked;
     const startTime = form.startTime.value;
@@ -137,9 +140,12 @@ class ScCalendar extends HTMLElement {
         color
     };
 
+    const url = isEdit ? `/api/calendar/${eventId}` : '/api/calendar';
+    const method = isEdit ? 'PUT' : 'POST';
+
     try {
-        const response = await fetch('/api/calendar', {
-            method: 'POST',
+        const response = await fetch(url, {
+            method: method,
             headers: { 'Content-Type': 'application/json' },
             credentials: 'same-origin',
             body: JSON.stringify(event)

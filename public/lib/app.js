@@ -94,6 +94,12 @@ function showApp() {
   hideAllScreens();
   $appScreen.classList.remove('hidden');
   if ($workspaceBar) $workspaceBar.style.display = '';
+  // Initialize dashboard with user info
+  const dashboard = document.getElementById('dashboard');
+  if (dashboard) {
+    if (state.user?.displayName) dashboard.userName = state.user.displayName;
+    dashboard.refresh?.();
+  }
   $msgInput?.focus();
 }
 
@@ -782,6 +788,22 @@ function wireNewUIModules() {
 
   // --- Workspace Bar events ---
   // Surface pill toggle — mobile uses exclusive stack, desktop uses grid
+  // Dashboard events
+  document.addEventListener('dashboard-open-widget', (e) => {
+    const widget = e.detail?.widget;
+    const tagMap = { notes: 'sc-notes', calendar: 'sc-calendar', email: 'sc-email' };
+    const tag = tagMap[widget];
+    if (tag && widget) _openWidget(tag, widget);
+  });
+  document.addEventListener('dashboard-suggestion', (e) => {
+    const text = e.detail?.text;
+    if (text && $msgInput) {
+      $msgInput.value = text;
+      $msgInput.focus();
+      autoResize($msgInput);
+    }
+  });
+
   // Widget open events from workspace bar
   document.addEventListener('widget-open', (e) => {
     const { widget, tag } = e.detail || {};

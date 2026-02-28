@@ -163,6 +163,8 @@
       </aside>
       <!-- Surface container: dynamic grid of contextual panels -->
       <div id="surfaces" class="surface-container" role="main" aria-label="Workspace">
+        <!-- Dashboard: default workspace home view -->
+        <sc-dashboard id="dashboard"></sc-dashboard>
         <!-- Surfaces injected dynamically by surface-manager.js -->
         <!-- Chat surface is always present -->
         <div id="chat-surface" class="surface chat-surface">
@@ -216,6 +218,7 @@
   <script type="module" src="components/sc-webapp.js?v=2.1.18"></script>
   <script type="module" src="components/sc-agent-wizard.js?v=2.1.18"></script>
   <script type="module" src="components/sc-onboarding.js?v=2.1.18"></script>
+  <script type="module" src="components/sc-dashboard.js?v=2.1.18"></script>
   <script type="module" src="components/sc-notes.js?v=2.1.18"></script>
   <script type="module" src="components/sc-calendar.js?v=2.1.18"></script>
   <script type="module" src="components/sc-email.js?v=2.1.18"></script>
