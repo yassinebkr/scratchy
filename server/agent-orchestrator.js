@@ -500,16 +500,33 @@ function buildAugmentedPrompt(userMessage, agentConfig, history, contextBlock, t
     parts.push(`[System]\n${agentConfig.systemPrompt}\n`);
   }
 
-  // ── MCP tool definitions ──
-  // NOTE: Only list MCP tools here, NOT built-in tools. NullClaw has its own
-  // built-in tools (shell, file_read, file_write, file_edit, git, web_search,
-  // web_fetch, memory_recall, etc.) that are already registered at the provider
-  // level. Listing Scratchy's builtin-tools.js definitions here causes the LLM
-  // to call phantom tools that NullClaw doesn't recognize.
-  // MCP tools (from external servers) are the only ones NullClaw doesn't know
-  // about — but even those need to be registered via NullClaw's tool system,
-  // not just described in the prompt. For now, skip tool listing entirely.
-  // TODO: When MCP bridge is implemented, register tools in NullClaw and list here.
+  // ── MCP tool bridge ──
+  // NullClaw has its own built-in tools (shell, file_read, file_write, file_edit,
+  // git, memory_recall, etc.) — those are NOT listed here.
+  // MCP tools (from external servers managed by Scratchy) are bridged via
+  // NullClaw's http_request tool → Scratchy's /api/internal/mcp endpoint.
+  if (tools.length > 0) {
+    // Filter: only include MCP tools (from external servers), not Scratchy's built-in tools
+    const mcpTools = tools.filter(t => t._source === 'mcp');
+    if (mcpTools.length > 0) {
+      const toolLines = mcpTools.map(t => {
+        const schemaStr = t.inputSchema
+          ? ` Input: ${JSON.stringify(t.inputSchema)}`
+          : '';
+        return `- ${t.name}: ${t.description || '(no description)'}${schemaStr}`;
+      });
+      parts.push([
+        '[MCP Tools — call via http_request]',
+        'These tools run on external MCP servers. To use them, call http_request:',
+        `  url: http://127.0.0.1:3002/api/internal/mcp`,
+        '  method: POST',
+        `  body: {"agentId":"${agentConfig.id}","tool":"<tool_name>","args":{...}}`,
+        '',
+        'Available MCP tools:',
+        ...toolLines,
+      ].join('\n') + '\n');
+    }
+  }
 
   // ── Retrieved context ──
   if (contextBlock) {
@@ -581,8 +598,11 @@ async function ensureMcpServers(agentConfig) {
     }
   }
 
+  // Tag MCP tools so buildAugmentedPrompt can filter them
+  const taggedMcpTools = mcpTools.map(t => ({ ...t, _source: 'mcp' }));
+
   // Merge: built-in tools first, then external MCP tools
-  return [...builtinTools, ...mcpTools];
+  return [...builtinTools, ...taggedMcpTools];
 }
 
 /* ------------------------------------------------------------------ */

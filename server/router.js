@@ -927,6 +927,47 @@ export function createRouter(opts = {}) {
         }
       }
 
+      /* ---------- Internal MCP Proxy (for NullClaw → MCP bridge) ---------- */
+
+      // POST /api/internal/mcp — NullClaw calls this via http_request tool
+      // to invoke MCP tools on external servers managed by Scratchy.
+      // Localhost-only: NullClaw instances run on the same machine.
+      if (method === 'POST' && pathname === '/api/internal/mcp') {
+        // Security: only allow localhost calls (from NullClaw instances)
+        const remoteAddr = req.socket?.remoteAddress || '';
+        const isLocalhost = remoteAddr === '127.0.0.1' || remoteAddr === '::1' || remoteAddr === '::ffff:127.0.0.1';
+        if (!isLocalhost) {
+          return json(res, 403, { error: 'Internal endpoint — localhost only' });
+        }
+
+        const registry = getMcpRegistry();
+        if (!registry) return json(res, 503, { error: 'MCP registry not available' });
+
+        const body = await parseJsonBody(req);
+        const { agentId, tool, args } = body;
+        if (!agentId || !tool) {
+          return json(res, 400, { error: 'agentId and tool are required' });
+        }
+
+        try {
+          // Auto-activate if not yet running
+          if (!registry.isActive(agentId)) {
+            const agent = agents.getAgent(agentId);
+            if (!agent) return json(res, 404, { error: `Agent ${agentId} not found` });
+            if (!agent.mcpServers || agent.mcpServers.length === 0) {
+              return json(res, 400, { error: `Agent ${agentId} has no MCP servers configured` });
+            }
+            await registry.activateAgent(agent);
+          }
+
+          const result = await registry.callTool(agentId, tool, args || {});
+          return json(res, 200, { ok: true, result });
+        } catch (err) {
+          console.error(`[mcp-proxy] Error calling ${tool} for agent ${agentId}:`, err.message);
+          return json(res, 500, { error: err.message });
+        }
+      }
+
       /* ---------- Admin Routes (comprehensive) ---------- */
 
       // Wire up admin routes from server/routes/admin.js
