@@ -4,7 +4,7 @@
  *
  * Tabs: Dashboard | Users | Agents | Config | Deploy
  * Fetches data from /api/admin/* routes.
- * Self-contained shadow DOM, dark theme, Geist font, indigo accent.
+ * Self-contained shadow DOM, dark theme, Geist font, gold/amber accent.
  */
 
 /* ------------------------------------------------------------------ */
@@ -13,26 +13,41 @@
 
 const STYLES = `
   :host {
-    display: block;
-    width: 100%;
-    height: 100%;
-    font-family: var(--sc-font, 'Geist', system-ui, -apple-system, sans-serif);
-    color: var(--sc-text, #e4e4e7);
-    background: var(--sc-bg, #0a0a0f);
+    position: fixed;
+    inset: 0;
+    z-index: 5000;
+    display: none;
+    font-family: 'Geist', system-ui, -apple-system, sans-serif;
+    color: #f0ead6;
+    background: #0d0b07;
     overflow-y: auto;
     line-height: 1.5;
     font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  :host([open]) {
+    display: block;
   }
 
   *, *::before, *::after { box-sizing: border-box; }
 
-  /* Tab bar */
+  /* ---- Scrollbar ---- */
+  :host::-webkit-scrollbar { width: 6px; }
+  :host::-webkit-scrollbar-track { background: transparent; }
+  :host::-webkit-scrollbar-thumb { background: rgba(249,166,2,0.15); border-radius: 3px; }
+  :host::-webkit-scrollbar-thumb:hover { background: rgba(249,166,2,0.3); }
+
+  /* ---- Tab bar ---- */
   .tab-bar {
     display: flex;
     gap: 2px;
     padding: 16px 24px 0;
-    border-bottom: 1px solid var(--sc-border, rgba(255,255,255,0.06));
-    background: var(--sc-surface, #111118);
+    border-bottom: 1px solid rgba(249,166,2,0.08);
+    background: rgba(26,22,16,0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
     position: sticky;
     top: 0;
     z-index: 10;
@@ -43,23 +58,32 @@ const STYLES = `
     background: none;
     border: none;
     border-bottom: 2px solid transparent;
-    color: var(--sc-text-muted, #71717a);
+    color: #8a7e6a;
     font-family: inherit;
     font-size: 13px;
     font-weight: 500;
     cursor: pointer;
-    transition: color 0.15s, border-color 0.15s;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
     white-space: nowrap;
+    border-radius: 6px 6px 0 0;
+    outline: none;
   }
 
-  .tab-btn:hover { color: var(--sc-text, #e4e4e7); }
+  .tab-btn:hover {
+    color: #f0ead6;
+    background: rgba(249,166,2,0.04);
+  }
+
+  .tab-btn:focus-visible {
+    box-shadow: 0 0 0 2px rgba(249,166,2,0.3);
+  }
 
   .tab-btn.active {
-    color: var(--sc-accent, #6366f1);
-    border-bottom-color: var(--sc-accent, #6366f1);
+    color: #F9A602;
+    border-bottom-color: #F9A602;
   }
 
-  /* Content area */
+  /* ---- Content area ---- */
   .tab-content {
     padding: 24px;
     max-width: 1200px;
@@ -69,40 +93,55 @@ const STYLES = `
   .tab-panel { display: none; }
   .tab-panel.active { display: block; }
 
-  /* Cards */
+  /* ---- Cards (glassmorphism) ---- */
   .card {
-    background: var(--sc-surface, #111118);
-    border: 1px solid var(--sc-border, rgba(255,255,255,0.06));
-    border-radius: 10px;
+    background: rgba(26,22,16,0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(249,166,2,0.08);
+    border-radius: 8px;
     padding: 20px;
     margin-bottom: 16px;
+    transition: border-color 0.2s;
+  }
+
+  .card:hover {
+    border-color: rgba(249,166,2,0.15);
   }
 
   .card h3 {
     margin: 0 0 14px;
     font-size: 15px;
     font-weight: 600;
-    color: var(--sc-text, #e4e4e7);
+    color: #f0ead6;
   }
 
-  /* Stats grid */
+  /* ---- Stats grid ---- */
   .stats-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
     gap: 12px;
     margin-bottom: 20px;
   }
 
   .stat-card {
-    background: var(--sc-surface, #111118);
-    border: 1px solid var(--sc-border, rgba(255,255,255,0.06));
-    border-radius: 10px;
+    background: rgba(26,22,16,0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(249,166,2,0.08);
+    border-radius: 8px;
     padding: 18px 20px;
+    transition: border-color 0.2s, transform 0.2s;
+  }
+
+  .stat-card:hover {
+    border-color: rgba(249,166,2,0.15);
+    transform: translateY(-1px);
   }
 
   .stat-label {
     font-size: 12px;
-    color: var(--sc-text-muted, #71717a);
+    color: #8a7e6a;
     text-transform: uppercase;
     letter-spacing: 0.5px;
     margin-bottom: 6px;
@@ -111,17 +150,17 @@ const STYLES = `
   .stat-value {
     font-size: 28px;
     font-weight: 700;
-    color: var(--sc-text, #e4e4e7);
+    color: #F9A602;
     line-height: 1.1;
   }
 
   .stat-sub {
     font-size: 12px;
-    color: var(--sc-text-muted, #71717a);
+    color: #8a7e6a;
     margin-top: 4px;
   }
 
-  /* Tables */
+  /* ---- Tables ---- */
   table {
     width: 100%;
     border-collapse: collapse;
@@ -130,24 +169,25 @@ const STYLES = `
 
   thead th {
     text-align: left;
-    padding: 10px 12px;
+    padding: 12px 14px;
     font-weight: 500;
-    color: var(--sc-text-muted, #71717a);
-    border-bottom: 1px solid var(--sc-border, rgba(255,255,255,0.06));
+    color: #8a7e6a;
+    border-bottom: 1px solid rgba(249,166,2,0.08);
     font-size: 12px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
   }
 
   tbody td {
-    padding: 10px 12px;
-    border-bottom: 1px solid var(--sc-border, rgba(255,255,255,0.03));
+    padding: 12px 14px;
+    border-bottom: 1px solid rgba(249,166,2,0.04);
     vertical-align: middle;
   }
 
-  tbody tr:hover { background: rgba(99,102,241,0.04); }
+  tbody tr { transition: background 0.15s; }
+  tbody tr:hover { background: rgba(249,166,2,0.04); }
 
-  /* Badges */
+  /* ---- Badges ---- */
   .badge {
     display: inline-block;
     padding: 2px 8px;
@@ -158,17 +198,17 @@ const STYLES = `
     letter-spacing: 0.3px;
   }
 
-  .badge-admin { background: rgba(239,68,68,0.15); color: #f87171; }
-  .badge-user  { background: rgba(99,102,241,0.15); color: #818cf8; }
-  .badge-free  { background: rgba(113,113,122,0.15); color: #a1a1aa; }
-  .badge-pro   { background: rgba(99,102,241,0.15); color: #818cf8; }
-  .badge-team  { background: rgba(34,197,94,0.15); color: #4ade80; }
-  .badge-byok  { background: rgba(251,191,36,0.15); color: #fbbf24; }
-  .badge-enterprise { background: rgba(168,85,247,0.15); color: #c084fc; }
-  .badge-enabled  { background: rgba(34,197,94,0.15); color: #4ade80; }
-  .badge-disabled { background: rgba(239,68,68,0.15); color: #f87171; }
+  .badge-admin { background: rgba(239,68,68,0.15); color: #ef4444; }
+  .badge-user  { background: rgba(249,166,2,0.12); color: #F9A602; }
+  .badge-free  { background: rgba(138,126,106,0.15); color: #8a7e6a; }
+  .badge-pro   { background: rgba(249,166,2,0.12); color: #F9A602; }
+  .badge-team  { background: rgba(34,197,94,0.15); color: #22c55e; }
+  .badge-byok  { background: rgba(249,166,2,0.15); color: #F9A602; }
+  .badge-enterprise { background: rgba(249,166,2,0.08); color: #f0ead6; border: 1px solid rgba(249,166,2,0.2); }
+  .badge-enabled  { background: rgba(34,197,94,0.15); color: #22c55e; }
+  .badge-disabled { background: rgba(239,68,68,0.15); color: #ef4444; }
 
-  /* Search */
+  /* ---- Search ---- */
   .search-bar {
     display: flex;
     gap: 10px;
@@ -179,78 +219,101 @@ const STYLES = `
   .search-input {
     flex: 1;
     max-width: 360px;
-    background: var(--sc-bg, #0a0a0f);
-    border: 1px solid var(--sc-border, rgba(255,255,255,0.06));
-    border-radius: 8px;
-    color: var(--sc-text, #e4e4e7);
+    height: 40px;
+    background: #0d0b07;
+    border: 1px solid rgba(249,166,2,0.08);
+    border-radius: 6px;
+    color: #f0ead6;
     font-family: inherit;
     font-size: 13px;
-    padding: 8px 12px;
+    padding: 0 12px;
     outline: none;
-    transition: border-color 0.15s;
+    transition: border-color 0.15s, box-shadow 0.15s;
   }
 
-  .search-input:focus { border-color: var(--sc-accent, #6366f1); }
-  .search-input::placeholder { color: var(--sc-text-muted, #71717a); opacity: 0.6; }
+  .search-input:hover {
+    border-color: rgba(249,166,2,0.15);
+  }
 
-  /* Buttons */
+  .search-input:focus {
+    border-color: #F9A602;
+    box-shadow: 0 0 0 2px rgba(249,166,2,0.3);
+  }
+
+  .search-input::placeholder { color: #8a7e6a; opacity: 0.6; }
+
+  /* ---- Buttons ---- */
   .btn {
-    padding: 8px 16px;
+    padding: 10px 18px;
     border: none;
-    border-radius: 8px;
+    border-radius: 6px;
     font-family: inherit;
     font-size: 13px;
     font-weight: 500;
     cursor: pointer;
-    transition: background 0.15s, opacity 0.15s;
+    transition: background 0.15s, opacity 0.15s, box-shadow 0.15s, transform 0.1s;
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 6px;
+    outline: none;
+  }
+
+  .btn:focus-visible {
+    box-shadow: 0 0 0 2px rgba(249,166,2,0.3);
+  }
+
+  .btn:active:not(:disabled) {
+    transform: scale(0.97);
   }
 
   .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
   .btn-primary {
-    background: var(--sc-accent, #6366f1);
-    color: #fff;
+    background: #F9A602;
+    color: #0d0b07;
+    font-weight: 600;
   }
-  .btn-primary:hover:not(:disabled) { background: #4f46e5; }
+  .btn-primary:hover:not(:disabled) { background: #e69500; }
 
   .btn-ghost {
-    background: rgba(255,255,255,0.04);
-    color: var(--sc-text, #e4e4e7);
-    border: 1px solid var(--sc-border, rgba(255,255,255,0.06));
+    background: rgba(249,166,2,0.06);
+    color: #f0ead6;
+    border: 1px solid rgba(249,166,2,0.08);
   }
-  .btn-ghost:hover:not(:disabled) { background: rgba(255,255,255,0.08); }
+  .btn-ghost:hover:not(:disabled) { background: rgba(249,166,2,0.12); }
 
   .btn-danger {
     background: rgba(239,68,68,0.15);
-    color: #f87171;
+    color: #ef4444;
   }
   .btn-danger:hover:not(:disabled) { background: rgba(239,68,68,0.25); }
 
-  .btn-sm { padding: 5px 10px; font-size: 12px; }
+  .btn-sm { padding: 6px 12px; font-size: 12px; }
 
-  /* Inline select */
+  /* ---- Inline select ---- */
   .inline-select {
-    background: var(--sc-bg, #0a0a0f);
-    border: 1px solid var(--sc-border, rgba(255,255,255,0.06));
+    height: 32px;
+    background: #0d0b07;
+    border: 1px solid rgba(249,166,2,0.08);
     border-radius: 6px;
-    color: var(--sc-text, #e4e4e7);
+    color: #f0ead6;
     font-family: inherit;
     font-size: 12px;
-    padding: 3px 6px;
+    padding: 0 8px;
     outline: none;
     cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s;
   }
 
-  .inline-select:focus { border-color: var(--sc-accent, #6366f1); }
+  .inline-select:hover { border-color: rgba(249,166,2,0.15); }
+  .inline-select:focus { border-color: #F9A602; box-shadow: 0 0 0 2px rgba(249,166,2,0.3); }
 
-  /* Usage bar */
+  /* ---- Usage bar ---- */
   .usage-bar {
     width: 80px;
     height: 6px;
-    background: rgba(255,255,255,0.06);
+    background: rgba(249,166,2,0.08);
     border-radius: 3px;
     overflow: hidden;
     display: inline-block;
@@ -261,11 +324,11 @@ const STYLES = `
   .usage-bar-fill {
     height: 100%;
     border-radius: 3px;
-    background: var(--sc-accent, #6366f1);
+    background: #F9A602;
     transition: width 0.3s;
   }
 
-  /* Gauge */
+  /* ---- Gauge ---- */
   .gauge-container {
     display: flex;
     align-items: center;
@@ -289,16 +352,17 @@ const STYLES = `
     justify-content: center;
     font-size: 18px;
     font-weight: 700;
+    color: #f0ead6;
   }
 
-  /* Sparkline (mini chart via canvas) */
+  /* ---- Sparkline (mini chart via canvas) ---- */
   .sparkline-canvas {
     display: block;
     width: 100%;
     height: 60px;
   }
 
-  /* KV editor */
+  /* ---- KV editor ---- */
   .kv-row {
     display: flex;
     gap: 8px;
@@ -307,27 +371,35 @@ const STYLES = `
   }
 
   .kv-key, .kv-value {
-    background: var(--sc-bg, #0a0a0f);
-    border: 1px solid var(--sc-border, rgba(255,255,255,0.06));
+    height: 40px;
+    background: #0d0b07;
+    border: 1px solid rgba(249,166,2,0.08);
     border-radius: 6px;
-    color: var(--sc-text, #e4e4e7);
+    color: #f0ead6;
     font-family: inherit;
     font-size: 13px;
-    padding: 7px 10px;
+    padding: 0 12px;
     outline: none;
-    transition: border-color 0.15s;
+    transition: border-color 0.15s, box-shadow 0.15s;
   }
 
   .kv-key { width: 200px; }
   .kv-value { flex: 1; }
 
-  .kv-key:focus, .kv-value:focus { border-color: var(--sc-accent, #6366f1); }
+  .kv-key:hover, .kv-value:hover { border-color: rgba(249,166,2,0.15); }
 
-  /* Modal overlay */
+  .kv-key:focus, .kv-value:focus {
+    border-color: #F9A602;
+    box-shadow: 0 0 0 2px rgba(249,166,2,0.3);
+  }
+
+  /* ---- Modal overlay ---- */
   .modal-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0,0,0,0.6);
+    background: rgba(13,11,7,0.75);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -335,9 +407,11 @@ const STYLES = `
   }
 
   .modal {
-    background: var(--sc-surface, #111118);
-    border: 1px solid var(--sc-border, rgba(255,255,255,0.06));
-    border-radius: 12px;
+    background: rgba(26,22,16,0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(249,166,2,0.12);
+    border-radius: 8px;
     padding: 28px;
     width: 90%;
     max-width: 560px;
@@ -349,6 +423,7 @@ const STYLES = `
     margin: 0 0 18px;
     font-size: 17px;
     font-weight: 600;
+    color: #f0ead6;
   }
 
   .modal .field {
@@ -359,7 +434,7 @@ const STYLES = `
     display: block;
     font-size: 12px;
     font-weight: 500;
-    color: var(--sc-text-muted, #71717a);
+    color: #8a7e6a;
     margin-bottom: 5px;
     text-transform: uppercase;
     letter-spacing: 0.3px;
@@ -369,24 +444,37 @@ const STYLES = `
   .modal .field textarea,
   .modal .field select {
     width: 100%;
-    background: var(--sc-bg, #0a0a0f);
-    border: 1px solid var(--sc-border, rgba(255,255,255,0.06));
-    border-radius: 8px;
-    color: var(--sc-text, #e4e4e7);
+    height: 40px;
+    background: #0d0b07;
+    border: 1px solid rgba(249,166,2,0.08);
+    border-radius: 6px;
+    color: #f0ead6;
     font-family: inherit;
     font-size: 13px;
-    padding: 9px 12px;
+    padding: 0 12px;
     outline: none;
-    transition: border-color 0.15s;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+
+  .modal .field input:hover,
+  .modal .field textarea:hover,
+  .modal .field select:hover {
+    border-color: rgba(249,166,2,0.15);
   }
 
   .modal .field input:focus,
   .modal .field textarea:focus,
   .modal .field select:focus {
-    border-color: var(--sc-accent, #6366f1);
+    border-color: #F9A602;
+    box-shadow: 0 0 0 2px rgba(249,166,2,0.3);
   }
 
-  .modal .field textarea { min-height: 120px; resize: vertical; }
+  .modal .field textarea {
+    height: auto;
+    min-height: 120px;
+    resize: vertical;
+    padding: 12px 14px;
+  }
 
   .modal-actions {
     display: flex;
@@ -395,7 +483,7 @@ const STYLES = `
     margin-top: 20px;
   }
 
-  /* Deploy section */
+  /* ---- Deploy section ---- */
   .deploy-status {
     display: flex;
     align-items: center;
@@ -405,8 +493,8 @@ const STYLES = `
 
   .version-tag {
     font-family: 'Geist Mono', 'SF Mono', monospace;
-    background: rgba(99,102,241,0.1);
-    color: #818cf8;
+    background: rgba(249,166,2,0.1);
+    color: #F9A602;
     padding: 4px 10px;
     border-radius: 6px;
     font-size: 13px;
@@ -414,23 +502,24 @@ const STYLES = `
   }
 
   .version-staged {
-    background: rgba(251,191,36,0.1);
-    color: #fbbf24;
+    background: rgba(249,166,2,0.18);
+    color: #f0ead6;
+    border: 1px solid rgba(249,166,2,0.3);
   }
 
-  /* Loading / empty state */
+  /* ---- Loading / empty state ---- */
   .loading, .empty {
     text-align: center;
     padding: 40px 20px;
-    color: var(--sc-text-muted, #71717a);
+    color: #8a7e6a;
     font-size: 13px;
   }
 
   .spinner {
     width: 24px;
     height: 24px;
-    border: 2px solid rgba(255,255,255,0.1);
-    border-top-color: var(--sc-accent, #6366f1);
+    border: 2px solid rgba(249,166,2,0.1);
+    border-top-color: #F9A602;
     border-radius: 50%;
     animation: spin 0.6s linear infinite;
     margin: 0 auto 12px;
@@ -438,12 +527,75 @@ const STYLES = `
 
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* Responsive */
+  /* ---- Toast / alert messages ---- */
+  .alert-warning {
+    margin: 12px 0;
+    padding: 10px 14px;
+    background: rgba(249,166,2,0.06);
+    border: 1px solid rgba(249,166,2,0.15);
+    border-radius: 8px;
+    font-size: 13px;
+    color: #F9A602;
+  }
+
+  .text-success { color: #22c55e; }
+  .text-danger { color: #ef4444; }
+
+  /* ---- Skip link (a11y) ---- */
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0,0,0,0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  /* ---- Responsive ---- */
+  @media (max-width: 900px) {
+    .two-col { grid-template-columns: 1fr !important; }
+  }
+
+  @media (max-width: 768px) {
+    .tab-bar {
+      flex-direction: column;
+      padding: 12px;
+      gap: 2px;
+    }
+    .tab-btn {
+      border-bottom: none;
+      border-left: 2px solid transparent;
+      border-radius: 6px;
+      padding: 8px 14px;
+      font-size: 13px;
+      text-align: left;
+    }
+    .tab-btn.active {
+      border-left-color: #F9A602;
+      border-bottom-color: transparent;
+      background: rgba(249,166,2,0.06);
+    }
+  }
+
   @media (max-width: 640px) {
-    .tab-bar { padding: 12px 12px 0; overflow-x: auto; }
-    .tab-btn { padding: 8px 12px; font-size: 12px; }
     .tab-content { padding: 16px; }
-    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .stat-value { font-size: 22px; }
+    .kv-row { flex-wrap: wrap; }
+    .kv-key { width: 100%; }
+    .search-input { max-width: none; }
+    .deploy-status { flex-wrap: wrap; }
+    table { font-size: 12px; }
+    thead th, tbody td { padding: 8px 10px; }
+    .modal { padding: 20px; width: 95%; }
+  }
+
+  @media (max-width: 400px) {
+    .stats-grid { grid-template-columns: 1fr; }
+    .search-bar { flex-wrap: wrap; }
   }
 `;
 
@@ -464,14 +616,31 @@ export class ScAdmin extends HTMLElement {
   /** @type {AbortController|null} */
   #fetchController = null;
 
+  /** @type {boolean} Whether the panel has been rendered at least once */
+  #rendered = false;
+
+  static get observedAttributes() { return ['open']; }
+
   constructor() {
     super();
     this.#shadow = this.attachShadow({ mode: 'open' });
   }
 
   connectedCallback() {
-    this.#render();
-    this.#loadTab('dashboard');
+    // Lazy render: only render when the open attribute is set.
+    if (this.hasAttribute('open') && !this.#rendered) {
+      this.#rendered = true;
+      this.#render();
+      this.#loadTab('dashboard');
+    }
+  }
+
+  attributeChangedCallback(name, oldVal, newVal) {
+    if (name === 'open' && oldVal === null && newVal !== null && !this.#rendered) {
+      this.#rendered = true;
+      this.#render();
+      this.#loadTab('dashboard');
+    }
   }
 
   disconnectedCallback() {
@@ -530,29 +699,83 @@ export class ScAdmin extends HTMLElement {
 
     this.#shadow.innerHTML = `
       <style>${STYLES}</style>
-      <div class="tab-bar">
+      <div class="tab-bar" role="tablist" aria-label="Admin navigation">
+        <button class="tab-btn" id="admin-close-btn" type="button" aria-label="Close admin panel" style="color:#8a7e6a;margin-right:8px;border-bottom:none;flex-shrink:0">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+        </button>
         ${tabs.map(t => `
-          <button class="tab-btn ${t.id === this.#activeTab ? 'active' : ''}" data-tab="${t.id}">
+          <button class="tab-btn ${t.id === this.#activeTab ? 'active' : ''}"
+                  data-tab="${t.id}"
+                  role="tab"
+                  id="tab-${t.id}"
+                  aria-selected="${t.id === this.#activeTab}"
+                  aria-controls="panel-${t.id}"
+                  tabindex="${t.id === this.#activeTab ? '0' : '-1'}">
             ${t.label}
           </button>
         `).join('')}
       </div>
       <div class="tab-content">
         ${tabs.map(t => `
-          <div class="tab-panel ${t.id === this.#activeTab ? 'active' : ''}" id="panel-${t.id}">
-            <div class="loading"><div class="spinner"></div>Loading…</div>
+          <div class="tab-panel ${t.id === this.#activeTab ? 'active' : ''}"
+               id="panel-${t.id}"
+               role="tabpanel"
+               aria-labelledby="tab-${t.id}"
+               ${t.id !== this.#activeTab ? 'hidden' : ''}>
+            <div class="loading"><div class="spinner" role="status" aria-label="Loading"></div>Loading…</div>
           </div>
         `).join('')}
       </div>
     `;
 
+    // Close button handler
+    this.#shadow.getElementById('admin-close-btn')?.addEventListener('click', () => {
+      this.dispatchEvent(new Event('admin-close', { bubbles: true, composed: true }));
+    });
+
     // Tab click handlers
-    this.#shadow.querySelectorAll('.tab-btn').forEach((btn) => {
+    this.#shadow.querySelectorAll('.tab-btn[data-tab]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const tab = btn.dataset.tab;
         if (tab === this.#activeTab) return;
         this.#switchTab(tab);
       });
+    });
+
+    // Keyboard navigation for tabs (arrow keys, home, end)
+    const tabBar = this.#shadow.querySelector('.tab-bar');
+    tabBar?.addEventListener('keydown', (e) => {
+      const tabBtns = Array.from(this.#shadow.querySelectorAll('.tab-btn'));
+      const currentIdx = tabBtns.findIndex(b => b.dataset.tab === this.#activeTab);
+      let nextIdx = -1;
+
+      switch (e.key) {
+        case 'ArrowRight':
+        case 'ArrowDown':
+          e.preventDefault();
+          nextIdx = (currentIdx + 1) % tabBtns.length;
+          break;
+        case 'ArrowLeft':
+        case 'ArrowUp':
+          e.preventDefault();
+          nextIdx = (currentIdx - 1 + tabBtns.length) % tabBtns.length;
+          break;
+        case 'Home':
+          e.preventDefault();
+          nextIdx = 0;
+          break;
+        case 'End':
+          e.preventDefault();
+          nextIdx = tabBtns.length - 1;
+          break;
+        default:
+          return;
+      }
+
+      if (nextIdx >= 0) {
+        tabBtns[nextIdx].focus();
+        this.#switchTab(tabBtns[nextIdx].dataset.tab);
+      }
     });
   }
 
@@ -561,14 +784,20 @@ export class ScAdmin extends HTMLElement {
    * @param {string} tabId
    */
   #switchTab(tabId) {
-    // Update tab buttons
+    // Update tab buttons (ARIA + visual)
     this.#shadow.querySelectorAll('.tab-btn').forEach((btn) => {
-      btn.classList.toggle('active', btn.dataset.tab === tabId);
+      const isActive = btn.dataset.tab === tabId;
+      btn.classList.toggle('active', isActive);
+      btn.setAttribute('aria-selected', String(isActive));
+      btn.setAttribute('tabindex', isActive ? '0' : '-1');
     });
 
-    // Update panels
+    // Update panels (ARIA + visual)
     this.#shadow.querySelectorAll('.tab-panel').forEach((panel) => {
-      panel.classList.toggle('active', panel.id === `panel-${tabId}`);
+      const isActive = panel.id === `panel-${tabId}`;
+      panel.classList.toggle('active', isActive);
+      if (isActive) panel.removeAttribute('hidden');
+      else panel.setAttribute('hidden', '');
     });
 
     this.#activeTab = tabId;
@@ -583,7 +812,7 @@ export class ScAdmin extends HTMLElement {
     const panel = this.#shadow.getElementById(`panel-${tabId}`);
     if (!panel) return;
 
-    panel.innerHTML = '<div class="loading"><div class="spinner"></div>Loading…</div>';
+    panel.innerHTML = '<div class="loading"><div class="spinner" role="status" aria-label="Loading"></div>Loading…</div>';
 
     try {
       switch (tabId) {
@@ -595,7 +824,7 @@ export class ScAdmin extends HTMLElement {
       }
     } catch (err) {
       if (err.name === 'AbortError') return;
-      panel.innerHTML = `<div class="empty">Error: ${this.#esc(err.message)}</div>`;
+      panel.innerHTML = `<div class="empty" role="alert">Error: ${this.#esc(err.message)}</div>`;
     }
   }
 
@@ -612,56 +841,56 @@ export class ScAdmin extends HTMLElement {
     const rssMB = ((mem.rss || 0) / 1024 / 1024).toFixed(1);
 
     panel.innerHTML = `
-      <div class="stats-grid">
-        <div class="stat-card">
+      <div class="stats-grid" role="list" aria-label="Dashboard statistics">
+        <div class="stat-card" role="listitem">
           <div class="stat-label">Total Users</div>
           <div class="stat-value">${stats.totalUsers}</div>
           <div class="stat-sub">${stats.activeToday} active today</div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card" role="listitem">
           <div class="stat-label">Messages Today</div>
           <div class="stat-value">${this.#formatNum(stats.messagesToday)}</div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card" role="listitem">
           <div class="stat-label">Tokens Today</div>
           <div class="stat-value">${this.#formatNum(stats.tokensToday)}</div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card" role="listitem">
           <div class="stat-label">Est. MRR</div>
           <div class="stat-value">${this.#formatCurrency(stats.estimatedMRR)}</div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card" role="listitem">
           <div class="stat-label">Agents</div>
-          <div class="stat-value">${stats.enabledAgents}<span style="font-size:14px;color:#71717a">/${stats.totalAgents}</span></div>
+          <div class="stat-value">${stats.enabledAgents}<span style="font-size:14px;color:#8a7e6a">/${stats.totalAgents}</span></div>
           <div class="stat-sub">enabled / total</div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card" role="listitem">
           <div class="stat-label">Memory</div>
           <div class="stat-value" style="font-size:22px">${heapMB} MB</div>
           <div class="stat-sub">heap (${rssMB} MB RSS)</div>
         </div>
       </div>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div class="two-col" style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
         <div class="card">
           <h3>Active Sessions</h3>
           <div class="gauge-container">
-            <div class="gauge-ring" id="sessions-gauge"></div>
+            <div class="gauge-ring" id="sessions-gauge" role="img" aria-label="Active sessions gauge: ${stats.activeSessions}"></div>
             <div>
-              <div style="font-size:24px;font-weight:700">${stats.activeSessions}</div>
-              <div style="font-size:12px;color:#71717a">${stats.wsConnections} WebSocket</div>
+              <div style="font-size:24px;font-weight:700;color:#f0ead6">${stats.activeSessions}</div>
+              <div style="font-size:12px;color:#8a7e6a">${stats.wsConnections} WebSocket</div>
             </div>
           </div>
         </div>
         <div class="card">
           <h3>Plan Distribution</h3>
-          <div id="plan-breakdown"></div>
+          <div id="plan-breakdown" role="img" aria-label="Plan distribution breakdown"></div>
         </div>
       </div>
 
       <div class="card">
         <h3>Usage (Last 7 Days)</h3>
-        <canvas class="sparkline-canvas" id="usage-chart"></canvas>
+        <canvas class="sparkline-canvas" id="usage-chart" role="img" aria-label="Usage chart for the last 7 days"></canvas>
       </div>
     `;
 
@@ -699,9 +928,9 @@ export class ScAdmin extends HTMLElement {
     const dash = circ * pct;
 
     container.innerHTML = `
-      <svg width="80" height="80" viewBox="0 0 80 80">
-        <circle cx="40" cy="40" r="${r}" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="6"/>
-        <circle cx="40" cy="40" r="${r}" fill="none" stroke="#6366f1" stroke-width="6"
+      <svg width="80" height="80" viewBox="0 0 80 80" aria-hidden="true">
+        <circle cx="40" cy="40" r="${r}" fill="none" stroke="rgba(249,166,2,0.08)" stroke-width="6"/>
+        <circle cx="40" cy="40" r="${r}" fill="none" stroke="#F9A602" stroke-width="6"
           stroke-dasharray="${dash} ${circ}" stroke-linecap="round"/>
       </svg>
       <div class="gauge-label">${value}</div>
@@ -715,22 +944,22 @@ export class ScAdmin extends HTMLElement {
    */
   #renderPlanBreakdown(container, breakdown) {
     if (!container) return;
-    const colors = { free: '#71717a', pro: '#6366f1', team: '#22c55e', byok: '#fbbf24', enterprise: '#a855f7' };
+    const colors = { free: '#8a7e6a', pro: '#F9A602', team: '#22c55e', byok: '#f0ead6', enterprise: '#F9A602' };
     const total = breakdown.reduce((s, b) => s + b.count, 0) || 1;
 
     let html = '<div style="display:flex;height:28px;border-radius:6px;overflow:hidden;margin-bottom:12px">';
     for (const b of breakdown) {
       const pct = (b.count / total * 100).toFixed(1);
-      const color = colors[b.plan] || '#52525b';
-      html += `<div style="width:${pct}%;background:${color};min-width:${b.count > 0 ? '4px' : '0'}" title="${b.plan}: ${b.count}"></div>`;
+      const color = colors[b.plan] || '#8a7e6a';
+      html += `<div style="width:${pct}%;background:${color};min-width:${b.count > 0 ? '4px' : '0'}" title="${b.plan}: ${b.count}" role="presentation"></div>`;
     }
     html += '</div>';
 
     html += '<div style="display:flex;flex-wrap:wrap;gap:12px">';
     for (const b of breakdown) {
-      const color = colors[b.plan] || '#52525b';
-      html += `<div style="display:flex;align-items:center;gap:5px;font-size:12px">
-        <div style="width:8px;height:8px;border-radius:2px;background:${color}"></div>
+      const color = colors[b.plan] || '#8a7e6a';
+      html += `<div style="display:flex;align-items:center;gap:5px;font-size:12px;color:#f0ead6">
+        <div style="width:8px;height:8px;border-radius:2px;background:${color}" aria-hidden="true"></div>
         ${b.plan}: ${b.count}
       </div>`;
     }
@@ -762,7 +991,7 @@ export class ScAdmin extends HTMLElement {
     const maxVal = Math.max(...data.map(d => d.messages), 1);
     const step = (w - pad * 2) / Math.max(data.length - 1, 1);
 
-    ctx.strokeStyle = '#6366f1';
+    ctx.strokeStyle = '#F9A602';
     ctx.lineWidth = 2;
     ctx.lineJoin = 'round';
     ctx.beginPath();
@@ -780,14 +1009,14 @@ export class ScAdmin extends HTMLElement {
     ctx.lineTo(pad, h - pad);
     ctx.closePath();
     const grad = ctx.createLinearGradient(0, 0, 0, h);
-    grad.addColorStop(0, 'rgba(99,102,241,0.2)');
-    grad.addColorStop(1, 'rgba(99,102,241,0.01)');
+    grad.addColorStop(0, 'rgba(249,166,2,0.2)');
+    grad.addColorStop(1, 'rgba(249,166,2,0.01)');
     ctx.fillStyle = grad;
     ctx.fill();
 
     // Day labels
-    ctx.fillStyle = '#71717a';
-    ctx.font = '10px system-ui';
+    ctx.fillStyle = '#8a7e6a';
+    ctx.font = '10px Geist, system-ui';
     ctx.textAlign = 'center';
     data.forEach((d, i) => {
       if (i === 0 || i === data.length - 1 || data.length <= 7) {
@@ -818,23 +1047,23 @@ export class ScAdmin extends HTMLElement {
         <tr data-user-id="${this.#esc(u.id)}">
           <td>
             <strong>${this.#esc(u.displayName || u.username)}</strong>
-            <div style="font-size:11px;color:#71717a">@${this.#esc(u.username)}</div>
+            <div style="font-size:11px;color:#8a7e6a">@${this.#esc(u.username)}</div>
           </td>
           <td><span class="badge badge-${this.#esc(u.role)}">${this.#esc(u.role)}</span></td>
           <td>
-            <select class="inline-select" data-field="plan" data-user-id="${this.#esc(u.id)}">
+            <select class="inline-select" data-field="plan" data-user-id="${this.#esc(u.id)}" aria-label="Plan for ${this.#esc(u.displayName || u.username)}">
               ${['free','pro','team','byok','enterprise'].map(p =>
                 `<option value="${p}" ${p === plan ? 'selected' : ''}>${p}</option>`
               ).join('')}
             </select>
           </td>
           <td>
-            <div class="usage-bar"><div class="usage-bar-fill" style="width:${msgPct}%"></div></div>
-            <span style="font-size:12px">${u.usage?.messages || 0} msgs</span>
+            <div class="usage-bar" role="progressbar" aria-valuenow="${Math.round(msgPct)}" aria-valuemin="0" aria-valuemax="100" aria-label="Usage ${Math.round(msgPct)}%"><div class="usage-bar-fill" style="width:${msgPct}%"></div></div>
+            <span style="font-size:12px;color:#f0ead6">${u.usage?.messages || 0} msgs</span>
           </td>
-          <td style="font-size:12px;color:#71717a">${this.#timeAgo(u.lastActive)}</td>
+          <td style="font-size:12px;color:#8a7e6a">${this.#timeAgo(u.lastActive)}</td>
           <td>
-            <button class="btn btn-sm btn-danger" data-action="delete-user" data-user-id="${this.#esc(u.id)}">
+            <button class="btn btn-sm btn-danger" data-action="delete-user" data-user-id="${this.#esc(u.id)}" aria-label="Delete user ${this.#esc(u.displayName || u.username)}">
               Delete
             </button>
           </td>
@@ -844,19 +1073,19 @@ export class ScAdmin extends HTMLElement {
 
     panel.innerHTML = `
       <div class="search-bar">
-        <input class="search-input" type="text" placeholder="Search users…" id="user-search" value="${this.#esc(search)}">
-        <span style="font-size:12px;color:#71717a">${data.total || 0} total</span>
+        <input class="search-input" type="search" placeholder="Search users…" id="user-search" value="${this.#esc(search)}" aria-label="Search users">
+        <span style="font-size:12px;color:#8a7e6a">${data.total || 0} total</span>
       </div>
       <div class="card" style="padding:0;overflow-x:auto">
-        <table>
+        <table aria-label="Users table">
           <thead>
             <tr>
-              <th>User</th>
-              <th>Role</th>
-              <th>Plan</th>
-              <th>Usage Today</th>
-              <th>Last Active</th>
-              <th></th>
+              <th scope="col">User</th>
+              <th scope="col">Role</th>
+              <th scope="col">Plan</th>
+              <th scope="col">Usage Today</th>
+              <th scope="col">Last Active</th>
+              <th scope="col"><span class="sr-only">Actions</span></th>
             </tr>
           </thead>
           <tbody>
@@ -919,14 +1148,14 @@ export class ScAdmin extends HTMLElement {
       <tr>
         <td>
           <strong>${this.#esc(a.name)}</strong>
-          <div style="font-size:11px;color:#71717a;font-family:monospace">${this.#esc(a.id?.slice(0, 8))}…</div>
+          <div style="font-size:11px;color:#8a7e6a;font-family:'Geist Mono',monospace">${this.#esc(a.id?.slice(0, 8))}…</div>
         </td>
-        <td style="font-family:monospace;font-size:12px">${this.#esc(a.model || 'sonnet')}</td>
+        <td style="font-family:'Geist Mono',monospace;font-size:12px;color:#f0ead6">${this.#esc(a.model || 'sonnet')}</td>
         <td><span class="badge badge-${a.enabled ? 'enabled' : 'disabled'}">${a.enabled ? 'enabled' : 'disabled'}</span></td>
-        <td>${a.isBuiltin ? '<span style="color:#71717a;font-size:12px">builtin</span>' : '<span style="font-size:12px">custom</span>'}</td>
-        <td style="font-size:12px;color:#71717a">T=${a.temperature ?? 0.7}</td>
+        <td>${a.isBuiltin ? '<span style="color:#8a7e6a;font-size:12px">builtin</span>' : '<span style="font-size:12px;color:#f0ead6">custom</span>'}</td>
+        <td style="font-size:12px;color:#8a7e6a">T=${a.temperature ?? 0.7}</td>
         <td>
-          <button class="btn btn-sm btn-ghost" data-action="edit-agent" data-agent-id="${this.#esc(a.id)}">
+          <button class="btn btn-sm btn-ghost" data-action="edit-agent" data-agent-id="${this.#esc(a.id)}" aria-label="Edit agent ${this.#esc(a.name)}">
             Edit
           </button>
         </td>
@@ -935,15 +1164,15 @@ export class ScAdmin extends HTMLElement {
 
     panel.innerHTML = `
       <div class="card" style="padding:0;overflow-x:auto">
-        <table>
+        <table aria-label="Agents table">
           <thead>
             <tr>
-              <th>Agent</th>
-              <th>Model</th>
-              <th>Status</th>
-              <th>Type</th>
-              <th>Temp</th>
-              <th></th>
+              <th scope="col">Agent</th>
+              <th scope="col">Model</th>
+              <th scope="col">Status</th>
+              <th scope="col">Type</th>
+              <th scope="col">Temp</th>
+              <th scope="col"><span class="sr-only">Actions</span></th>
             </tr>
           </thead>
           <tbody>
@@ -970,28 +1199,31 @@ export class ScAdmin extends HTMLElement {
   #showAgentModal(agent) {
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-label', `Edit agent: ${agent.name}`);
     overlay.innerHTML = `
       <div class="modal">
         <h3>Edit Agent: ${this.#esc(agent.name)}</h3>
         <div class="field">
-          <label>Name</label>
-          <input type="text" id="agent-name" value="${this.#esc(agent.name)}">
+          <label for="agent-name-input">Name</label>
+          <input type="text" id="agent-name-input" value="${this.#esc(agent.name)}">
         </div>
         <div class="field">
-          <label>Model</label>
-          <input type="text" id="agent-model" value="${this.#esc(agent.model || 'sonnet')}" placeholder="sonnet, opus, etc.">
+          <label for="agent-model-input">Model</label>
+          <input type="text" id="agent-model-input" value="${this.#esc(agent.model || 'sonnet')}" placeholder="sonnet, opus, etc.">
         </div>
         <div class="field">
-          <label>Temperature</label>
-          <input type="number" id="agent-temp" value="${agent.temperature ?? 0.7}" min="0" max="2" step="0.1">
+          <label for="agent-temp-input">Temperature</label>
+          <input type="number" id="agent-temp-input" value="${agent.temperature ?? 0.7}" min="0" max="2" step="0.1">
         </div>
         <div class="field">
-          <label>System Prompt</label>
-          <textarea id="agent-prompt">${this.#esc(agent.systemPrompt || '')}</textarea>
+          <label for="agent-prompt-input">System Prompt</label>
+          <textarea id="agent-prompt-input">${this.#esc(agent.systemPrompt || '')}</textarea>
         </div>
         <div class="field">
-          <label>Enabled</label>
-          <select id="agent-enabled">
+          <label for="agent-enabled-input">Enabled</label>
+          <select id="agent-enabled-input">
             <option value="true" ${agent.enabled ? 'selected' : ''}>Yes</option>
             <option value="false" ${!agent.enabled ? 'selected' : ''}>No</option>
           </select>
@@ -1005,20 +1237,36 @@ export class ScAdmin extends HTMLElement {
 
     this.#shadow.appendChild(overlay);
 
+    // Focus the first input on open
+    const firstInput = overlay.querySelector('#agent-name-input');
+    requestAnimationFrame(() => firstInput?.focus());
+
     // Close on overlay click
     overlay.addEventListener('click', (e) => {
       if (e.target === overlay) overlay.remove();
     });
 
-    overlay.querySelector('#modal-cancel').addEventListener('click', () => overlay.remove());
+    // Close on Escape
+    const escHandler = (e) => {
+      if (e.key === 'Escape') {
+        overlay.remove();
+        document.removeEventListener('keydown', escHandler);
+      }
+    };
+    document.addEventListener('keydown', escHandler);
+
+    overlay.querySelector('#modal-cancel').addEventListener('click', () => {
+      overlay.remove();
+      document.removeEventListener('keydown', escHandler);
+    });
 
     overlay.querySelector('#modal-save').addEventListener('click', async () => {
       const patch = {
-        name: overlay.querySelector('#agent-name').value.trim(),
-        model: overlay.querySelector('#agent-model').value.trim(),
-        temperature: parseFloat(overlay.querySelector('#agent-temp').value),
-        systemPrompt: overlay.querySelector('#agent-prompt').value,
-        enabled: overlay.querySelector('#agent-enabled').value === 'true',
+        name: overlay.querySelector('#agent-name-input').value.trim(),
+        model: overlay.querySelector('#agent-model-input').value.trim(),
+        temperature: parseFloat(overlay.querySelector('#agent-temp-input').value),
+        systemPrompt: overlay.querySelector('#agent-prompt-input').value,
+        enabled: overlay.querySelector('#agent-enabled-input').value === 'true',
       };
 
       try {
@@ -1027,6 +1275,7 @@ export class ScAdmin extends HTMLElement {
           body: JSON.stringify(patch),
         });
         overlay.remove();
+        document.removeEventListener('keydown', escHandler);
         this.#loadTab('agents');
       } catch (err) {
         alert('Failed to update agent: ' + err.message);
@@ -1046,24 +1295,24 @@ export class ScAdmin extends HTMLElement {
 
     const kvRows = entries.map(([key, value]) => `
       <div class="kv-row" data-key="${this.#esc(key)}">
-        <input class="kv-key" value="${this.#esc(key)}" readonly>
-        <input class="kv-value" value="${this.#esc(String(value))}" data-original="${this.#esc(String(value))}">
-        <button class="btn btn-sm btn-ghost kv-save" style="display:none">Save</button>
+        <input class="kv-key" value="${this.#esc(key)}" readonly aria-label="Config key: ${this.#esc(key)}">
+        <input class="kv-value" value="${this.#esc(String(value))}" data-original="${this.#esc(String(value))}" aria-label="Config value for ${this.#esc(key)}">
+        <button class="btn btn-sm btn-ghost kv-save" style="display:none" aria-label="Save ${this.#esc(key)}">Save</button>
       </div>
     `).join('');
 
     panel.innerHTML = `
       <div class="card">
         <h3>Server Configuration</h3>
-        <p style="font-size:12px;color:#71717a;margin-top:-8px;margin-bottom:16px">
+        <p style="font-size:12px;color:#8a7e6a;margin-top:-8px;margin-bottom:16px">
           Edit values below. Sensitive fields are redacted. ${entries.length} key(s).
         </p>
         <div id="kv-list">
           ${kvRows || '<div class="empty">No configuration keys found</div>'}
         </div>
-        <div style="margin-top:16px;display:flex;gap:8px">
-          <input class="search-input" id="new-key" placeholder="New key" style="max-width:200px">
-          <input class="search-input" id="new-value" placeholder="Value" style="max-width:none;flex:1">
+        <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
+          <input class="search-input" id="new-key" placeholder="New key" style="max-width:200px" aria-label="New config key">
+          <input class="search-input" id="new-value" placeholder="Value" style="max-width:none;flex:1" aria-label="New config value">
           <button class="btn btn-primary btn-sm" id="add-config">Add</button>
         </div>
       </div>
@@ -1139,33 +1388,35 @@ export class ScAdmin extends HTMLElement {
       <div class="card">
         <h3>Deployment Status</h3>
         <div class="deploy-status">
-          <span style="font-size:13px;color:#71717a">Current Version</span>
+          <span style="font-size:13px;color:#8a7e6a">Current Version</span>
           <span class="version-tag">${this.#esc(status.current || 'unknown')}</span>
         </div>
         <div class="deploy-status">
-          <span style="font-size:13px;color:#71717a">Staged Version</span>
+          <span style="font-size:13px;color:#8a7e6a">Staged Version</span>
           ${status.staged
             ? `<span class="version-tag version-staged">${this.#esc(status.staged)}</span>`
-            : '<span style="font-size:13px;color:#52525b">none</span>'
+            : '<span style="font-size:13px;color:#8a7e6a">none</span>'
           }
         </div>
         ${status.needsDeploy
-          ? '<div style="margin:12px 0;padding:10px 14px;background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.2);border-radius:8px;font-size:13px;color:#fbbf24">⚠ A new version is staged and ready to deploy.</div>'
+          ? `<div class="alert-warning" role="alert">A new version is staged and ready to deploy.</div>
+             <button class="btn btn-primary" id="deploy-btn" style="margin-top:12px">Deploy Now</button>
+             <div id="deploy-result" style="margin-top:8px;font-size:13px" role="status" aria-live="polite"></div>`
           : ''
         }
-        <div style="margin-top:8px;font-size:12px;color:#71717a">Server uptime: ${uptimeStr}</div>
+        <div style="margin-top:8px;font-size:12px;color:#8a7e6a">Server uptime: ${uptimeStr}</div>
       </div>
 
       <div class="card">
         <h3>Stage New Version</h3>
-        <p style="font-size:12px;color:#71717a;margin-top:-8px;margin-bottom:14px">
+        <p style="font-size:12px;color:#8a7e6a;margin-top:-8px;margin-bottom:14px">
           Write a version tag to .version-staged. Deployment tooling will pick it up.
         </p>
-        <div style="display:flex;gap:8px;align-items:center">
-          <input class="search-input" id="stage-version" placeholder="e.g. 2.0.0-beta.1" style="max-width:280px">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <input class="search-input" id="stage-version" placeholder="e.g. 2.0.0-beta.1" style="max-width:280px" aria-label="Version tag to stage">
           <button class="btn btn-primary" id="stage-btn">Stage Version</button>
         </div>
-        <div id="stage-result" style="margin-top:10px;font-size:13px"></div>
+        <div id="stage-result" style="margin-top:10px;font-size:13px" role="status" aria-live="polite"></div>
       </div>
     `;
 
@@ -1175,7 +1426,7 @@ export class ScAdmin extends HTMLElement {
       const version = input.value.trim();
 
       if (!version) {
-        result.innerHTML = '<span style="color:#f87171">Version tag is required</span>';
+        result.innerHTML = '<span class="text-danger">Version tag is required</span>';
         return;
       }
 
@@ -1184,12 +1435,29 @@ export class ScAdmin extends HTMLElement {
           method: 'POST',
           body: JSON.stringify({ version }),
         });
-        result.innerHTML = `<span style="color:#4ade80">✓ Staged version: ${this.#esc(res.staged)}</span>`;
+        result.innerHTML = `<span class="text-success">✓ Staged version: ${this.#esc(res.staged)}</span>`;
         input.value = '';
         // Refresh status after a moment
         setTimeout(() => this.#loadDeploy(panel), 500);
       } catch (err) {
-        result.innerHTML = `<span style="color:#f87171">${this.#esc(err.message)}</span>`;
+        result.innerHTML = `<span class="text-danger">${this.#esc(err.message)}</span>`;
+      }
+    });
+
+    panel.querySelector('#deploy-btn')?.addEventListener('click', async () => {
+      const result = panel.querySelector('#deploy-result');
+      const btn = panel.querySelector('#deploy-btn');
+      btn.disabled = true;
+      btn.textContent = 'Deploying...';
+      result.innerHTML = '<span style="color:#8a7e6a">Restarting service...</span>';
+      try {
+        const res = await this.#apiFetch('/api/admin/deploy/push', { method: 'POST' });
+        result.innerHTML = `<span class="text-success">Deployed successfully. Reloading...</span>`;
+        setTimeout(() => window.location.reload(), 3000);
+      } catch (err) {
+        result.innerHTML = `<span class="text-danger">${this.#esc(err.message)}</span>`;
+        btn.disabled = false;
+        btn.textContent = 'Deploy Now';
       }
     });
   }

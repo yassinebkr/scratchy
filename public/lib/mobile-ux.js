@@ -5,6 +5,8 @@
  * @module mobile-ux
  */
 
+import { mobileSurfaceStack } from './mobile-surface-stack.js';
+
 const SWIPE_THRESHOLD = 50;
 const SWIPE_VELOCITY_MIN = 0.3; // px/ms
 const BREAKPOINTS = {
@@ -85,6 +87,9 @@ class MobileUXManager extends EventTarget {
 
     // Safe area CSS vars
     this._applySafeAreaVars();
+
+    // Wire swipe gestures to surface stack navigation
+    this._initSurfaceStackGestures();
   }
 
   /* ------------------------------------------------------------------ */
@@ -161,6 +166,35 @@ class MobileUXManager extends EventTarget {
       const direction = dx > 0 ? 'right' : 'left';
       this._emit('gesture-swipe', { direction, distance: absDx, velocity });
     }
+  }
+
+  /* ------------------------------------------------------------------ */
+  /*  Surface Stack Gesture Integration                                 */
+  /* ------------------------------------------------------------------ */
+
+  /**
+   * Wire swipe gestures to the mobile surface stack.
+   * - Swipe right with surfaces open → pop the top surface
+   * - Swipe right at base (chat) → show agent picker
+   * - Swipe left → show surface picker bottom sheet
+   * @private
+   */
+  _initSurfaceStackGestures() {
+    this.addEventListener('gesture-swipe', (e) => {
+      const { direction } = e.detail;
+
+      if (direction === 'right') {
+        if (mobileSurfaceStack.depth > 0) {
+          mobileSurfaceStack.pop();
+        } else {
+          // At chat base — show agent picker
+          window.dispatchEvent(new CustomEvent('show-agent-picker'));
+        }
+      } else if (direction === 'left') {
+        // Show surface picker bottom sheet
+        window.dispatchEvent(new CustomEvent('show-surface-picker'));
+      }
+    });
   }
 
   /* ------------------------------------------------------------------ */

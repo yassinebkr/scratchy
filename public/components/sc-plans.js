@@ -310,7 +310,7 @@ class ScPlans extends HTMLElement {
         display: block;
         font-family: 'Geist', system-ui, -apple-system, sans-serif;
         font-size: 14px;
-        color: #e4e4e7;
+        color: #f0ead6;
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
       }
@@ -334,19 +334,19 @@ class ScPlans extends HTMLElement {
         font-weight: 700;
         letter-spacing: -0.02em;
         margin-bottom: 8px;
-        color: #e4e4e7;
+        color: #f0ead6;
       }
       .subtitle {
         font-size: 16px;
-        color: #71717a;
+        color: #8a7e6a;
         margin-bottom: 28px;
       }
 
       /* === Toggle === */
       .toggle-wrap {
         display: inline-flex;
-        background: #111118;
-        border: 1px solid rgba(255,255,255,0.06);
+        background: #1a1610;
+        border: 1px solid rgba(249,166,2,0.10);
         border-radius: 8px;
         padding: 3px;
         gap: 2px;
@@ -359,7 +359,7 @@ class ScPlans extends HTMLElement {
         border: none;
         border-radius: 6px;
         background: transparent;
-        color: #71717a;
+        color: #8a7e6a;
         cursor: pointer;
         transition: color 200ms ease, background 200ms ease;
         min-height: 44px;
@@ -368,11 +368,11 @@ class ScPlans extends HTMLElement {
         gap: 6px;
       }
       .toggle-btn.active {
-        background: #1a1a24;
-        color: #e4e4e7;
+        background: #242016;
+        color: #f0ead6;
       }
       .toggle-btn:focus-visible {
-        outline: 2px solid #6366f1;
+        outline: 2px solid #F9A602;
         outline-offset: 2px;
       }
       .save-badge {
@@ -401,8 +401,8 @@ class ScPlans extends HTMLElement {
       /* === Card === */
       .card {
         position: relative;
-        background: #111118;
-        border: 1px solid rgba(255,255,255,0.06);
+        background: #1a1610;
+        border: 1px solid rgba(249,166,2,0.10);
         border-radius: 12px;
         padding: 28px 24px 24px;
         display: flex;
@@ -425,14 +425,14 @@ class ScPlans extends HTMLElement {
           border-color: rgba(255,255,255,0.12);
         }
         .card--highlight:hover {
-          border-color: rgba(99,102,241,0.5);
-          box-shadow: 0 0 24px rgba(99,102,241,0.18);
+          border-color: rgba(249,166,2,0.5);
+          box-shadow: 0 0 24px rgba(249,166,2,0.18);
         }
       }
 
       .card--highlight {
-        border-color: rgba(99,102,241,0.35);
-        box-shadow: 0 0 20px rgba(99,102,241,0.10);
+        border-color: rgba(249,166,2,0.35);
+        box-shadow: 0 0 20px rgba(249,166,2,0.10);
       }
 
       /* === Badge === */
@@ -448,8 +448,8 @@ class ScPlans extends HTMLElement {
         width: fit-content;
       }
       .badge--accent {
-        background: rgba(99,102,241,0.14);
-        color: #818cf8;
+        background: rgba(249,166,2,0.14);
+        color: #F9A602;
       }
       .badge--muted {
         background: rgba(251,191,36,0.12);
@@ -466,7 +466,7 @@ class ScPlans extends HTMLElement {
         font-size: 18px;
         font-weight: 600;
         margin-bottom: 12px;
-        color: #e4e4e7;
+        color: #f0ead6;
       }
       .card-price-row {
         display: flex;
@@ -477,7 +477,7 @@ class ScPlans extends HTMLElement {
       .card-currency {
         font-size: 22px;
         font-weight: 600;
-        color: #71717a;
+        color: #8a7e6a;
         align-self: flex-start;
         margin-top: 4px;
       }
@@ -487,11 +487,11 @@ class ScPlans extends HTMLElement {
         font-weight: 700;
         letter-spacing: -0.03em;
         line-height: 1;
-        color: #e4e4e7;
+        color: #f0ead6;
       }
       .card-period {
         font-size: 13px;
-        color: #71717a;
+        color: #8a7e6a;
         margin-bottom: 24px;
       }
 
@@ -509,7 +509,7 @@ class ScPlans extends HTMLElement {
         align-items: center;
         gap: 8px;
         font-size: 13px;
-        color: #a1a1aa;
+        color: #8a7e6a;
         line-height: 1.4;
       }
       .check-icon {
@@ -534,7 +534,7 @@ class ScPlans extends HTMLElement {
         border: 1.5px solid transparent;
       }
       .cta:focus-visible {
-        outline: 2px solid #6366f1;
+        outline: 2px solid #F9A602;
         outline-offset: 2px;
       }
 
@@ -542,39 +542,39 @@ class ScPlans extends HTMLElement {
       .cta--ghost {
         background: transparent;
         border-color: rgba(255,255,255,0.10);
-        color: #e4e4e7;
+        color: #f0ead6;
       }
       @media (hover: hover) {
         .cta--ghost:hover {
-          background: #1a1a24;
+          background: #242016;
           border-color: rgba(255,255,255,0.16);
         }
       }
 
       /* Solid (accent) */
       .cta--solid {
-        background: #6366f1;
-        border-color: #6366f1;
-        color: #fff;
+        background: #F9A602;
+        border-color: #F9A602;
+        color: #0d0b07;
       }
       @media (hover: hover) {
         .cta--solid:hover {
-          background: #4f46e5;
-          border-color: #4f46e5;
-          box-shadow: 0 0 16px rgba(99,102,241,0.25);
+          background: #DAA520;
+          border-color: #DAA520;
+          box-shadow: 0 0 16px rgba(249,166,2,0.25);
         }
       }
 
       /* Outline (accent) */
       .cta--outline {
         background: transparent;
-        border-color: #6366f1;
-        color: #818cf8;
+        border-color: #F9A602;
+        color: #F9A602;
       }
       @media (hover: hover) {
         .cta--outline:hover {
-          background: rgba(99,102,241,0.08);
-          border-color: #818cf8;
+          background: rgba(249,166,2,0.08);
+          border-color: #DAA520;
         }
       }
 
@@ -590,7 +590,7 @@ class ScPlans extends HTMLElement {
         font-weight: 700;
         text-align: center;
         margin-bottom: 28px;
-        color: #e4e4e7;
+        color: #f0ead6;
         letter-spacing: -0.01em;
       }
       .faq-list {
@@ -599,8 +599,8 @@ class ScPlans extends HTMLElement {
         gap: 8px;
       }
       .faq-item {
-        background: #111118;
-        border: 1px solid rgba(255,255,255,0.06);
+        background: #1a1610;
+        border: 1px solid rgba(249,166,2,0.10);
         border-radius: 8px;
         overflow: hidden;
         transition: border-color 200ms ease;
@@ -616,7 +616,7 @@ class ScPlans extends HTMLElement {
         padding: 16px 20px;
         font-size: 14px;
         font-weight: 600;
-        color: #e4e4e7;
+        color: #f0ead6;
         cursor: pointer;
         list-style: none;
         min-height: 44px;
@@ -626,14 +626,14 @@ class ScPlans extends HTMLElement {
       .faq-q::-webkit-details-marker { display: none; }
       .faq-q::marker { content: ''; }
       .faq-q:focus-visible {
-        outline: 2px solid #6366f1;
+        outline: 2px solid #F9A602;
         outline-offset: -2px;
         border-radius: 8px;
       }
       .faq-chevron {
         width: 16px;
         height: 16px;
-        color: #71717a;
+        color: #8a7e6a;
         flex-shrink: 0;
         transition: transform 250ms ease;
       }
@@ -647,7 +647,7 @@ class ScPlans extends HTMLElement {
         padding: 0 20px 16px;
         font-size: 13px;
         line-height: 1.65;
-        color: #a1a1aa;
+        color: #8a7e6a;
       }
 
       /* === Responsive tweaks === */

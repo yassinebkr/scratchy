@@ -59,49 +59,29 @@ TEMPLATE.innerHTML = `
   :host {
     display: flex;
     flex-direction: column;
-    background: #0d1117;
-    color: #c9d1d9;
+    background: var(--sc-bg, #0e0c09);
+    color: var(--sc-text, #e8e0d2);
     font-family: var(--mono, 'Geist Mono', 'SF Mono', 'Fira Code', monospace);
     font-size: 13px;
     overflow: hidden;
     height: 100%;
   }
 
-  .toolbar {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 12px;
-    background: #161b22;
-    border-bottom: 1px solid rgba(255,255,255,0.06);
-    flex-shrink: 0;
-    min-height: 32px;
-  }
-
-  .toolbar-title {
-    font-size: 12px;
-    font-weight: 600;
-    color: #8b949e;
-    letter-spacing: 0.5px;
-    text-transform: uppercase;
-    flex: 1;
-  }
-
   .toolbar-btn {
     background: none;
-    border: 1px solid rgba(255,255,255,0.1);
+    border: 1px solid var(--sc-border, rgba(249,166,2,0.12));
     border-radius: 4px;
-    color: #8b949e;
+    color: var(--sc-text-dim, #5a5040);
     font-family: inherit;
     font-size: 11px;
     padding: 2px 8px;
     cursor: pointer;
-    transition: color 0.15s, border-color 0.15s;
+    transition: color 0.15s ease, border-color 0.15s ease;
   }
 
   .toolbar-btn:hover {
-    color: #c9d1d9;
-    border-color: rgba(255,255,255,0.2);
+    color: var(--sc-text, #e8e0d2);
+    border-color: var(--sc-accent, #F9A602);
   }
 
   .output {
@@ -136,7 +116,7 @@ TEMPLATE.innerHTML = `
   }
 
   .cmd-time {
-    color: #484f58;
+    color: var(--sc-text-dim, #5a5040);
     font-size: 11px;
     margin-left: auto;
   }
@@ -166,10 +146,10 @@ TEMPLATE.innerHTML = `
     position: absolute;
     bottom: 12px;
     right: 12px;
-    background: rgba(22,27,34,0.9);
-    border: 1px solid rgba(255,255,255,0.1);
+    background: var(--sc-glass-bg, rgba(26,22,16,0.85));
+    border: 1px solid var(--sc-border, rgba(249,166,2,0.12));
     border-radius: 6px;
-    color: #8b949e;
+    color: var(--sc-text-dim, #5a5040);
     font-family: inherit;
     font-size: 11px;
     padding: 4px 10px;
@@ -178,7 +158,7 @@ TEMPLATE.innerHTML = `
     z-index: 2;
   }
 
-  .scroll-lock:hover { color: #c9d1d9; }
+  .scroll-lock:hover { color: var(--sc-text, #e8e0d2); }
   .scroll-lock.hidden { opacity: 0; pointer-events: none; }
 
   .empty-state {
@@ -186,27 +166,110 @@ TEMPLATE.innerHTML = `
     align-items: center;
     justify-content: center;
     height: 100%;
-    color: #484f58;
+    color: var(--sc-text-dim, #5a5040);
     font-size: 13px;
     gap: 8px;
   }
 
-  .empty-state .icon { font-size: 20px; }
+  .empty-state .icon {
+    color: var(--sc-text-dim, #5a5040);
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
 
   /* Scrollbar */
   .output::-webkit-scrollbar { width: 6px; }
   .output::-webkit-scrollbar-track { background: transparent; }
   .output::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+
+  /* Surface header — 36px uniform glassmorphism */
+  .surface-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 36px;
+    min-height: 36px;
+    padding: 0 12px;
+    background: var(--sc-glass-bg, rgba(26,22,16,0.85));
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--sc-border, rgba(249,166,2,0.12));
+    flex-shrink: 0;
+    gap: 8px;
+  }
+  .surface-header-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--sc-text-muted, #8a7e6a);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    letter-spacing: 0.3px;
+  }
+  .surface-header-icon {
+    color: var(--sc-accent, #F9A602);
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+  }
+  .surface-close {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    color: var(--sc-text-dim, #5a5040);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  .surface-close:hover {
+    background: rgba(239,68,68,0.12);
+    color: #ef4444;
+  }
+  .surface-close:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(249,166,2,0.35);
+  }
+  .toolbar-btn {
+    cursor: pointer;
+    transition: color 0.15s ease, border-color 0.15s ease;
+  }
+  .toolbar-btn:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(249,166,2,0.35);
+  }
+
+  @media (max-width: 767px) {
+    .surface-header {
+      padding-left: 48px;
+    }
+  }
 </style>
 
-<div class="toolbar">
-  <span class="toolbar-title">Terminal</span>
-  <button class="toolbar-btn" id="copy-btn" title="Copy last output">Copy</button>
-  <button class="toolbar-btn" id="clear-btn" title="Clear terminal">Clear</button>
+<div class="surface-header">
+  <span class="surface-header-title">
+    <svg class="surface-header-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="4 6 7 9 4 12"/><line x1="9" y1="12" x2="13" y2="12"/>
+    </svg>
+    Terminal
+  </span>
+  <div style="display:flex;align-items:center;gap:6px;">
+    <button class="toolbar-btn" id="copy-btn" title="Copy last output">Copy</button>
+    <button class="toolbar-btn" id="clear-btn" title="Clear terminal">Clear</button>
+    <button class="surface-close" id="surface-close-btn" title="Close terminal">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/></svg>
+    </button>
+  </div>
 </div>
 <div class="output" id="output">
   <div class="empty-state">
-    <span class="icon">⚡</span>
+    <span class="icon"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 6 7 9 4 12"/><line x1="9" y1="12" x2="13" y2="12"/></svg></span>
     <span>Waiting for commands…</span>
   </div>
 </div>
@@ -235,6 +298,9 @@ export class ScTerminal extends HTMLElement {
     this._scrollLock.addEventListener('click', () => this._scrollToBottom());
     this._copyBtn.addEventListener('click', () => this._copyLast());
     this._clearBtn.addEventListener('click', () => this.clear());
+    this.shadowRoot.getElementById('surface-close-btn').addEventListener('click', () => {
+      this.dispatchEvent(new CustomEvent('surface-close', { detail: { type: 'terminal' }, bubbles: true, composed: true }));
+    });
   }
 
   /** Add a new command execution block */
@@ -288,7 +354,7 @@ export class ScTerminal extends HTMLElement {
     this._output.innerHTML = '';
     this._blocks.clear();
     this._hasContent = false;
-    this._output.innerHTML = `<div class="empty-state"><span class="icon">⚡</span><span>Waiting for commands…</span></div>`;
+    this._output.innerHTML = `<div class="empty-state"><span class="icon"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 6 7 9 4 12"/><line x1="9" y1="12" x2="13" y2="12"/></svg></span><span>Waiting for commands…</span></div>`;
   }
 
   _ensureContent() {

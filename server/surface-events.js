@@ -28,7 +28,7 @@ import {
 } from '../protocol/a2ui.js';
 
 import {
-  broadcastToUser,
+  broadcastToUser as _defaultBroadcast,
 } from './ws.js';
 
 /* ------------------------------------------------------------------ */
@@ -110,6 +110,19 @@ export function cleanupUser(userId) {
     }
     userStates.delete(userId);
   }
+}
+
+/**
+ * Clean up ALL user state (call on shutdown or in tests).
+ * Clears every linger timer and removes all entries from the state map.
+ */
+export function cleanupAll() {
+  for (const [userId, state] of userStates) {
+    for (const timer of state.lingerTimers.values()) {
+      clearTimeout(timer);
+    }
+  }
+  userStates.clear();
 }
 
 /* ------------------------------------------------------------------ */
@@ -375,6 +388,7 @@ function classifyA2UIComponents(components) {
  * @typedef {Object} SurfaceEventHandlerOpts
  * @property {typeof console} [logger=console] - Logger instance.
  * @property {number} [lingerMs=30000] - Surface deactivation linger time.
+ * @property {(userId: string, msg: object) => void} [broadcast] - Override broadcastToUser (for testing).
  */
 
 /**
@@ -421,6 +435,7 @@ function classifyA2UIComponents(components) {
  */
 export function createSurfaceEventHandler(opts = {}) {
   const logger = opts.logger || console;
+  const broadcastToUser = opts.broadcast || _defaultBroadcast;
 
   // ── handleToolCall ──────────────────────────────────────────────────
 

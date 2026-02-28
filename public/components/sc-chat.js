@@ -14,23 +14,23 @@ const STYLES = `
     flex-direction: column;
     height: 100%;
     width: 100%;
-    font-family: 'Geist', system-ui, -apple-system, sans-serif;
+    font-family: var(--font, 'Geist', system-ui, sans-serif);
     font-size: 14px;
-    color: #e4e4e7;
-    background: #0a0a0f;
+    color: #f0ead6;
+    background: #0d0b07;
     position: relative;
     overflow: hidden;
-    --bg: #0a0a0f;
-    --surface: #111118;
-    --surface-hover: #1a1a24;
-    --border: rgba(255,255,255,0.06);
+    --bg: #0d0b07;
+    --surface: rgba(255,255,255,0.03);
+    --surface-hover: rgba(255,255,255,0.06);
+    --border: rgba(249,166,2,0.12);
     --radius: 8px;
-    --text: #e4e4e7;
-    --muted: #71717a;
-    --accent: #6366f1;
-    --accent-hover: #4f46e5;
-    --user-bubble: #1e1b4b;
-    --assistant-bubble: #111118;
+    --text: #f0ead6;
+    --muted: #8a7e6a;
+    --accent: #F9A602;
+    --accent-hover: #e09500;
+    --user-bubble: rgba(249,166,2,0.08);
+    --assistant-bubble: rgba(255,255,255,0.03);
     --transition: 200ms ease;
   }
 
@@ -50,11 +50,11 @@ const STYLES = `
   .chat-messages::-webkit-scrollbar { width: 6px; }
   .chat-messages::-webkit-scrollbar-track { background: transparent; }
   .chat-messages::-webkit-scrollbar-thumb {
-    background: rgba(255,255,255,0.08);
+    background: rgba(249,166,2,0.15);
     border-radius: 3px;
   }
   .chat-messages::-webkit-scrollbar-thumb:hover {
-    background: rgba(255,255,255,0.14);
+    background: rgba(249,166,2,0.25);
   }
 
   /* ─── Empty State ─── */
@@ -75,11 +75,19 @@ const STYLES = `
     width: 48px;
     height: 48px;
     border-radius: 50%;
-    background: rgba(99,102,241,0.1);
+    background: rgba(249,166,2,0.1);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 22px;
+  }
+  .empty-state-icon svg {
+    width: 24px;
+    height: 24px;
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
   }
 
   .empty-state h3 {
@@ -120,7 +128,7 @@ const STYLES = `
   .suggested-prompt:hover {
     background: var(--surface-hover);
     color: var(--text);
-    border-color: rgba(99,102,241,0.3);
+    border-color: rgba(249,166,2,0.3);
   }
 
   /* ─── Messages ─── */
@@ -175,6 +183,7 @@ const STYLES = `
   }
   .msg--user .msg-bubble {
     background: var(--user-bubble);
+    border: 1px solid rgba(249,166,2,0.1);
     border-bottom-right-radius: 2px;
   }
   .msg--assistant .msg-bubble {
@@ -225,7 +234,9 @@ const STYLES = `
     height: 28px;
     border-radius: 6px;
     border: 1px solid var(--border);
-    background: var(--surface);
+    background: rgba(13,11,7,0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     color: var(--muted);
     cursor: pointer;
     display: flex;
@@ -236,10 +247,19 @@ const STYLES = `
     padding: 0;
     font-family: inherit;
   }
+  .msg-action-btn svg {
+    width: 14px;
+    height: 14px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
   .msg-action-btn:hover {
     background: var(--surface-hover);
     color: var(--text);
-    border-color: rgba(99,102,241,0.3);
+    border-color: rgba(249,166,2,0.3);
   }
   .msg-action-btn.copied {
     color: #22c55e;
@@ -264,7 +284,7 @@ const STYLES = `
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: var(--muted);
+    background: var(--accent);
     animation: typing-bounce 1.2s ease-in-out infinite;
   }
   .typing-dot:nth-child(2) { animation-delay: 0.15s; }
@@ -294,6 +314,10 @@ const STYLES = `
     50% { opacity: 0; }
   }
 
+  @media (prefers-reduced-motion: reduce) {
+    .sc-cursor { animation: none !important; opacity: 1; }
+  }
+
   /* ─── Scroll-to-Bottom Button ─── */
   .scroll-bottom-btn {
     position: absolute;
@@ -302,10 +326,12 @@ const STYLES = `
     transform: translateX(-50%) translateY(8px);
     opacity: 0;
     pointer-events: none;
-    background: var(--surface);
+    background: rgba(13,11,7,0.8);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     border: 1px solid var(--border);
     border-radius: 20px;
-    color: var(--text);
+    color: var(--accent);
     padding: 6px 16px;
     font-size: 12px;
     font-family: inherit;
@@ -323,10 +349,23 @@ const STYLES = `
     pointer-events: auto;
   }
   .scroll-bottom-btn:hover {
-    background: var(--surface-hover);
-    border-color: rgba(99,102,241,0.3);
+    background: rgba(249,166,2,0.15);
+    border-color: rgba(249,166,2,0.3);
   }
-  .scroll-bottom-btn .arrow { font-size: 14px; }
+  .scroll-bottom-btn .arrow-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .scroll-bottom-btn .arrow-icon svg {
+    width: 14px;
+    height: 14px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
 
   /* ─── New Messages Pill ─── */
   .new-messages-pill {
@@ -337,7 +376,7 @@ const STYLES = `
     opacity: 0;
     pointer-events: none;
     background: var(--accent);
-    color: white;
+    color: #0d0b07;
     border: none;
     border-radius: 20px;
     padding: 6px 16px;
@@ -347,7 +386,10 @@ const STYLES = `
     cursor: pointer;
     transition: all var(--transition);
     z-index: 11;
-    box-shadow: 0 4px 16px rgba(99,102,241,0.3);
+    box-shadow: 0 4px 16px rgba(249,166,2,0.3);
+    display: flex;
+    align-items: center;
+    gap: 6px;
   }
   .new-messages-pill.visible {
     opacity: 1;
@@ -355,6 +397,19 @@ const STYLES = `
     pointer-events: auto;
   }
   .new-messages-pill:hover { background: var(--accent-hover); }
+  .new-messages-pill .pill-arrow {
+    display: flex;
+    align-items: center;
+  }
+  .new-messages-pill .pill-arrow svg {
+    width: 14px;
+    height: 14px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
 
   /* ─── Input Area ─── */
   .chat-input-area {
@@ -369,22 +424,23 @@ const STYLES = `
     display: flex;
     align-items: flex-end;
     gap: 8px;
-    background: var(--surface);
+    background: rgba(255,255,255,0.03);
     border: 1px solid var(--border);
     border-radius: 12px;
     padding: 8px 12px;
-    transition: border-color var(--transition), box-shadow var(--transition);
+    transition: border-color var(--transition), box-shadow var(--transition), background var(--transition);
   }
   .chat-input-wrap:focus-within {
-    border-color: rgba(99,102,241,0.4);
-    box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
+    border-color: rgba(249,166,2,0.4);
+    box-shadow: 0 0 0 3px rgba(249,166,2,0.1);
+    background: rgba(255,255,255,0.04);
   }
 
   .chat-input-wrap.dragover {
     border-color: var(--accent);
     border-style: dashed;
-    background: rgba(99,102,241,0.05);
-    box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
+    background: rgba(249,166,2,0.05);
+    box-shadow: 0 0 0 3px rgba(249,166,2,0.15);
   }
 
   .chat-textarea {
@@ -397,7 +453,7 @@ const STYLES = `
     font-size: 14px;
     line-height: 1.5;
     resize: none;
-    max-height: calc(1.5em * 6 + 4px); /* ~6 rows */
+    max-height: calc(1.5em * 6 + 4px);
     overflow-y: auto;
     padding: 2px 0;
     scrollbar-width: none;
@@ -421,10 +477,10 @@ const STYLES = `
     padding: 0;
     flex-shrink: 0;
   }
-  .send-btn:hover { background: var(--accent); color: white; }
+  .send-btn:hover { background: var(--accent); color: #0d0b07; }
   .send-btn.active {
     background: var(--accent);
-    color: white;
+    color: #0d0b07;
     animation: send-pulse 2s ease-in-out infinite;
   }
   .send-btn:active { transform: scale(0.92); }
@@ -435,8 +491,8 @@ const STYLES = `
   }
 
   @keyframes send-pulse {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(99,102,241,0.4); }
-    50%  { box-shadow: 0 0 0 6px rgba(99,102,241,0); }
+    0%, 100% { box-shadow: 0 0 0 0 rgba(249,166,2,0.4); }
+    50%  { box-shadow: 0 0 0 6px rgba(249,166,2,0); }
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -447,7 +503,7 @@ const STYLES = `
   .drop-overlay {
     position: absolute;
     inset: 0;
-    background: rgba(99,102,241,0.08);
+    background: rgba(249,166,2,0.06);
     border: 2px dashed var(--accent);
     border-radius: var(--radius);
     display: flex;
@@ -489,7 +545,7 @@ const STYLES = `
     margin: 8px 0;
     padding: 4px 12px;
     color: var(--muted);
-    background: rgba(255,255,255,0.02);
+    background: rgba(249,166,2,0.04);
     border-radius: 0 var(--radius) var(--radius) 0;
   }
 
@@ -502,14 +558,14 @@ const STYLES = `
   .msg-bubble a:hover { border-bottom-color: var(--accent); }
 
   .msg-bubble code {
-    background: rgba(255,255,255,0.06);
+    background: rgba(249,166,2,0.08);
     padding: 2px 6px;
     border-radius: 4px;
     font-family: 'Geist Mono', 'SF Mono', 'Fira Code', monospace;
     font-size: 0.9em;
   }
 
-  .msg-bubble strong { font-weight: 600; color: #f4f4f5; }
+  .msg-bubble strong { font-weight: 600; color: #f4f0e0; }
   .msg-bubble em { font-style: italic; }
 
   /* ─── Code Blocks ─── */
@@ -517,19 +573,19 @@ const STYLES = `
     margin: 8px 0;
     border-radius: var(--radius);
     overflow: hidden;
-    border: 1px solid var(--border);
-    background: #0c0c12;
+    border: 1px solid rgba(249,166,2,0.15);
+    background: #0a0907;
   }
   .sc-code-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     padding: 6px 12px;
-    background: rgba(255,255,255,0.03);
-    border-bottom: 1px solid var(--border);
+    background: rgba(249,166,2,0.05);
+    border-bottom: 1px solid rgba(249,166,2,0.1);
     font-size: 12px;
   }
-  .sc-code-lang { color: var(--muted); text-transform: lowercase; }
+  .sc-code-lang { color: var(--accent); text-transform: lowercase; opacity: 0.7; }
   .sc-code-copy {
     background: transparent;
     border: 1px solid var(--border);
@@ -541,7 +597,7 @@ const STYLES = `
     font-family: inherit;
     transition: all var(--transition);
   }
-  .sc-code-copy:hover { color: var(--text); border-color: rgba(255,255,255,0.15); }
+  .sc-code-copy:hover { color: var(--text); border-color: rgba(249,166,2,0.3); }
   .sc-code-copy.copied { color: #22c55e; border-color: rgba(34,197,94,0.3); }
 
   .sc-code-wrap pre {
@@ -551,7 +607,7 @@ const STYLES = `
     scrollbar-width: thin;
   }
   .sc-code-wrap pre::-webkit-scrollbar { height: 4px; }
-  .sc-code-wrap pre::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+  .sc-code-wrap pre::-webkit-scrollbar-thumb { background: rgba(249,166,2,0.15); border-radius: 2px; }
 
   .sc-code-wrap code {
     font-family: 'Geist Mono', 'SF Mono', 'Fira Code', monospace;
@@ -574,11 +630,21 @@ const STYLES = `
     align-items: center;
     gap: 4px;
     padding: 4px 10px;
-    background: rgba(99,102,241,0.1);
-    border: 1px solid rgba(99,102,241,0.2);
+    background: rgba(249,166,2,0.08);
+    border: 1px solid rgba(249,166,2,0.2);
     border-radius: 14px;
     font-size: 12px;
     color: var(--text);
+  }
+  .file-chip svg {
+    width: 12px;
+    height: 12px;
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    flex-shrink: 0;
   }
   .file-chip-remove {
     width: 16px;
@@ -590,29 +656,53 @@ const STYLES = `
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 14px;
     padding: 0;
     border-radius: 50%;
     transition: all var(--transition);
     font-family: inherit;
   }
+  .file-chip-remove svg {
+    width: 12px;
+    height: 12px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
   .file-chip-remove:hover { color: #ef4444; background: rgba(239,68,68,0.1); }
 
   /* ─── Mobile ─── */
-  @media (max-width: 640px) {
+  @media (max-width: 768px) {
+    .chat-messages { padding: 14px 14px 8px; }
+    .msg { max-width: 90%; }
+  }
+  @media (max-width: 480px) {
     .chat-messages { padding: 12px 12px 8px; }
-    .msg { max-width: 92%; }
+    .msg { max-width: 94%; }
     .chat-input-area { padding: 8px 12px; padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px)); }
+    .suggested-prompts { max-width: 100%; }
+    .suggested-prompt { font-size: 12px; padding: 6px 12px; }
   }
 `;
+
+/* ─── SVG Icon Constants ─── */
+const SVG_CHAT = '<svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
+const SVG_SEND = '<svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>';
+const SVG_ARROW_DOWN = '<svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>';
+const SVG_COPY = '<svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+const SVG_CHECK = '<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>';
+const SVG_RETRY = '<svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>';
+const SVG_PAPERCLIP = '<svg viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>';
+const SVG_CLOSE = '<svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
 
 const TEMPLATE = `
   <div class="drop-overlay">Drop files here</div>
   <div class="chat-messages"></div>
   <div class="empty-state">
-    <div class="empty-state-icon">💬</div>
+    <div class="empty-state-icon">${SVG_CHAT}</div>
     <h3>Start a conversation</h3>
-    <p>Ask anything — I'm here to help you think, build, and explore ideas.</p>
+    <p>Ask anything -- I'm here to help you think, build, and explore ideas.</p>
     <div class="suggested-prompts">
       <button class="suggested-prompt">Explain this code</button>
       <button class="suggested-prompt">Help me debug</button>
@@ -621,14 +711,17 @@ const TEMPLATE = `
     </div>
   </div>
   <button class="scroll-bottom-btn" aria-label="Scroll to bottom">
-    <span class="arrow">↓</span> Scroll to bottom
+    <span class="arrow-icon">${SVG_ARROW_DOWN}</span> Scroll to bottom
   </button>
-  <button class="new-messages-pill">↓ New messages</button>
+  <button class="new-messages-pill" aria-label="New messages">
+    <span class="pill-arrow">${SVG_ARROW_DOWN}</span>
+    <span class="pill-text"></span>
+  </button>
   <div class="chat-input-area">
     <div class="chat-input-wrap">
       <textarea class="chat-textarea" rows="1" aria-label="Chat input"></textarea>
       <button class="send-btn" aria-label="Send message">
-        <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+        ${SVG_SEND}
       </button>
     </div>
     <div class="file-chips"></div>
@@ -642,7 +735,7 @@ class ScChat extends HTMLElement {
 
     this._messages = [];
     this._isTyping = false;
-    this._placeholder = 'Type a message…';
+    this._placeholder = 'Type a message...';
     this._userScrolled = false;
     this._pendingFiles = [];
     this._newMsgCount = 0;
@@ -683,7 +776,7 @@ class ScChat extends HTMLElement {
 
   get placeholder() { return this._placeholder; }
   set placeholder(val) {
-    this._placeholder = val || 'Type a message…';
+    this._placeholder = val || 'Type a message...';
     if (this._textareaEl) this._textareaEl.placeholder = this._placeholder;
   }
 
@@ -705,6 +798,7 @@ class ScChat extends HTMLElement {
     this._sendBtn = container.querySelector('.send-btn');
     this._scrollBtn = container.querySelector('.scroll-bottom-btn');
     this._newMsgPill = container.querySelector('.new-messages-pill');
+    this._newMsgPillText = container.querySelector('.pill-text');
     this._inputWrap = container.querySelector('.chat-input-wrap');
     this._dropOverlay = container.querySelector('.drop-overlay');
     this._fileChipsEl = container.querySelector('.file-chips');
@@ -843,8 +937,8 @@ class ScChat extends HTMLElement {
       const chip = document.createElement('span');
       chip.className = 'file-chip';
       chip.innerHTML = `
-        📎 ${this._escapeHtml(this._truncateFilename(file.name, 24))}
-        <button class="file-chip-remove" data-idx="${idx}" aria-label="Remove file">×</button>
+        ${SVG_PAPERCLIP} ${this._escapeHtml(this._truncateFilename(file.name, 24))}
+        <button class="file-chip-remove" data-idx="${idx}" aria-label="Remove file">${SVG_CLOSE}</button>
       `;
       chip.querySelector('.file-chip-remove').addEventListener('click', () => {
         this._pendingFiles.splice(idx, 1);
@@ -862,9 +956,9 @@ class ScChat extends HTMLElement {
     const ext = name.lastIndexOf('.');
     if (ext > 0 && name.length - ext < 8) {
       const extStr = name.slice(ext);
-      return name.slice(0, max - extStr.length - 1) + '…' + extStr;
+      return name.slice(0, max - extStr.length - 1) + '...' + extStr;
     }
-    return name.slice(0, max - 1) + '…';
+    return name.slice(0, max - 1) + '...';
   }
 
   /* ─── Auto-resize Textarea ─── */
@@ -923,7 +1017,7 @@ class ScChat extends HTMLElement {
 
     if (this._userScrolled) {
       this._newMsgCount++;
-      this._newMsgPill.textContent = `↓ ${this._newMsgCount} new message${this._newMsgCount > 1 ? 's' : ''}`;
+      this._newMsgPillText.textContent = `${this._newMsgCount} new message${this._newMsgCount > 1 ? 's' : ''}`;
       this._newMsgPill.classList.add('visible');
       this._scrollBtn.classList.remove('visible');
     } else {
@@ -1136,15 +1230,15 @@ class ScChat extends HTMLElement {
     const copyBtn = document.createElement('button');
     copyBtn.className = 'msg-action-btn';
     copyBtn.title = 'Copy message';
-    copyBtn.innerHTML = '📋';
+    copyBtn.innerHTML = SVG_COPY;
     copyBtn.addEventListener('click', () => {
       const msg = this._messages.find(m => m.id === msgId);
       const text = msg ? msg.content : '';
       navigator.clipboard.writeText(text).then(() => {
-        copyBtn.innerHTML = '✓';
+        copyBtn.innerHTML = SVG_CHECK;
         copyBtn.classList.add('copied');
         setTimeout(() => {
-          copyBtn.innerHTML = '📋';
+          copyBtn.innerHTML = SVG_COPY;
           copyBtn.classList.remove('copied');
         }, 1500);
       }).catch(() => {});
@@ -1156,7 +1250,7 @@ class ScChat extends HTMLElement {
       const retryBtn = document.createElement('button');
       retryBtn.className = 'msg-action-btn';
       retryBtn.title = 'Retry';
-      retryBtn.innerHTML = '↻';
+      retryBtn.innerHTML = SVG_RETRY;
       retryBtn.addEventListener('click', () => {
         this.dispatchEvent(new CustomEvent('message-retry', {
           bubbles: true, composed: true,

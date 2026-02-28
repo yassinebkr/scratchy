@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0a0a0f">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Scratchy v2</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/geist@1.3.1/dist/fonts/geist-sans/style.css">
+  <link rel="stylesheet" href="styles/main.css?v=2.0.0a2">
+</head>
+<body>
+  <!-- Auth screen (shown when logged out) -->
+  <div id="auth-screen" class="screen">
+    <sc-auth></sc-auth>
+  </div>
+
+  <!-- Setup wizard screen (shown on first run) -->
+  <div id="wizard-screen" class="screen hidden">
+    <sc-setup-wizard></sc-setup-wizard>
+  </div>
+
+  <!-- App screen (shown when logged in) -->
+  <div id="app-screen" class="screen hidden">
+    <!-- Top bar -->
+    <div id="topbar" class="topbar">
+      <div class="topbar-left">
+        <span class="topbar-brand">Scratchy</span>
+        <span class="status-badge">
+          <span id="status-dot" class="status-dot disconnected"></span>
+          <span id="status-text" class="status-text">Disconnected</span>
+        </span>
+      </div>
+      <div class="topbar-right">
+        <span id="topbar-user" class="topbar-user"></span>
+        <button id="logout-btn" class="topbar-logout" aria-label="Log out">Log out</button>
+      </div>
+    </div>
+
+    <!-- Main app area -->
+    <div id="app" class="app-main">
+      <!-- Sidebar with agent switcher -->
+      <aside id="sidebar" class="app-sidebar">
+        <sc-agent-switcher></sc-agent-switcher>
+      </aside>
+      <!-- Surface container: dynamic grid of contextual panels -->
+      <div id="surfaces" class="surface-container">
+        <!-- Surfaces injected dynamically by surface-manager.js -->
+        <!-- Chat surface is always present -->
+        <div id="chat-surface" class="surface chat-surface">
+          <div id="messages" class="messages"></div>
+          <div id="input-area" class="input-area">
+            <textarea id="msg-input" placeholder="Message..." rows="1"></textarea>
+            <button id="send-btn" aria-label="Send">↑</button>
+          </div>
+        </div>
+      </div>
+      <!-- Surface toggle toolbar -->
+      <sc-surface-toolbar></sc-surface-toolbar>
+    </div>
+  </div>
+
+  <!-- Scripts (ESM) -->
+  <script type="module" src="components/sc-auth.js?v=2.0.3a"></script>
+  <script type="module" src="components/sc-agent-switcher.js?v=2.0.3a"></script>
+  <script type="module" src="components/sc-setup-wizard.js?v=2.0.3a"></script>
+  <script type="module" src="components/sc-terminal.js?v=2.0.3a"></script>
+  <script type="module" src="components/sc-filetree.js?v=2.0.3a"></script>
+  <script type="module" src="components/sc-editor.js?v=2.0.3a"></script>
+  <script type="module" src="components/sc-search.js?v=2.0.3a"></script>
+  <script type="module" src="components/sc-surface-toolbar.js?v=2.0.3a"></script>
+  <script type="module" src="lib/ws-client.js?v=2.0.3a"></script>
+  <script type="module" src="lib/surface-manager.js?v=2.0.3a"></script>
+  <script type="module" src="components/sc-chat.js?v=2.0.3a"></script>
+  <script type="module" src="lib/app.js?v=2.0.3a"></script>
+</body>
+</html>

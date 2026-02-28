@@ -1,0 +1,21 @@
+{
+  "name": "scratchy-oss",
+  "version": "2.0.0-alpha.1",
+  "type": "module",
+  "description": "Scratchy v2 OSS — Contextual AI chat interface with GenUI protocol",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js",
+    "test": "node --test test/*.test.js"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "better-sqlite3": "^12.6.2",
+    "openai": "^6.25.0",
+    "ws": "^8.19.0"
+  }
+}

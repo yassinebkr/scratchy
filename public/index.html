@@ -2,21 +2,118 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#0a0a0f">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0d0b07">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Scratchy v2</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/geist@1.3.1/dist/fonts/geist-sans/style.css">
-  <link rel="stylesheet" href="styles/main.css?v=2.0.6a">
-  <link rel="stylesheet" href="styles/chat.css?v=2.0.6a">
-  <link rel="stylesheet" href="styles/tiles.css?v=2.0.6a">
-  <link rel="stylesheet" href="app.css?v=2.0.6a">
-  <link rel="stylesheet" href="css/mobile.css?v=2.0.6a">
+  <link rel="stylesheet" href="styles/tokens.css?v=2.1.10">
+  <link rel="stylesheet" href="styles/main.css?v=2.1.10">
+  <link rel="stylesheet" href="styles/chat.css?v=2.1.10">
+  <link rel="stylesheet" href="styles/tiles.css?v=2.1.10">
+  <link rel="stylesheet" href="app.css?v=2.1.10">
+  <link rel="stylesheet" href="css/mobile.css?v=2.1.10">
+  <style>
+    /* Agent-driven UI: Chat header — compact */
+    .chat-header {
+      display: flex; align-items: center; gap: 8px;
+      height: 36px; min-height: 36px;
+      padding: 0 16px;
+      background: var(--sc-glass-bg, rgba(26,22,16,0.85));
+      border-bottom: 1px solid rgba(249,166,2,0.08);
+      flex-shrink: 0;
+    }
+    .chat-header-avatar {
+      width: 22px; height: 22px; border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 9px; font-weight: 700;
+      color: var(--agent-accent-fg, #0d0b07);
+      background: var(--agent-accent, #F9A602);
+      transition: background 0.3s ease, color 0.3s ease;
+      flex-shrink: 0;
+    }
+    .chat-header-info { display: flex; align-items: baseline; gap: 6px; }
+    .chat-header-name { font-size: 12.5px; font-weight: 600; color: #f0ead6; }
+    .chat-header-model { font-size: 10px; color: #5a5040; }
+
+    /* Agent-driven UI: Thinking indicator */
+    .msg-thinking {
+      display: flex; gap: 5px; padding: 12px 16px; align-items: center;
+    }
+    .msg-thinking .dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--agent-accent, #F9A602);
+      animation: thinking-bounce 1.4s ease-in-out infinite;
+    }
+    .msg-thinking .dot:nth-child(2) { animation-delay: 0.15s; }
+    .msg-thinking .dot:nth-child(3) { animation-delay: 0.3s; }
+    @keyframes thinking-bounce {
+      0%, 80%, 100% { transform: translateY(0); opacity: 0.3; }
+      40% { transform: translateY(-5px); opacity: 1; }
+    }
+
+    /* GenUI rendering placeholder (shown while tiles load) */
+    .genui-rendering {
+      display: flex; align-items: center; gap: 8px;
+      padding: 12px 16px; margin: 8px 0;
+      background: rgba(249,166,2,0.06);
+      border: 1px solid rgba(249,166,2,0.12);
+      border-radius: 10px;
+      color: #8a7e6a; font-size: 13px;
+      animation: genui-pulse 1.5s ease-in-out infinite;
+    }
+    .genui-rendering::before {
+      content: '';
+      display: inline-block;
+      width: 14px; height: 14px;
+      border: 2px solid rgba(249,166,2,0.3);
+      border-top-color: #F9A602;
+      border-radius: 50%;
+      animation: genui-spin 0.6s linear infinite;
+    }
+    @keyframes genui-spin { to { transform: rotate(360deg); } }
+    @keyframes genui-pulse {
+      0%, 100% { opacity: 0.7; }
+      50% { opacity: 1; }
+    }
+    @keyframes canvas-fade-in {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Activity state CSS hooks — surfaces glow when active */
+    html[data-activity-state="coding"] .surface.editor-surface,
+    html[data-activity-state="coding"] .surface.terminal-surface {
+      box-shadow: 0 0 20px var(--agent-accent-glow, rgba(249,166,2,0.2));
+    }
+    html[data-activity-state="searching"] .surface.search-surface {
+      box-shadow: 0 0 20px var(--agent-accent-glow, rgba(249,166,2,0.2));
+    }
+    html[data-activity-state="reading"] .surface.explorer-surface {
+      box-shadow: 0 0 20px var(--agent-accent-glow, rgba(249,166,2,0.2));
+    }
+  </style>
 </head>
 <body>
-  <!-- Auth screen (shown when logged out) -->
-  <div id="auth-screen" class="screen">
+  <!-- Loading screen (shown during auth check to prevent FOUC) -->
+  <style>
+    #loading-screen { display:flex;align-items:center;justify-content:center;height:100dvh;background:#0d0b07; }
+    #loading-screen.hidden { display:none; }
+    #loading-screen .loader { width:32px;height:32px;border:3px solid rgba(249,166,2,0.15);border-top-color:#F9A602;border-radius:50%;animation:_spin .65s linear infinite; }
+    @keyframes _spin{to{transform:rotate(360deg)}}
+  </style>
+  <div id="loading-screen" class="screen">
+    <div class="loader"></div>
+  </div>
+
+  <!-- Landing page (shown to visitors) -->
+  <div id="landing-screen" class="screen hidden">
+    <sc-landing></sc-landing>
+  </div>
+
+  <!-- Auth screen (shown when logging in) -->
+  <div id="auth-screen" class="screen hidden">
     <sc-auth></sc-auth>
   </div>
 
@@ -33,63 +130,95 @@
   <!-- App screen (shown when logged in) -->
   <div id="app-screen" class="screen hidden">
     <!-- Top bar -->
-    <div id="topbar" class="topbar">
+    <header id="topbar" class="topbar" role="banner">
       <div class="topbar-left">
-        <span class="topbar-brand">Scratchy</span>
-        <span class="status-badge">
-          <span id="status-dot" class="status-dot disconnected"></span>
+        <span class="topbar-brand" aria-label="Scratchy v2">Scratchy</span>
+        <span class="status-badge" role="status" aria-live="polite">
+          <span id="status-dot" class="status-dot disconnected" aria-hidden="true"></span>
           <span id="status-text" class="status-text">Disconnected</span>
         </span>
       </div>
+      <button id="mobile-agent-btn" class="topbar-agent-btn mobile-only" aria-label="Switch agent">
+        <span id="mobile-agent-icon">🤖</span>
+      </button>
       <div class="topbar-right">
-        <span id="topbar-user" class="topbar-user"></span>
-        <button id="logout-btn" class="topbar-logout" aria-label="Log out">Log out</button>
+        <button id="topbar-user-btn" class="topbar-user-btn" aria-label="User menu" aria-haspopup="true" aria-expanded="false">
+          <span id="topbar-user" class="topbar-user"></span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <div id="user-menu" class="user-menu hidden" role="menu" aria-label="User menu">
+          <button id="admin-btn" class="user-menu-item admin-only" role="menuitem" style="display:none">🛠️ Admin</button>
+          <div class="user-menu-divider admin-only" role="separator" style="display:none"></div>
+          <button id="settings-btn" class="user-menu-item" role="menuitem">⚙️ Settings</button>
+          <button id="logout-btn" class="user-menu-item danger" role="menuitem">🚪 Log out</button>
+        </div>
       </div>
-    </div>
+    </header>
 
     <!-- Main app area -->
     <div id="app" class="app-main">
       <!-- Sidebar with agent switcher -->
-      <aside id="sidebar" class="app-sidebar">
+      <aside id="sidebar" class="app-sidebar" role="complementary" aria-label="Agent sidebar">
         <sc-agent-switcher></sc-agent-switcher>
       </aside>
       <!-- Surface container: dynamic grid of contextual panels -->
-      <div id="surfaces" class="surface-container">
+      <div id="surfaces" class="surface-container" role="main" aria-label="Workspace">
         <!-- Surfaces injected dynamically by surface-manager.js -->
         <!-- Chat surface is always present -->
         <div id="chat-surface" class="surface chat-surface">
-          <div id="messages" class="messages"></div>
+          <div class="chat-header" id="chat-header">
+            <div class="chat-header-avatar" id="chat-header-avatar">AS</div>
+            <div class="chat-header-info">
+              <span class="chat-header-name" id="chat-header-name">Assistant</span>
+              <span class="chat-header-model" id="chat-header-model">Claude</span>
+            </div>
+          </div>
+          <div id="messages" class="messages" role="log" aria-label="Chat messages" aria-live="polite"></div>
+          <div class="msg-thinking" id="thinking-indicator" style="display:none">
+            <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+          </div>
           <div id="input-area" class="input-area">
-            <textarea id="msg-input" placeholder="Message..." rows="1"></textarea>
-            <button id="send-btn" aria-label="Send">↑</button>
+            <textarea id="msg-input" placeholder="Message Scratchy… (Shift+Enter for new line)" rows="1" aria-label="Message input"></textarea>
+            <button id="send-btn" aria-label="Send message">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+            </button>
           </div>
         </div>
       </div>
-      <!-- Surface toggle toolbar -->
-      <sc-surface-toolbar></sc-surface-toolbar>
     </div>
   </div>
 
+  <!-- Workspace bar: direct child of body for fixed positioning — hidden by default, shown in showApp() -->
+  <sc-workspace-bar style="display:none"></sc-workspace-bar>
+  <sc-command-palette></sc-command-palette>
+
   <!-- Scripts (ESM) -->
-  <script type="module" src="components/sc-auth.js?v=2.0.6a"></script>
-  <script type="module" src="components/sc-plans.js?v=2.0.6a"></script>
-  <script type="module" src="components/sc-agent-switcher.js?v=2.0.6a"></script>
-  <script type="module" src="components/sc-setup-wizard.js?v=2.0.6a"></script>
-  <script type="module" src="components/sc-chat.js?v=2.0.6a"></script>
-  <script type="module" src="components/sc-canvas.js?v=2.0.6a"></script>
-  <script type="module" src="components/sc-tile.js?v=2.0.6a"></script>
-  <script type="module" src="components/sc-admin.js?v=2.0.6a"></script>
-  <script type="module" src="components/sc-terminal.js?v=2.0.6a"></script>
-  <script type="module" src="components/sc-filetree.js?v=2.0.6a"></script>
-  <script type="module" src="components/sc-editor.js?v=2.0.6a"></script>
-  <script type="module" src="components/sc-search.js?v=2.0.6a"></script>
-  <script type="module" src="components/sc-surface-toolbar.js?v=2.0.6a"></script>
-  <script type="module" src="lib/ws-client.js?v=2.0.6a"></script>
-  <script type="module" src="lib/surface-manager.js?v=2.0.6a"></script>
-  <script type="module" src="lib/virtual-scroller.js?v=2.0.6a"></script>
-  <script type="module" src="lib/mobile-ux.js?v=2.0.6a"></script>
-  <script type="module" src="lib/agent-orchestrator.js?v=2.0.6a"></script>
-  <script type="module" src="lib/performance.js?v=2.0.6a"></script>
-  <script type="module" src="lib/app.js?v=2.0.6a"></script>
+  <script type="module" src="components/sc-landing.js?v=2.1.10"></script>
+  <script type="module" src="components/sc-auth.js?v=2.1.10"></script>
+  <script type="module" src="components/sc-plans.js?v=2.1.10"></script>
+  <script type="module" src="components/sc-agent-switcher.js?v=2.1.10"></script>
+  <script type="module" src="components/sc-setup-wizard.js?v=2.1.10"></script>
+  <script type="module" src="components/sc-chat.js?v=2.1.10"></script>
+  <script type="module" src="components/sc-canvas.js?v=2.1.10"></script>
+  <script type="module" src="components/sc-tile.js?v=2.1.10"></script>
+  <script type="module" src="components/sc-admin.js?v=2.1.10"></script>
+  <script type="module" src="components/sc-settings.js?v=2.1.10"></script>
+  <script type="module" src="components/sc-agent-config.js?v=2.1.10"></script>
+  <script type="module" src="components/sc-terminal.js?v=2.1.10"></script>
+  <script type="module" src="components/sc-filetree.js?v=2.1.10"></script>
+  <script type="module" src="components/sc-editor.js?v=2.1.10"></script>
+  <script type="module" src="components/sc-search.js?v=2.1.10"></script>
+  <script type="module" src="components/sc-workspace-bar.js?v=2.1.10"></script>
+  <script type="module" src="components/sc-command-palette.js?v=2.1.10"></script>
+  <script type="module" src="lib/ws-client.js?v=2.1.10"></script>
+  <script type="module" src="lib/surface-manager.js?v=2.1.10"></script>
+  <script type="module" src="lib/activity-monitor.js?v=2.1.10"></script>
+  <script type="module" src="lib/agent-presence.js?v=2.1.10"></script>
+  <script type="module" src="lib/virtual-scroller.js?v=2.1.10"></script>
+  <script type="module" src="lib/mobile-ux.js?v=2.1.10"></script>
+  <script type="module" src="lib/mobile-surface-stack.js?v=2.1.10"></script>
+  <script type="module" src="lib/agent-orchestrator.js?v=2.1.10"></script>
+  <script type="module" src="lib/performance.js?v=2.1.10"></script>
+  <script type="module" src="lib/app.js?v=2.1.10"></script>
 </body>
 </html>

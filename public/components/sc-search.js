@@ -29,8 +29,8 @@ TEMPLATE.innerHTML = `
   :host {
     display: flex;
     flex-direction: column;
-    background: var(--surface, #111118);
-    color: var(--text, #e4e4e7);
+    background: var(--sc-bg, #0e0c09);
+    color: var(--sc-text, #e8e0d2);
     font-family: var(--font, 'Geist', system-ui, sans-serif);
     font-size: 13px;
     overflow: hidden;
@@ -42,8 +42,8 @@ TEMPLATE.innerHTML = `
     align-items: center;
     gap: 8px;
     padding: 6px 12px;
-    background: rgba(255,255,255,0.02);
-    border-bottom: 1px solid rgba(255,255,255,0.06);
+    background: rgba(14,12,9,0.5);
+    border-bottom: 1px solid var(--sc-border, rgba(249,166,2,0.12));
     flex-shrink: 0;
     min-height: 32px;
   }
@@ -51,15 +51,15 @@ TEMPLATE.innerHTML = `
   .toolbar-title {
     font-size: 12px;
     font-weight: 600;
-    color: #71717a;
+    color: var(--sc-text-dim, #5a5040);
     letter-spacing: 0.5px;
     text-transform: uppercase;
   }
 
   .query-badge {
     font-size: 12px;
-    color: var(--text, #e4e4e7);
-    background: rgba(99,102,241,0.12);
+    color: var(--sc-text, #f0ead6);
+    background: var(--sc-accent-subtle, rgba(249, 166, 2, 0.08));
     padding: 2px 8px;
     border-radius: 4px;
     max-width: 300px;
@@ -70,15 +70,15 @@ TEMPLATE.innerHTML = `
 
   .result-count {
     font-size: 11px;
-    color: #71717a;
+    color: var(--sc-text-dim, #5a5040);
     margin-left: auto;
   }
 
   .toolbar-btn {
     background: none;
-    border: 1px solid rgba(255,255,255,0.1);
+    border: 1px solid var(--sc-border, rgba(249,166,2,0.12));
     border-radius: 4px;
-    color: #8b949e;
+    color: var(--sc-text-dim, #5a5040);
     font-family: inherit;
     font-size: 11px;
     padding: 2px 8px;
@@ -86,12 +86,13 @@ TEMPLATE.innerHTML = `
     transition: color 0.15s, border-color 0.15s;
   }
 
-  .toolbar-btn:hover { color: #c9d1d9; border-color: rgba(255,255,255,0.2); }
+  .toolbar-btn:hover { color: var(--sc-text, #e8e0d2); border-color: var(--sc-accent, #F9A602); }
+  .toolbar-btn:focus-visible { outline: none; box-shadow: 0 0 0 2px rgba(249,166,2,0.35); }
 
   /* View toggle */
   .view-tabs {
     display: flex;
-    border: 1px solid rgba(255,255,255,0.08);
+    border: 1px solid var(--sc-border, rgba(249,166,2,0.12));
     border-radius: 4px;
     overflow: hidden;
   }
@@ -99,7 +100,7 @@ TEMPLATE.innerHTML = `
   .view-tab {
     padding: 3px 10px;
     font-size: 11px;
-    color: #71717a;
+    color: var(--sc-text-dim, #5a5040);
     cursor: pointer;
     background: transparent;
     border: none;
@@ -107,8 +108,9 @@ TEMPLATE.innerHTML = `
     transition: color 0.1s, background 0.1s;
   }
 
-  .view-tab:hover { color: #c9d1d9; }
-  .view-tab.active { background: rgba(255,255,255,0.06); color: var(--text, #e4e4e7); }
+  .view-tab:hover { color: var(--sc-text, #e8e0d2); }
+  .view-tab:focus-visible { outline: none; box-shadow: 0 0 0 2px rgba(249,166,2,0.35); }
+  .view-tab.active { background: rgba(249,166,2,0.06); color: var(--sc-text, #e8e0d2); }
 
   /* Results list */
   .results {
@@ -117,51 +119,46 @@ TEMPLATE.innerHTML = `
     padding: 8px;
   }
 
-  .result-card {
-    padding: 10px 12px;
-    border-radius: 6px;
-    margin-bottom: 4px;
+  .search-result-card {
+    padding: 12px 14px;
+    border-radius: var(--sc-radius-md, 10px);
+    margin-bottom: 6px;
     cursor: pointer;
-    transition: background 0.1s;
-    border: 1px solid transparent;
+    transition: border-color 0.15s, background 0.15s;
+    border: 1px solid var(--sc-border, rgba(249, 166, 2, 0.10));
+    background: rgba(255,255,255,0.02);
   }
 
-  .result-card:hover { background: rgba(255,255,255,0.03); border-color: rgba(255,255,255,0.06); }
-
-  .result-title {
-    font-size: 14px;
-    font-weight: 500;
-    color: #58a6ff;
-    margin-bottom: 3px;
-    line-height: 1.3;
+  .search-result-card:hover {
+    border-color: rgba(249,166,2,0.15);
+    background: rgba(249,166,2,0.03);
   }
 
-  .result-title:hover { text-decoration: underline; }
-
-  .result-url {
+  .search-result-url {
     font-size: 11px;
-    color: #3fb950;
+    color: var(--sc-accent, #F9A602);
     margin-bottom: 4px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .result-snippet {
-    font-size: 12px;
-    color: #8b949e;
-    line-height: 1.5;
+  .search-result-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--sc-text, #f0ead6);
+    margin-bottom: 4px;
+    line-height: 1.3;
+  }
+
+  .search-result-snippet {
+    font-size: 13px;
+    color: var(--sc-text-muted, #8a7e6a);
+    line-height: 1.4;
     display: -webkit-box;
     -webkit-line-clamp: 3;
     -webkit-box-orient: vertical;
     overflow: hidden;
-  }
-
-  .result-index {
-    font-size: 11px;
-    color: #484f58;
-    margin-right: 6px;
-    font-weight: 500;
   }
 
   /* Fetch view */
@@ -235,9 +232,9 @@ TEMPLATE.innerHTML = `
   }
 
   .history-item:hover { background: rgba(255,255,255,0.03); }
-  .history-icon { color: #484f58; }
+  .history-icon { color: var(--sc-text-dim, #5a5040); }
   .history-query { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .history-time { font-size: 11px; color: #484f58; }
+  .history-time { font-size: 11px; color: var(--sc-text-dim, #5a5040); }
 
   /* Empty */
   .empty-state {
@@ -245,7 +242,7 @@ TEMPLATE.innerHTML = `
     align-items: center;
     justify-content: center;
     height: 100%;
-    color: #484f58;
+    color: var(--sc-text-dim, #5a5040);
     font-size: 13px;
     gap: 8px;
   }
@@ -259,10 +256,73 @@ TEMPLATE.innerHTML = `
   .fetch-content::-webkit-scrollbar-track { background: transparent; }
   .results::-webkit-scrollbar-thumb,
   .fetch-content::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+
+  /* Surface header — 36px uniform glassmorphism */
+  .surface-header {
+    display: flex;
+    align-items: center;
+    height: 36px;
+    min-height: 36px;
+    padding: 0 12px;
+    background: var(--sc-glass-bg, rgba(26,22,16,0.85));
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--sc-border, rgba(249,166,2,0.12));
+    flex-shrink: 0;
+    gap: 8px;
+  }
+  .surface-header-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--sc-text-muted, #8a7e6a);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+    letter-spacing: 0.3px;
+  }
+  .surface-header-icon {
+    color: var(--sc-accent, #F9A602);
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+  }
+  .surface-close {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    color: var(--sc-text-dim, #5a5040);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  .surface-close:hover {
+    background: rgba(239,68,68,0.12);
+    color: #ef4444;
+  }
+  .surface-close:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(249,166,2,0.35);
+  }
+
+  @media (max-width: 767px) {
+    .surface-header {
+      padding-left: 48px;
+    }
+  }
 </style>
 
-<div class="toolbar">
-  <span class="toolbar-title">Search</span>
+<div class="surface-header">
+  <span class="surface-header-title">
+    <svg class="surface-header-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="6.5" cy="6.5" r="4"/><line x1="10" y1="10" x2="14" y2="14"/>
+    </svg>
+  </span>
   <span class="query-badge" id="query-badge"></span>
   <span class="result-count" id="result-count"></span>
   <div class="view-tabs" id="view-tabs">
@@ -270,6 +330,9 @@ TEMPLATE.innerHTML = `
     <button class="view-tab" data-view="reader">Reader</button>
     <button class="view-tab" data-view="history">History</button>
   </div>
+  <button class="surface-close" id="surface-close-btn" title="Close search">
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/></svg>
+  </button>
 </div>
 <div class="results" id="results-view">
   <div class="empty-state"><span class="icon">🔍</span><span>Search results will appear here</span></div>
@@ -308,6 +371,9 @@ export class ScSearch extends HTMLElement {
       const tab = e.target.closest('.view-tab');
       if (!tab) return;
       this._switchView(tab.dataset.view);
+    });
+    this.shadowRoot.getElementById('surface-close-btn').addEventListener('click', () => {
+      this.dispatchEvent(new CustomEvent('surface-close', { detail: { type: 'search' }, bubbles: true, composed: true }));
     });
   }
 
@@ -365,18 +431,23 @@ export class ScSearch extends HTMLElement {
       return;
     }
 
-    this._resultsView.innerHTML = this._results.map((r, i) => `
-      <div class="result-card" data-url="${escapeHtml(r.url || '')}">
-        <div class="result-title"><span class="result-index">${i + 1}.</span>${escapeHtml(r.title || 'Untitled')}</div>
-        <div class="result-url">${escapeHtml(getDomain(r.url || ''))}</div>
-        <div class="result-snippet">${escapeHtml(r.snippet || r.description || '')}</div>
+    this._resultsView.innerHTML = this._results.map((r) => `
+      <div class="search-result-card" data-url="${escapeHtml(r.url || '')}" data-title="${escapeHtml(r.title || '')}">
+        <div class="search-result-url">${escapeHtml(getDomain(r.url || ''))}</div>
+        <div class="search-result-title">${escapeHtml(r.title || 'Untitled')}</div>
+        <div class="search-result-snippet">${escapeHtml(r.snippet || r.description || '')}</div>
       </div>
     `).join('');
 
-    this._resultsView.querySelectorAll('.result-card').forEach(card => {
+    this._resultsView.querySelectorAll('.search-result-card').forEach(card => {
       card.addEventListener('click', () => {
         const url = card.dataset.url;
-        if (url) window.open(url, '_blank', 'noopener');
+        const title = card.dataset.title;
+        this.dispatchEvent(new CustomEvent('search-result-click', {
+          detail: { url, title },
+          bubbles: true,
+          composed: true
+        }));
       });
     });
   }

@@ -62,6 +62,9 @@ class ScCanvas extends HTMLElement {
         .tile-wrapper[data-zone="half"] {
           grid-column: span 1;
         }
+        .tile-wrapper.a2ui-widget {
+          border-color: rgba(249, 166, 2, 0.15);
+        }
       </style>
       <div class="canvas-grid" id="grid"></div>
     `;
@@ -201,6 +204,50 @@ class ScCanvas extends HTMLElement {
     this._state.clear();
     this._tiles.clear();
     this._grid.innerHTML = '';
+  }
+
+  /**
+   * Load and render an A2UI community widget in the canvas grid.
+   * @param {Object} component — { type, id, data }
+   * @param {Object} [metadata] — A2UI envelope metadata
+   */
+  async loadA2UIWidget(component, metadata = {}) {
+    try {
+      const { loadWidget, updateWidget } = await import('../lib/a2ui-widget-loader.js');
+
+      const existingWrapper = this._tiles.get(component.id);
+      if (existingWrapper) {
+        // Update existing widget
+        const widgetEl = existingWrapper.querySelector('[data-a2ui-type]');
+        if (widgetEl) {
+          updateWidget(widgetEl, component.data);
+          return;
+        }
+      }
+
+      // Load new widget
+      const widgetEl = await loadWidget(component, metadata);
+
+      // Wrap in tile container (same style as GenUI tiles)
+      const wrapper = document.createElement('div');
+      wrapper.className = 'tile-wrapper a2ui-widget';
+      wrapper.dataset.id = component.id;
+      wrapper.dataset.a2uiType = component.type;
+      wrapper.appendChild(widgetEl);
+
+      // Store and add to grid
+      this._tiles.set(component.id, wrapper);
+      this._state.set(component.id, {
+        type: `a2ui:${component.type}`,
+        data: component.data,
+        layout: { zone: 'auto' },
+        isA2UI: true,
+      });
+      this._grid.appendChild(wrapper);
+
+    } catch (err) {
+      console.error(`[sc-canvas] A2UI widget load failed for "${component.type}":`, err);
+    }
   }
 
   /** Get current state as a plain object */

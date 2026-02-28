@@ -17,6 +17,7 @@ import * as agents from '../state/agents.js';
 import * as adminConfig from '../state/admin-config.js';
 import * as preferences from '../state/preferences.js';
 import { adminRoutes } from './routes/admin.js';
+import { createChatRoutes } from './routes/chat.js';
 
 /** @type {import('../lib/mcp-registry.js').McpRegistry|null} */
 let _mcpRegistry = null;
@@ -128,10 +129,11 @@ function setSecurityHeaders(res) {
   res.setHeader('Content-Security-Policy', [
     "default-src 'self'",
     "script-src 'self'",
-    "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob:",
+    "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+    "style-src-elem 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+    "img-src 'self' data: blob: https:",
     "connect-src 'self' ws: wss:",
-    "font-src 'self'",
+    "font-src 'self' https://cdn.jsdelivr.net",
     "frame-ancestors 'none'",
   ].join('; '));
 }
@@ -210,10 +212,13 @@ async function serveStatic(req, res, pathname) {
     const headers = { 'Content-Type': mime, 'Content-Length': data.length };
 
     // Cache versioned assets aggressively; everything else gets short cache
-    if (pathname.includes('?v=')) {
+    // Note: ?v= is in the query string (req.url), not in pathname
+    const rawUrl = req.url || '';
+    if (rawUrl.includes('?v=') || rawUrl.includes('&v=')) {
       headers['Cache-Control'] = 'public, max-age=31536000, immutable';
     } else if (ext === '.html') {
-      headers['Cache-Control'] = 'no-cache';
+      headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0';
+      headers['Pragma'] = 'no-cache';
     } else {
       headers['Cache-Control'] = 'public, max-age=3600';
     }
@@ -276,6 +281,8 @@ export function createRouter(opts = {}) {
   const getDb = opts.getDb ?? null;
   const version = opts.version ?? PKG_VERSION;
   const startedAt = Date.now();
+  /** @type {Map<string, {count:number, firstAt:number}>} */
+  const loginAttempts = new Map();
 
   // Store MCP registry if provided
   if (opts.mcpRegistry) {
@@ -287,6 +294,9 @@ export function createRouter(opts = {}) {
 
   /** Lazily initialized admin route handlers */
   let _adminHandlers = null;
+
+  /** Lazily initialized chat route handler */
+  let _chatHandler = null;
 
   /**
    * Lazily initialize state modules when we have a db.
@@ -407,9 +417,23 @@ export function createRouter(opts = {}) {
         });
       }
 
-      // Auth: login
+      // Auth: login (with brute-force protection)
       if (method === 'POST' && pathname === '/api/auth/login') {
         if (!auth) return json(res, 501, { error: 'Auth not configured' });
+        const clientIp = (req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '').split(',')[0].trim();
+        const attempts = loginAttempts.get(clientIp) || { count: 0, firstAt: Date.now() };
+        // Reset window after 15 minutes
+        if (Date.now() - attempts.firstAt > 15 * 60 * 1000) {
+          attempts.count = 0;
+          attempts.firstAt = Date.now();
+        }
+        attempts.count++;
+        loginAttempts.set(clientIp, attempts);
+        if (attempts.count > 5) {
+          const retryAfter = Math.ceil((attempts.firstAt + 15 * 60 * 1000 - Date.now()) / 1000);
+          res.setHeader('Retry-After', String(retryAfter));
+          return json(res, 429, { error: 'Too many login attempts. Try again later.' });
+        }
         const body = await parseJsonBody(req);
         const { username, password } = body;
         if (!username || !password) {
@@ -418,7 +442,8 @@ export function createRouter(opts = {}) {
         try {
           const result = await auth.login(String(username), String(password));
           // Set cookie as well for browser convenience
-          res.setHeader('Set-Cookie', `token=${result.token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=2592000`);
+          res.setHeader('Set-Cookie', `token=${result.token}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=2592000`);
+          loginAttempts.delete(clientIp);
           return json(res, 200, result);
         } catch (err) {
           const status = err.status ?? 401;
@@ -434,13 +459,16 @@ export function createRouter(opts = {}) {
         if (!username || !password) {
           return json(res, 400, { error: 'username and password required' });
         }
+        if (password.length < 8) {
+          return json(res, 400, { error: 'Password must be at least 8 characters' });
+        }
         try {
           const result = await auth.signup(
             String(username),
             String(password),
             displayName ? String(displayName) : undefined,
           );
-          res.setHeader('Set-Cookie', `token=${result.token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=2592000`);
+          res.setHeader('Set-Cookie', `token=${result.token}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=2592000`);
           return json(res, 201, result);
         } catch (err) {
           const status = err.status ?? 400;
@@ -456,6 +484,7 @@ export function createRouter(opts = {}) {
           id: user.id,
           username: user.username,
           displayName: user.displayName,
+          role: user.role,
         });
       }
 
@@ -466,40 +495,174 @@ export function createRouter(opts = {}) {
           try { await auth.logout(token); } catch { /* ignore */ }
         }
         // Clear cookie
-        res.setHeader('Set-Cookie', 'token=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0');
+        res.setHeader('Set-Cookie', 'token=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0');
         return json(res, 200, { ok: true });
       }
 
-      // OAuth stubs
-      {
-        const oauthMatch = matchRoute('/api/auth/oauth/:provider', pathname);
-        if (oauthMatch) {
-          if (method === 'GET') {
-            return json(res, 501, {
-              error: 'OAuth not yet configured',
-              provider: oauthMatch.provider,
-              supportedProviders: ['google', 'github'],
-            });
-          }
+      // Auth: change password
+      if (method === 'POST' && pathname === '/api/auth/password') {
+        const user = await requireAuth(req, res);
+        if (!user) return;
+        const body = await parseJsonBody(req);
+        const { currentPassword, newPassword } = body;
+        if (!currentPassword || !newPassword) {
+          return json(res, 400, { error: 'Current and new password required' });
         }
-        const oauthCbMatch = matchRoute('/api/auth/oauth/:provider/callback', pathname);
-        if (oauthCbMatch) {
-          if (method === 'GET') {
-            return json(res, 501, {
-              error: 'OAuth not yet configured',
-              provider: oauthCbMatch.provider,
-              supportedProviders: ['google', 'github'],
-            });
+        if (newPassword.length < 8) {
+          return json(res, 400, { error: 'New password must be at least 8 characters' });
+        }
+        try {
+          const { getUser, updateUser } = await import('../state/users.js');
+          const fullUser = getUser(user.id);
+          if (!fullUser) return json(res, 404, { error: 'User not found' });
+          const valid = await auth.verifyPassword(currentPassword, fullUser.passwordHash);
+          if (!valid) {
+            return json(res, 403, { error: 'Current password is incorrect' });
+          }
+          const hash = await auth.hashPassword(newPassword);
+          updateUser(user.id, { passwordHash: hash });
+          return json(res, 200, { ok: true, message: 'Password changed' });
+        } catch (err) {
+          return json(res, 500, { error: 'Failed to change password' });
+        }
+      }
+
+      // Provider token management (paste-token flow)
+      // POST /api/auth/provider-token — save a provider token (Claude setup-token or Gemini OAuth)
+      if (method === 'POST' && pathname === '/api/auth/provider-token') {
+        const user = await requireAuth(req, res);
+        if (!user) return;
+
+        const body = await parseJsonBody(req);
+        if (!body || !body.provider || !body.token) {
+          return json(res, 400, { error: 'provider and token are required' });
+        }
+
+        const provider = String(body.provider);
+        const validProviders = ['anthropic', 'google', 'openai'];
+        if (!validProviders.includes(provider)) {
+          return json(res, 400, { error: `Invalid provider. Supported: ${validProviders.join(', ')}` });
+        }
+
+        const encKey = getEncryptionKey();
+        if (!encKey) {
+          return json(res, 503, { error: 'Encryption not configured (ENCRYPTION_KEY missing)' });
+        }
+
+        try {
+          const tokenData = {
+            type: body.type || 'token', // 'token' for Claude setup-token, 'oauth' for Gemini refresh
+            token: String(body.token),
+            provider,
+            email: body.email ? String(body.email) : undefined,
+            savedAt: new Date().toISOString(),
+          };
+
+          preferences.setOAuthToken(user.id, provider, tokenData, encKey);
+          return json(res, 201, { ok: true, provider, type: tokenData.type });
+        } catch (err) {
+          console.error('[provider-token] Save failed:', err.message);
+          return json(res, 500, { error: 'Failed to save provider token' });
+        }
+      }
+
+      // GET /api/auth/provider-tokens — list configured providers (no secrets)
+      if (method === 'GET' && pathname === '/api/auth/provider-tokens') {
+        const user = await requireAuth(req, res);
+        if (!user) return;
+
+        const encKey = getEncryptionKey();
+        if (!encKey) {
+          return json(res, 503, { error: 'Encryption not configured' });
+        }
+
+        try {
+          const db = getDb ? getDb() : null;
+          if (!db) return json(res, 500, { error: 'Database not available' });
+
+          const row = db.prepare('SELECT oauthTokens, apiKeys FROM user_preferences WHERE userId = ?').get(user.id);
+          const providers = {};
+
+          if (row) {
+            // Check OAuth tokens
+            if (row.oauthTokens && row.oauthTokens !== '{}') {
+              try {
+                const tokens = JSON.parse(preferences.decrypt(row.oauthTokens, encKey));
+                for (const [p, data] of Object.entries(tokens)) {
+                  providers[p] = { type: data.type || 'oauth', email: data.email, configured: true };
+                }
+              } catch { /* empty or not yet encrypted */ }
+            }
+            // Check API keys
+            if (row.apiKeys && row.apiKeys !== '{}') {
+              try {
+                const keys = row.apiKeys.includes(':')
+                  ? JSON.parse(preferences.decrypt(row.apiKeys, encKey))
+                  : JSON.parse(row.apiKeys);
+                for (const p of Object.keys(keys)) {
+                  providers[p] = { ...(providers[p] || {}), type: 'apikey', configured: true };
+                }
+              } catch { /* empty */ }
+            }
+          }
+
+          return json(res, 200, { providers });
+        } catch (err) {
+          console.error('[provider-tokens] List failed:', err.message);
+          return json(res, 500, { error: 'Failed to list provider tokens' });
+        }
+      }
+
+      // DELETE /api/auth/provider-token/:provider — remove a provider token
+      {
+        const delMatch = matchRoute('/api/auth/provider-token/:provider', pathname);
+        if (delMatch && method === 'DELETE') {
+          const user = await requireAuth(req, res);
+          if (!user) return;
+
+          const encKey = getEncryptionKey();
+          if (!encKey) return json(res, 503, { error: 'Encryption not configured' });
+
+          try {
+            const db = getDb ? getDb() : null;
+            if (!db) return json(res, 500, { error: 'Database not available' });
+
+            const row = db.prepare('SELECT oauthTokens FROM user_preferences WHERE userId = ?').get(user.id);
+            if (!row || !row.oauthTokens || row.oauthTokens === '{}') {
+              return json(res, 404, { error: 'Token not found' });
+            }
+
+            const tokens = JSON.parse(preferences.decrypt(row.oauthTokens, encKey));
+            if (!(delMatch.provider in tokens)) {
+              return json(res, 404, { error: 'Token not found' });
+            }
+
+            delete tokens[delMatch.provider];
+            const encrypted = Object.keys(tokens).length > 0
+              ? preferences.encrypt(JSON.stringify(tokens), encKey)
+              : '{}';
+            const now = new Date().toISOString();
+            db.prepare('UPDATE user_preferences SET oauthTokens = ?, updatedAt = ? WHERE userId = ?')
+              .run(encrypted, now, user.id);
+
+            return json(res, 200, { ok: true });
+          } catch (err) {
+            console.error('[provider-token] Delete failed:', err.message);
+            return json(res, 500, { error: 'Failed to delete token' });
           }
         }
       }
 
-      // Chat history (placeholder)
-      if (method === 'GET' && pathname === '/api/history') {
-        const user = await requireAuth(req, res);
-        if (!user) return;
-        // TODO: wire up to real history store
-        return json(res, 200, []);
+      // Chat history API
+      if (pathname.startsWith('/api/chat/')) {
+        if (!_chatHandler) {
+          _chatHandler = createChatRoutes({
+            authenticate,
+            getDb: () => getDb ? getDb() : null,
+          });
+        }
+        const handled = await _chatHandler(req, res, pathname);
+        if (handled) return;
       }
 
       /* ---------- Agent CRUD ---------- */

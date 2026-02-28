@@ -20,24 +20,28 @@ import assert from 'node:assert/strict';
 /* ------------------------------------------------------------------ */
 
 // The surface-events module imports broadcastToUser from ./ws.js at module level.
-// We need to intercept those calls. We'll test extractToolCalls directly
-// (it's a pure function) and test the handler via the actual module.
+// ws.js has a setInterval that keeps the event loop alive forever.
+// We inject a no-op broadcast via opts.broadcast to keep tests lightweight.
+// extractToolCalls is a pure function — no broadcast needed.
 
-// Since broadcastToUser is called internally, we test the handler factory
-// using the exported API — any broadcast will go through the real ws module.
-// For our tests, we just verify the handler doesn't crash and returns
-// the right structure. The broadcastToUser calls will silently fail
-// (no connected users in test).
+import { extractToolCalls, createSurfaceEventHandler, cleanupUser, cleanupAll } from '../server/surface-events.js';
 
-import { extractToolCalls, createSurfaceEventHandler, cleanupUser } from '../server/surface-events.js';
+/** No-op broadcast for tests — captures messages for optional inspection. */
+function noopBroadcast(_userId, _msg) {}
+
+/** Create a test handler with no-op broadcast (avoids ws.js side effects). */
+function createTestHandler(extraOpts = {}) {
+  return createSurfaceEventHandler({ broadcast: noopBroadcast, ...extraOpts });
+}
 
 /* ------------------------------------------------------------------ */
-/*  Force exit after all tests — prevent dangling linger timers       */
+/*  Clean up ALL linger timers after tests — prevents hanging         */
 /* ------------------------------------------------------------------ */
 after(() => {
-  // Surface linger timers (30s setTimeout) keep the process alive.
-  // Force exit after all tests complete.
-  setTimeout(() => process.exit(0), 500).unref();
+  // cleanupAll() clears every user's 30s linger timers from the
+  // module-level state map. No process.exit() hack needed.
+  cleanupAll();
+  console.log('# after(): cleanupAll() called — all linger timers cleared');
 });
 
 /* ------------------------------------------------------------------ */
@@ -283,7 +287,7 @@ That should give us what we need.`;
 
 describe('createSurfaceEventHandler()', () => {
   it('returns an object with all expected methods', () => {
-    const handler = createSurfaceEventHandler();
+    const handler = createTestHandler();
     assert.equal(typeof handler.handleToolCall, 'function');
     assert.equal(typeof handler.handleToolResult, 'function');
     assert.equal(typeof handler.handleA2UI, 'function');
@@ -300,13 +304,13 @@ describe('createSurfaceEventHandler()', () => {
       warn: (...args) => logs.push(['warn', ...args]),
       error: (...args) => logs.push(['error', ...args]),
     };
-    const handler = createSurfaceEventHandler({ logger: customLogger });
+    const handler = createTestHandler({ logger: customLogger });
     assert.ok(handler);
   });
 
   it('default options → no crash', () => {
-    assert.doesNotThrow(() => createSurfaceEventHandler());
-    assert.doesNotThrow(() => createSurfaceEventHandler({}));
+    assert.doesNotThrow(() => createTestHandler());
+    assert.doesNotThrow(() => createTestHandler({}));
   });
 });
 
@@ -316,13 +320,13 @@ describe('createSurfaceEventHandler()', () => {
 
 describe('getActiveSurfaces()', () => {
   it('always includes chat for new users', () => {
-    const handler = createSurfaceEventHandler();
+    const handler = createTestHandler();
     const surfaces = handler.getActiveSurfaces('new_user_123');
     assert.ok(surfaces.includes('chat'));
   });
 
   it('returns a new array each time (no shared reference)', () => {
-    const handler = createSurfaceEventHandler();
+    const handler = createTestHandler();
     const a = handler.getActiveSurfaces('user_a');
     const b = handler.getActiveSurfaces('user_a');
     assert.notStrictEqual(a, b, 'should return new array each time');
@@ -330,7 +334,7 @@ describe('getActiveSurfaces()', () => {
   });
 
   it('different users have independent surface state', () => {
-    const handler = createSurfaceEventHandler();
+    const handler = createTestHandler();
     const s1 = handler.getActiveSurfaces('user_x');
     const s2 = handler.getActiveSurfaces('user_y');
     assert.deepStrictEqual(s1, s2, 'both should start with just chat');
@@ -343,21 +347,21 @@ describe('getActiveSurfaces()', () => {
 
 describe('handleToolCall()', () => {
   it('does not crash for known tool name', () => {
-    const handler = createSurfaceEventHandler();
+    const handler = createTestHandler();
     assert.doesNotThrow(() => {
       handler.handleToolCall('user1', 'exec', { command: 'ls' });
     });
   });
 
   it('does not crash for unknown tool name', () => {
-    const handler = createSurfaceEventHandler();
+    const handler = createTestHandler();
     assert.doesNotThrow(() => {
       handler.handleToolCall('user1', 'unknown_tool', { foo: 'bar' });
     });
   });
 
   it('activates terminal surface for exec tool', () => {
-    const handler = createSurfaceEventHandler();
+    const handler = createTestHandler();
     handler.handleToolCall('tool_user', 'exec', { command: 'ls' });
     const surfaces = handler.getActiveSurfaces('tool_user');
     assert.ok(surfaces.includes('terminal'), 'exec should activate terminal');
@@ -365,21 +369,21 @@ describe('handleToolCall()', () => {
   });
 
   it('activates editor surface for write_file tool', () => {
-    const handler = createSurfaceEventHandler();
+    const handler = createTestHandler();
     handler.handleToolCall('tool_user2', 'write_file', { path: '/tmp/test' });
     const surfaces = handler.getActiveSurfaces('tool_user2');
     assert.ok(surfaces.includes('editor'));
   });
 
   it('activates search surface for web_search tool', () => {
-    const handler = createSurfaceEventHandler();
+    const handler = createTestHandler();
     handler.handleToolCall('tool_user3', 'web_search', { query: 'test' });
     const surfaces = handler.getActiveSurfaces('tool_user3');
     assert.ok(surfaces.includes('search'));
   });
 
   it('with optional WS parameter → no crash', () => {
-    const handler = createSurfaceEventHandler();
+    const handler = createTestHandler();
     const ws = createMockWs();
     assert.doesNotThrow(() => {
       handler.handleToolCall('user1', 'exec', { command: 'ls' }, ws);
@@ -388,7 +392,7 @@ describe('handleToolCall()', () => {
 
   it('logs tool call via custom logger', () => {
     const logs = [];
-    const handler = createSurfaceEventHandler({
+    const handler = createTestHandler({
       logger: {
         log: (...args) => logs.push(args.join(' ')),
         warn: () => {},
@@ -406,21 +410,21 @@ describe('handleToolCall()', () => {
 
 describe('handleToolResult()', () => {
   it('does not crash for known tool', () => {
-    const handler = createSurfaceEventHandler();
+    const handler = createTestHandler();
     assert.doesNotThrow(() => {
       handler.handleToolResult('user1', 'exec', { output: 'result', exitCode: 0 });
     });
   });
 
   it('does not crash for unknown tool', () => {
-    const handler = createSurfaceEventHandler();
+    const handler = createTestHandler();
     assert.doesNotThrow(() => {
       handler.handleToolResult('user1', 'unknown_tool', { data: 'something' });
     });
   });
 
   it('schedules deactivation for non-chat surfaces', () => {
-    const handler = createSurfaceEventHandler();
+    const handler = createTestHandler();
     // First activate terminal
     handler.handleToolCall('deact_user', 'exec', { command: 'ls' });
     const before = handler.getActiveSurfaces('deact_user');
@@ -444,7 +448,7 @@ describe('handleToolResult()', () => {
 
 describe('handleA2UI()', () => {
   it('does not crash with valid A2UI envelope string', () => {
-    const handler = createSurfaceEventHandler();
+    const handler = createTestHandler();
     const a2ui = JSON.stringify({
       a2ui: {
         version: '1.0',
@@ -462,7 +466,7 @@ describe('handleA2UI()', () => {
   });
 
   it('does not crash with parsed A2UI object', () => {
-    const handler = createSurfaceEventHandler();
+    const handler = createTestHandler();
     const a2ui = {
       a2ui: {
         version: '1.0',
@@ -480,7 +484,7 @@ describe('handleA2UI()', () => {
   });
 
   it('handles community (non-builtin) components', () => {
-    const handler = createSurfaceEventHandler();
+    const handler = createTestHandler();
     const a2ui = JSON.stringify({
       a2ui: {
         version: '1.0',
@@ -499,7 +503,7 @@ describe('handleA2UI()', () => {
   });
 
   it('handles mixed builtin + community components', () => {
-    const handler = createSurfaceEventHandler();
+    const handler = createTestHandler();
     const a2ui = JSON.stringify({
       a2ui: {
         version: '1.0',
@@ -519,7 +523,7 @@ describe('handleA2UI()', () => {
 
   it('empty A2UI envelope → warns, does not crash', () => {
     const logs = [];
-    const handler = createSurfaceEventHandler({
+    const handler = createTestHandler({
       logger: {
         log: () => {},
         warn: (...args) => logs.push(args.join(' ')),
@@ -532,7 +536,7 @@ describe('handleA2UI()', () => {
   });
 
   it('invalid JSON string → does not crash', () => {
-    const handler = createSurfaceEventHandler();
+    const handler = createTestHandler();
     assert.doesNotThrow(() => {
       handler.handleA2UI('a2ui_bad', 'not json at all');
     });
@@ -545,7 +549,7 @@ describe('handleA2UI()', () => {
 
 describe('handleSurfaceAction()', () => {
   it('does not crash with valid surface action', () => {
-    const handler = createSurfaceEventHandler();
+    const handler = createTestHandler();
     assert.doesNotThrow(() => {
       handler.handleSurfaceAction('user1', {
         surface: 'terminal',
@@ -557,7 +561,7 @@ describe('handleSurfaceAction()', () => {
 
   it('warns on missing surface field', () => {
     const logs = [];
-    const handler = createSurfaceEventHandler({
+    const handler = createTestHandler({
       logger: {
         log: () => {},
         warn: (...args) => logs.push(args.join(' ')),
@@ -571,7 +575,7 @@ describe('handleSurfaceAction()', () => {
 
   it('warns on missing action field', () => {
     const logs = [];
-    const handler = createSurfaceEventHandler({
+    const handler = createTestHandler({
       logger: {
         log: () => {},
         warn: (...args) => logs.push(args.join(' ')),
@@ -584,7 +588,7 @@ describe('handleSurfaceAction()', () => {
 
   it('warns on unknown surface name', () => {
     const logs = [];
-    const handler = createSurfaceEventHandler({
+    const handler = createTestHandler({
       logger: {
         log: () => {},
         warn: (...args) => logs.push(args.join(' ')),
@@ -599,7 +603,7 @@ describe('handleSurfaceAction()', () => {
   });
 
   it('does not crash with empty data', () => {
-    const handler = createSurfaceEventHandler();
+    const handler = createTestHandler();
     assert.doesNotThrow(() => {
       handler.handleSurfaceAction('user1', {
         surface: 'chat',
@@ -615,7 +619,7 @@ describe('handleSurfaceAction()', () => {
 
 describe('cleanup()', () => {
   it('removes user state', () => {
-    const handler = createSurfaceEventHandler();
+    const handler = createTestHandler();
     // Create state
     handler.handleToolCall('cleanup_user', 'exec', { command: 'ls' });
     const before = handler.getActiveSurfaces('cleanup_user');
@@ -630,14 +634,14 @@ describe('cleanup()', () => {
   });
 
   it('cleanup non-existent user does not crash', () => {
-    const handler = createSurfaceEventHandler();
+    const handler = createTestHandler();
     assert.doesNotThrow(() => {
       handler.cleanup('nonexistent_user_xyz');
     });
   });
 
   it('cleanup clears linger timers', () => {
-    const handler = createSurfaceEventHandler();
+    const handler = createTestHandler();
     // Activate a surface and trigger deactivation timer
     handler.handleToolCall('timer_user', 'exec', { command: 'ls' });
     handler.handleToolResult('timer_user', 'exec', { output: 'done' });
@@ -661,7 +665,7 @@ describe('cleanup()', () => {
 
 describe('surface linger behavior', () => {
   it('surface stays active immediately after tool result', () => {
-    const handler = createSurfaceEventHandler();
+    const handler = createTestHandler();
     handler.handleToolCall('linger_user', 'exec', { command: 'ls' });
     handler.handleToolResult('linger_user', 'exec', { output: 'files' });
 
@@ -672,7 +676,7 @@ describe('surface linger behavior', () => {
   });
 
   it('new tool call resets linger timer (no premature deactivation)', () => {
-    const handler = createSurfaceEventHandler();
+    const handler = createTestHandler();
 
     // First tool call + result
     handler.handleToolCall('linger_user2', 'exec', { command: 'ls' });
@@ -688,7 +692,7 @@ describe('surface linger behavior', () => {
   });
 
   it('chat surface is never deactivated', () => {
-    const handler = createSurfaceEventHandler();
+    const handler = createTestHandler();
     // After any operations, chat should always be present
     handler.handleToolCall('chat_persist', 'exec', { command: 'ls' });
     handler.handleToolResult('chat_persist', 'exec', { output: 'done' });
@@ -706,7 +710,7 @@ describe('surface linger behavior', () => {
 
 describe('layout computation with multiple active surfaces', () => {
   it('multiple tools activate multiple surfaces', () => {
-    const handler = createSurfaceEventHandler();
+    const handler = createTestHandler();
 
     handler.handleToolCall('multi_user', 'exec', { command: 'ls' });
     handler.handleToolCall('multi_user', 'web_search', { query: 'test' });
@@ -721,7 +725,7 @@ describe('layout computation with multiple active surfaces', () => {
   });
 
   it('surfaces are sorted by priority', () => {
-    const handler = createSurfaceEventHandler();
+    const handler = createTestHandler();
 
     handler.handleToolCall('sort_user', 'exec', { command: 'ls' });
     handler.handleToolCall('sort_user', 'web_search', { query: 'q' });
@@ -746,12 +750,12 @@ describe('layout computation with multiple active surfaces', () => {
 
 describe('handler.extractToolCalls()', () => {
   it('is the same function as the module-level export', () => {
-    const handler = createSurfaceEventHandler();
+    const handler = createTestHandler();
     assert.equal(handler.extractToolCalls, extractToolCalls);
   });
 
   it('works via handler reference', () => {
-    const handler = createSurfaceEventHandler();
+    const handler = createTestHandler();
     const text = '<tool_use><name>exec</name><input>{"command":"test"}</input></tool_use>';
     const calls = handler.extractToolCalls(text);
     assert.equal(calls.length, 1);

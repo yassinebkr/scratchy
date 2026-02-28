@@ -33,63 +33,130 @@ TEMPLATE.innerHTML = `
   :host {
     display: flex;
     flex-direction: column;
-    background: #0d1117;
-    color: #c9d1d9;
+    background: var(--sc-bg, #0e0c09);
+    color: var(--sc-text, #e8e0d2);
     font-family: var(--mono, 'Geist Mono', 'SF Mono', 'Fira Code', monospace);
     font-size: 13px;
     overflow: hidden;
     height: 100%;
   }
 
-  /* Tab bar */
-  .tab-bar {
+  /* Surface header — 36px uniform glassmorphism */
+  .surface-header {
     display: flex;
-    align-items: stretch;
-    background: #161b22;
-    border-bottom: 1px solid rgba(255,255,255,0.06);
+    align-items: center;
+    height: 36px;
+    min-height: 36px;
+    padding: 0 12px;
+    background: var(--sc-glass-bg, rgba(26,22,16,0.85));
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--sc-border, rgba(249,166,2,0.12));
     flex-shrink: 0;
-    overflow-x: auto;
-    scrollbar-width: none;
+    gap: 8px;
   }
-
-  .tab-bar::-webkit-scrollbar { display: none; }
-
-  .tab {
+  .surface-header-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--sc-text-muted, #8a7e6a);
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 6px 14px;
-    font-family: var(--font, 'Geist', system-ui, sans-serif);
-    font-size: 12px;
-    color: #8b949e;
-    border-right: 1px solid rgba(255,255,255,0.04);
+    flex-shrink: 0;
+    letter-spacing: 0.3px;
+  }
+  .surface-header-icon {
+    color: var(--sc-accent, #F9A602);
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+  }
+  .surface-close {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    color: var(--sc-text-dim, #5a5040);
     cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  .surface-close:hover {
+    background: rgba(239,68,68,0.12);
+    color: #ef4444;
+  }
+  .surface-close:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(249,166,2,0.35);
+  }
+
+  @media (max-width: 767px) {
+    .surface-header {
+      padding-left: 48px;
+    }
+  }
+
+  /* Tab bar */
+  .editor-tab-bar {
+    display: flex;
+    align-items: stretch;
+    overflow-x: auto;
+    scrollbar-width: none;
+    background: rgba(14,12,9,0.6);
+    border-bottom: 1px solid var(--sc-border, rgba(249,166,2,0.12));
+    flex-shrink: 0;
+  }
+
+  .editor-tab-bar::-webkit-scrollbar { display: none; }
+
+  .editor-tab {
+    padding: 8px 14px;
+    font-size: 12px;
+    color: var(--sc-text-dim, #5a5040);
+    border-right: 1px solid var(--sc-border, rgba(249,166,2,0.12));
+    cursor: pointer;
+    transition: background 0.15s;
     white-space: nowrap;
-    transition: color 0.1s, background 0.1s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
     user-select: none;
   }
 
-  .tab:hover { background: rgba(255,255,255,0.03); color: #c9d1d9; }
-  .tab.active { background: #0d1117; color: #c9d1d9; border-bottom: 2px solid var(--accent, #6366f1); }
+  .editor-tab:hover { background: rgba(249,166,2,0.04); color: var(--sc-text, #e8e0d2); }
+  .editor-tab:focus-visible { outline: none; box-shadow: inset 0 0 0 2px rgba(249,166,2,0.35); }
+  .editor-tab.active { background: rgba(249,166,2,0.06); color: var(--sc-text, #e8e0d2); border-bottom: 2px solid var(--sc-accent, #F9A602); }
 
-  .tab-close {
+  .editor-tab-close {
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+    border: none;
+    background: transparent;
+    color: var(--sc-text-muted, #8a7e6a);
+    cursor: pointer;
+    opacity: 0;
     font-size: 14px;
     line-height: 1;
-    opacity: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     transition: opacity 0.1s;
-    padding: 0 2px;
-    border-radius: 2px;
   }
 
-  .tab:hover .tab-close { opacity: 0.6; }
-  .tab-close:hover { opacity: 1; background: rgba(255,255,255,0.1); }
+  .editor-tab:hover .editor-tab-close { opacity: 0.5; }
+  .editor-tab-close:hover { opacity: 1 !important; background: rgba(239,68,68,0.15); color: var(--sc-danger, #ef4444); }
 
-  .tab-lang {
+  .editor-tab-lang {
     font-size: 10px;
     padding: 1px 4px;
     border-radius: 3px;
-    background: rgba(255,255,255,0.06);
-    color: #636e7b;
+    background: rgba(249,166,2,0.06);
+    color: var(--sc-text-dim, #5a5040);
   }
 
   /* Status bar */
@@ -98,11 +165,11 @@ TEMPLATE.innerHTML = `
     align-items: center;
     gap: 12px;
     padding: 3px 12px;
-    background: #161b22;
-    border-top: 1px solid rgba(255,255,255,0.06);
+    background: var(--sc-glass-bg, rgba(26,22,16,0.85));
+    border-top: 1px solid var(--sc-border, rgba(249,166,2,0.12));
     font-family: var(--font, 'Geist', system-ui, sans-serif);
     font-size: 11px;
-    color: #636e7b;
+    color: var(--sc-text-dim, #5a5040);
     flex-shrink: 0;
     min-height: 24px;
   }
@@ -132,11 +199,12 @@ TEMPLATE.innerHTML = `
 
   .line-gutter {
     display: table-cell;
-    width: 50px;
+    width: 48px;
     text-align: right;
     padding: 0 12px 0 8px;
-    color: #484f58;
+    color: rgba(255, 255, 255, 0.15);
     user-select: none;
+    font-family: var(--sc-mono, 'Geist Mono', 'SF Mono', 'Fira Code', monospace);
     font-size: 12px;
     vertical-align: top;
     border-right: 1px solid rgba(255,255,255,0.04);
@@ -183,13 +251,20 @@ TEMPLATE.innerHTML = `
     align-items: center;
     justify-content: center;
     height: 100%;
-    color: #484f58;
+    color: var(--sc-text-dim, #5a5040);
     font-size: 13px;
     font-family: var(--font, 'Geist', system-ui, sans-serif);
     gap: 8px;
   }
 
-  .empty-state .icon { font-size: 20px; }
+  .empty-state .icon {
+    color: var(--sc-text-dim, #5a5040);
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
 
   /* Diff summary badge */
   .diff-badge {
@@ -211,9 +286,21 @@ TEMPLATE.innerHTML = `
   .editor-area::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
 </style>
 
-<div class="tab-bar" id="tab-bar"></div>
+<div class="surface-header">
+  <span class="surface-header-title">
+    <svg class="surface-header-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M11 2l3 3-8 8H3v-3z"/><line x1="9" y1="4" x2="12" y2="7"/>
+    </svg>
+    Editor
+  </span>
+  <span style="flex:1"></span>
+  <button class="surface-close" id="surface-close-btn" title="Close editor">
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/></svg>
+  </button>
+</div>
+<div class="editor-tab-bar" id="tab-bar"></div>
 <div class="editor-area" id="editor-area">
-  <div class="empty-state"><span class="icon">✏️</span><span>No files open</span></div>
+  <div class="empty-state"><span class="icon"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 2l3 3-8 8H3v-3z"/><line x1="9" y1="4" x2="12" y2="7"/></svg></span><span>No files open</span></div>
 </div>
 <div class="status-bar" id="status-bar">
   <span class="status-item" id="status-lang"></span>
@@ -248,10 +335,25 @@ export class ScEditor extends HTMLElement {
     this._activeTab = null;
   }
 
+  connectedCallback() {
+    this.shadowRoot.getElementById('surface-close-btn').addEventListener('click', () => {
+      this.dispatchEvent(new CustomEvent('surface-close', { detail: { type: 'editor' }, bubbles: true, composed: true }));
+    });
+  }
+
   /** Open a file (or update if already open) */
-  openFile(path, content, diff) {
-    const lang = detectLang(path);
-    this._tabs.set(path, { path, content, lang, diff: diff || [] });
+  openFile(path, content, langOrDiff, diff) {
+    let lang, diffData;
+    if (Array.isArray(langOrDiff)) {
+      // Backward compat: openFile(path, content, diff)
+      diffData = langOrDiff;
+      lang = detectLang(path);
+    } else {
+      lang = langOrDiff || detectLang(path);
+      diffData = diff || [];
+    }
+    this._saveScrollPosition();
+    this._tabs.set(path, { path, content, lang, diff: diffData, scrollTop: 0 });
     this._activeTab = path;
     this._render();
   }
@@ -291,7 +393,7 @@ export class ScEditor extends HTMLElement {
     this._tabBar.innerHTML = '';
     for (const [path, tab] of this._tabs) {
       const el = document.createElement('div');
-      el.className = 'tab' + (path === this._activeTab ? ' active' : '');
+      el.className = 'editor-tab' + (path === this._activeTab ? ' active' : '');
 
       const name = path.split('/').pop() || path;
       const langLabel = LANG_LABELS[tab.lang] || tab.lang;
@@ -300,17 +402,19 @@ export class ScEditor extends HTMLElement {
       el.innerHTML = `
         <span>${escapeHtml(name)}</span>
         ${hasDiff ? '<span class="change-marker modified"></span>' : ''}
-        <span class="tab-lang">${langLabel}</span>
-        <span class="tab-close">×</span>
+        <span class="editor-tab-lang">${langLabel}</span>
+        <button class="editor-tab-close" title="Close tab">×</button>
       `;
 
       el.addEventListener('click', (e) => {
-        if (e.target.classList.contains('tab-close')) {
+        if (e.target.classList.contains('editor-tab-close')) {
           this.closeTab(path);
           return;
         }
+        this._saveScrollPosition();
         this._activeTab = path;
         this._render();
+        this._restoreScrollPosition();
       });
 
       this._tabBar.appendChild(el);
@@ -319,7 +423,7 @@ export class ScEditor extends HTMLElement {
 
   _renderContent() {
     if (!this._activeTab || !this._tabs.has(this._activeTab)) {
-      this._editorArea.innerHTML = '<div class="empty-state"><span class="icon">✏️</span><span>No files open</span></div>';
+      this._editorArea.innerHTML = '<div class="empty-state"><span class="icon"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 2l3 3-8 8H3v-3z"/><line x1="9" y1="4" x2="12" y2="7"/></svg></span><span>No files open</span></div>';
       return;
     }
 
@@ -371,6 +475,22 @@ export class ScEditor extends HTMLElement {
       this._statusDiff.innerHTML = `<span class="diff-badge"><span class="added">+${added}</span><span class="removed">-${removed}</span></span>`;
     } else {
       this._statusDiff.innerHTML = '';
+    }
+  }
+
+  _saveScrollPosition() {
+    if (this._activeTab && this._tabs.has(this._activeTab)) {
+      const tab = this._tabs.get(this._activeTab);
+      tab.scrollTop = this._editorArea.scrollTop;
+    }
+  }
+
+  _restoreScrollPosition() {
+    if (this._activeTab && this._tabs.has(this._activeTab)) {
+      const tab = this._tabs.get(this._activeTab);
+      if (tab.scrollTop) {
+        requestAnimationFrame(() => { this._editorArea.scrollTop = tab.scrollTop; });
+      }
     }
   }
 

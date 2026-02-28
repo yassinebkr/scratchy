@@ -25,9 +25,12 @@
 import { spawn } from 'node:child_process';
 import { NullClawAdapter } from '../lib/nullclaw-adapter.js';
 import { searchContext, searchMemory, formatResultsAsToon } from '../lib/context-search.js';
-import { createOpenAIProvider, createMockProvider } from '../lib/embeddings.js';
+import { createBestGeminiProvider, createOpenAIProvider, createMockProvider } from '../lib/embeddings.js';
 import { extractMemories } from '../lib/memory-extraction.js';
+import { BUILTIN_TOOLS, createToolExecutor } from '../lib/builtin-tools.js';
 import { isA2UIMessage, parseA2UIMessage, a2uiToGenUI } from '../protocol/a2ui.js';
+import { parseGenUIResponse } from '../lib/genui-response-parser.js';
+import { createToolCallDetector } from '../lib/tool-call-detector.js';
 import * as agents from '../state/agents.js';
 import * as memory from '../state/memory.js';
 import * as contextIndex from '../state/context-index.js';
@@ -36,7 +39,7 @@ import * as contextIndex from '../state/context-index.js';
 /*  Constants                                                         */
 /* ------------------------------------------------------------------ */
 
-const NULLCLAW_BIN = '/home/nonbios/nullclaw/zig-out/bin/nullclaw';
+const NULLCLAW_BIN = '/home/nonbios/nullclaw-gateway-streaming/zig-out/bin/nullclaw';
 const NULLCLAW_TIMEOUT = 60_000;
 
 /** Number of history turns to retrieve for prompt building */
@@ -53,6 +56,166 @@ const ADAPTER_PORT_MIN = 28_000;
 const ADAPTER_PORT_MAX = 28_999;
 
 /* ------------------------------------------------------------------ */
+/*  Streaming text filter — strips tool XML from client output        */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Creates a streaming filter that suppresses <tool_call>, <tool_result>,
+ * <tool_use> XML blocks from reaching the client while allowing all other
+ * text through immediately.
+ *
+ * @param {(text: string) => void} onText — callback for displayable text
+ * @returns {{ feed(chunk: string): void, flush(): void }}
+ */
+function _createStreamFilter(onText) {
+  let buffer = '';
+  let insideTag = false;
+  let insideCodeFence = false; // tracks ```scratchy-canvas...``` blocks
+  const OPEN_PATTERNS = ['<tool_use', '<tool_call', '<tool_result'];
+  const CLOSE_PATTERNS = ['</tool_use>', '</tool_call>', '</tool_result>'];
+  const GENUI_FENCE_OPEN = /```scratchy-(canvas|toon|tpl)/;
+  const GENUI_FENCE_CLOSE = '```';
+  const MAX_PARTIAL = 15; // longest opening tag prefix to check
+
+  return {
+    feed(chunk) {
+      buffer += chunk;
+
+      // Process buffer in a loop until no more progress can be made
+      let progress = true;
+      while (buffer.length > 0 && progress) {
+        progress = false;
+
+        // ── Inside a GenUI code fence (```scratchy-canvas...```)
+        if (insideCodeFence) {
+          // Look for closing ``` (but not the opening one — find next occurrence)
+          // The opening was already consumed; look for a standalone ``` on a new line
+          const closeIdx = buffer.indexOf('\n```');
+          if (closeIdx !== -1) {
+            // Find end of the closing fence line
+            let endIdx = closeIdx + 4; // skip \n```
+            while (endIdx < buffer.length && buffer[endIdx] !== '\n') endIdx++;
+            buffer = buffer.slice(endIdx);
+            insideCodeFence = false;
+            progress = true;
+          }
+          // else: still inside fence, wait for more data
+          continue;
+        }
+
+        // ── Inside a tool XML tag
+        if (insideTag) {
+          let closeIdx = -1;
+          let closeLen = 0;
+          for (const pat of CLOSE_PATTERNS) {
+            const idx = buffer.indexOf(pat);
+            if (idx !== -1 && (closeIdx === -1 || idx < closeIdx)) {
+              closeIdx = idx;
+              closeLen = pat.length;
+            }
+          }
+          if (closeIdx !== -1) {
+            buffer = buffer.slice(closeIdx + closeLen);
+            insideTag = false;
+            progress = true;
+          }
+          continue;
+        }
+
+        // ── Normal text: look for tool tags OR GenUI fences
+        // Check for GenUI fence opening: ```scratchy-canvas or ```scratchy-toon or ```scratchy-tpl
+        const fenceMatch = buffer.match(GENUI_FENCE_OPEN);
+        // Check for tool XML opening
+        let toolOpenIdx = -1;
+        for (const pat of OPEN_PATTERNS) {
+          const idx = buffer.indexOf(pat);
+          if (idx !== -1 && (toolOpenIdx === -1 || idx < toolOpenIdx)) {
+            toolOpenIdx = idx;
+          }
+        }
+
+        const fenceIdx = fenceMatch ? fenceMatch.index : -1;
+
+        // Determine which comes first
+        let firstIdx = -1;
+        let firstType = null; // 'tool' or 'fence'
+        if (toolOpenIdx !== -1 && fenceIdx !== -1) {
+          if (toolOpenIdx <= fenceIdx) { firstIdx = toolOpenIdx; firstType = 'tool'; }
+          else { firstIdx = fenceIdx; firstType = 'fence'; }
+        } else if (toolOpenIdx !== -1) { firstIdx = toolOpenIdx; firstType = 'tool'; }
+        else if (fenceIdx !== -1) { firstIdx = fenceIdx; firstType = 'fence'; }
+
+        if (firstIdx !== -1) {
+          // Emit text before the match
+          if (firstIdx > 0) {
+            onText(buffer.slice(0, firstIdx));
+          }
+          buffer = buffer.slice(firstIdx);
+          if (firstType === 'tool') {
+            insideTag = true;
+          } else {
+            insideCodeFence = true;
+            // Skip the opening fence line itself
+            const nlIdx = buffer.indexOf('\n');
+            if (nlIdx !== -1) {
+              buffer = buffer.slice(nlIdx + 1);
+            } else {
+              buffer = ''; // entire buffer is the opening line, wait for more
+            }
+          }
+          progress = true;
+        } else {
+          // Check for partial matches at end of buffer
+          let partialStart = -1;
+
+          // Partial tool tag
+          for (let i = Math.max(0, buffer.length - MAX_PARTIAL); i < buffer.length; i++) {
+            if (buffer[i] === '<') {
+              const remainder = buffer.slice(i);
+              for (const pat of OPEN_PATTERNS) {
+                if (pat.startsWith(remainder)) { partialStart = i; break; }
+              }
+              if (partialStart !== -1) break;
+            }
+          }
+
+          // Partial GenUI fence (``` at end that could become ```scratchy-canvas)
+          if (partialStart === -1) {
+            for (let i = Math.max(0, buffer.length - 20); i < buffer.length; i++) {
+              if (buffer[i] === '`') {
+                const remainder = buffer.slice(i);
+                if ('```scratchy-'.startsWith(remainder)) { partialStart = i; break; }
+              }
+            }
+          }
+
+          if (partialStart !== -1) {
+            if (partialStart > 0) {
+              onText(buffer.slice(0, partialStart));
+              buffer = buffer.slice(partialStart);
+            }
+            progress = false;
+          } else {
+            onText(buffer);
+            buffer = '';
+            progress = false;
+          }
+        }
+      }
+    },
+
+    flush() {
+      if (buffer.length > 0 && !insideTag && !insideCodeFence) {
+        onText(buffer);
+      }
+      buffer = '';
+      insideTag = false;
+      insideCodeFence = false;
+    },
+  };
+}
+
+/* ------------------------------------------------------------------ */
 /*  Module state                                                      */
 /* ------------------------------------------------------------------ */
 
@@ -67,6 +230,12 @@ let _mcpRegistry = null;
 
 /** @type {import('../lib/embeddings.js').EmbeddingProvider|null} */
 let _embedder = null;
+
+/**
+ * Built-in tool executor — provides tools without external MCP servers.
+ * @type {ReturnType<import('../lib/builtin-tools.js').createToolExecutor>|null}
+ */
+let _toolExecutor = null;
 
 /**
  * Cache of default agent ID. Refreshed on miss.
@@ -91,14 +260,18 @@ export function init(db, mcpRegistry) {
   _db = db;
   _mcpRegistry = mcpRegistry;
 
-  // ── Embedding provider (same as chat-handler) ──
+  // ── Embedding provider (priority: Gemini OAuth → Gemini API key → OpenAI → Mock) ──
+  const geminiProvider = createBestGeminiProvider();
   const openaiKey = process.env.OPENAI_API_KEY;
-  if (openaiKey) {
+  if (geminiProvider) {
+    _embedder = geminiProvider;
+    console.log('[orchestrator] Embedding provider: Gemini text-embedding-004');
+  } else if (openaiKey) {
     _embedder = createOpenAIProvider(openaiKey);
-    console.log('[orchestrator] Embedding provider: OpenAI');
+    console.log('[orchestrator] Embedding provider: OpenAI text-embedding-3-small');
   } else {
     _embedder = createMockProvider();
-    console.warn('[orchestrator] No OPENAI_API_KEY — using mock embeddings');
+    console.warn('[orchestrator] No Gemini OAuth/API key or OpenAI key — using mock embeddings (semantic search disabled)');
   }
 
   // ── NullClaw adapter pool (separate port range from chat-handler) ──
@@ -134,6 +307,17 @@ export function init(db, mcpRegistry) {
     console.error('[orchestrator] Failed to initialize adapter pool:', err.message);
     _adapter = null;
   }
+
+  // ── Built-in tool executor (memory, context, web, etc.) ──
+  _toolExecutor = createToolExecutor({
+    embedder: _embedder,
+    memory,
+    contextIndex,
+    searchContext,
+    searchMemory,
+    formatResultsAsToon,
+  });
+  console.log(`[orchestrator] Built-in tools registered: ${BUILTIN_TOOLS.length}`);
 
   console.log('[orchestrator] Multi-agent orchestrator initialized');
 }
@@ -356,35 +540,44 @@ function buildAugmentedPrompt(userMessage, agentConfig, history, contextBlock, t
  * @returns {Promise<Array<{name: string, description: string, inputSchema: Object}>>}
  */
 async function ensureMcpServers(agentConfig) {
-  if (!_mcpRegistry) return [];
-  if (!agentConfig.mcpServers || agentConfig.mcpServers.length === 0) return [];
+  // Always include built-in tools
+  const builtinTools = _toolExecutor ? _toolExecutor.getTools() : [];
+
+  // If no MCP registry or no MCP servers configured, return just built-in tools
+  if (!_mcpRegistry || !agentConfig.mcpServers || agentConfig.mcpServers.length === 0) {
+    return builtinTools;
+  }
+
+  let mcpTools = [];
 
   // Already active — return cached tools
   if (_mcpRegistry.isActive(agentConfig.id)) {
-    return _mcpRegistry.getAvailableTools(agentConfig.id);
-  }
-
-  // Skip if currently being activated (concurrent request guard)
-  if (_mcpRegistry.isActivating(agentConfig.id)) {
+    mcpTools = _mcpRegistry.getAvailableTools(agentConfig.id);
+  } else if (_mcpRegistry.isActivating(agentConfig.id)) {
+    // Skip if currently being activated (concurrent request guard)
     // Wait briefly for activation to complete
     for (let i = 0; i < 20; i++) {
       await new Promise(r => setTimeout(r, 250));
       if (_mcpRegistry.isActive(agentConfig.id)) {
-        return _mcpRegistry.getAvailableTools(agentConfig.id);
+        mcpTools = _mcpRegistry.getAvailableTools(agentConfig.id);
+        break;
       }
     }
-    console.warn(`[orchestrator] MCP activation timed out for agent ${agentConfig.id}`);
-    return [];
+    if (mcpTools.length === 0) {
+      console.warn(`[orchestrator] MCP activation timed out for agent ${agentConfig.id}`);
+    }
+  } else {
+    try {
+      const { tools } = await _mcpRegistry.activateAgent(agentConfig);
+      mcpTools = tools;
+      console.log(`[orchestrator] Activated ${tools.length} MCP tools for agent ${agentConfig.name}`);
+    } catch (err) {
+      console.error(`[orchestrator] MCP activation failed for agent ${agentConfig.name}:`, err.message);
+    }
   }
 
-  try {
-    const { tools } = await _mcpRegistry.activateAgent(agentConfig);
-    console.log(`[orchestrator] Activated ${tools.length} MCP tools for agent ${agentConfig.name}`);
-    return tools;
-  } catch (err) {
-    console.error(`[orchestrator] MCP activation failed for agent ${agentConfig.name}:`, err.message);
-    return [];
-  }
+  // Merge: built-in tools first, then external MCP tools
+  return [...builtinTools, ...mcpTools];
 }
 
 /* ------------------------------------------------------------------ */
@@ -403,40 +596,21 @@ function adapterKey(userId, agentId) {
 }
 
 /**
- * Send a message through the NullClaw adapter for a specific user+agent.
+ * Send a message through the NullClaw adapter via /api/message with SSE streaming.
+ * Calls onChunk for each incremental delta, returns full accumulated text.
  *
  * @param {string} userId
  * @param {string} agentId
  * @param {string} augmentedPrompt
  * @param {Object} agentConfig — for model preference
- * @returns {Promise<{text: string}>}
+ * @param {(chunk: string) => void} onChunk — called for each streaming delta
+ * @returns {Promise<string>} — full response text
  */
-async function sendViaAdapter(userId, agentId, augmentedPrompt, agentConfig) {
+async function sendViaAdapter(userId, agentId, augmentedPrompt, agentConfig, onChunk, onToolEvent) {
   if (!_adapter) throw new Error('Adapter not initialized');
-
   const key = adapterKey(userId, agentId);
-
-  const payload = {
-    type: 'chat',
-    message: augmentedPrompt,
-    userId: key,
-    model: agentConfig.model || undefined,
-    temperature: agentConfig.temperature || undefined,
-    ts: Date.now(),
-  };
-
-  const { status, body } = await _adapter.routeWebhook(key, payload);
-
-  if (status >= 400) {
-    const errMsg = typeof body === 'object' ? (body.error || JSON.stringify(body)) : String(body);
-    throw new Error(`NullClaw webhook returned ${status}: ${errMsg}`);
-  }
-
-  const text = typeof body === 'object'
-    ? (body.response || body.text || body.message || JSON.stringify(body))
-    : String(body);
-
-  return { text };
+  // routeMessageStreaming(userId, message, onChunk, sessionKey?, onToolEvent?)
+  return _adapter.routeMessageStreaming(key, augmentedPrompt, onChunk, undefined, onToolEvent);
 }
 
 /**
@@ -622,19 +796,92 @@ export async function routeMessage(userId, agentId, message, ws) {
     let response = '';
     let usedAdapter = false;
 
-    if (_adapter) {
-      try {
-        const result = await sendViaAdapter(userId, effectiveAgentId, augmentedPrompt, agent);
-        response = result.text;
-        usedAdapter = true;
+    // ── Tool call detector: parses tool calls from streaming output
+    //    and forwards them as WebSocket events so the client-side
+    //    surface-manager can auto-activate surfaces (Terminal, Editor, etc.)
+    const toolDetector = createToolCallDetector({
+      onToolCall: (tc) => {
+        sendJson(ws, {
+          type: 'tool_call',
+          tool: tc.name,
+          args: tc.args,
+          requestId: tc.id,
+          agentId: effectiveAgentId,
+          ts: Date.now(),
+        });
+      },
+      onToolResult: (tr) => {
+        sendJson(ws, {
+          type: 'tool_result',
+          tool: tr.name,
+          result: { content: tr.result },
+          requestId: tr.id,
+          agentId: effectiveAgentId,
+          ts: Date.now(),
+        });
+      },
+    });
 
+    // ── Streaming filter: suppress <tool_call>/<tool_result>/<tool_use> XML
+    //    from reaching the client. The tool detector still gets the raw chunks.
+    const streamFilter = _createStreamFilter((cleanDelta) => {
+      if (cleanDelta) {
         sendJson(ws, {
           type: 'chat-stream',
-          delta: response,
+          delta: cleanDelta,
           agentId: effectiveAgentId,
           agentName: agent.name,
           ts: Date.now(),
         });
+      }
+    });
+
+    if (_adapter) {
+      try {
+        response = await sendViaAdapter(
+          userId, effectiveAgentId, augmentedPrompt, agent,
+          // onChunk — text deltas (still feed to detector as fallback + filter)
+          (chunk) => {
+            toolDetector.feed(chunk);
+            streamFilter.feed(chunk);
+          },
+          // onToolEvent — structured events from NullClaw's ToolEventCallback
+          // These are authoritative (directly from the agent loop), so forward
+          // them immediately to the client. The XML-based toolDetector is kept
+          // as fallback for NullClaw instances without the event callback patch.
+          (evt) => {
+            if (evt.type === 'tool_call_start') {
+              sendJson(ws, {
+                type: 'tool_call',
+                tool: evt.name,
+                args: safeParseJson(evt.arguments),
+                requestId: evt.id || `tc-${Date.now()}`,
+                iteration: evt.iteration,
+                agentId: effectiveAgentId,
+                ts: Date.now(),
+              });
+            } else if (evt.type === 'tool_call_result') {
+              sendJson(ws, {
+                type: 'tool_result',
+                tool: evt.name,
+                result: { success: evt.success, duration_ms: evt.duration_ms },
+                requestId: evt.id || `tr-${Date.now()}`,
+                iteration: evt.iteration,
+                agentId: effectiveAgentId,
+                ts: Date.now(),
+              });
+            } else if (evt.type === 'iteration_start') {
+              sendJson(ws, {
+                type: 'agent_iteration',
+                iteration: evt.iteration,
+                isStreaming: evt.is_streaming,
+                agentId: effectiveAgentId,
+                ts: Date.now(),
+              });
+            }
+          }
+        );
+        usedAdapter = true;
       } catch (adapterErr) {
         console.warn(
           `[orchestrator] Adapter failed for ${userId}:${effectiveAgentId}, ` +
@@ -646,21 +893,38 @@ export async function routeMessage(userId, agentId, message, ws) {
     // Fallback: direct spawn with streaming
     if (!usedAdapter) {
       response = await runNullClawDirect(augmentedPrompt, (chunk) => {
-        sendJson(ws, {
-          type: 'chat-stream',
-          delta: chunk,
-          agentId: effectiveAgentId,
-          agentName: agent.name,
-          ts: Date.now(),
-        });
+        toolDetector.feed(chunk);
+        streamFilter.feed(chunk);
       });
     }
+
+    // Flush both detector and filter at stream end
+    toolDetector.flush();
+    streamFilter.flush();
 
     // ── End stream ──
     sendJson(ws, { type: 'chat-stream-end', agentId: effectiveAgentId, ts: Date.now() });
     sendJson(ws, { type: 'typing', status: 'stop', agentId: effectiveAgentId, ts: Date.now() });
 
-    // ── Step 8: A2UI detection → GenUI conversion ──
+    // ── Step 8a: GenUI code block detection → canvas ops ──
+    if (response) {
+      const { text: cleanText, ops, hasOps } = parseGenUIResponse(response);
+      if (hasOps && ops.length > 0) {
+        // Signal client that GenUI tiles are coming (shows "Rendering UI..." placeholder)
+        sendJson(ws, { type: 'genui-pending', count: ops.length, ts: Date.now() });
+        sendJson(ws, {
+          type: 'canvas-ops',
+          ops,
+          source: 'genui',
+          ts: Date.now(),
+        });
+        console.log(`[orchestrator] GenUI: ${ops.length} canvas ops extracted for ${userId}`);
+        // Use cleaned text (without code blocks) for history storage
+        response = cleanText;
+      }
+    }
+
+    // ── Step 8b: A2UI detection → GenUI conversion ──
     if (response) {
       handleA2UIResponse(response, ws, userId);
     }
@@ -716,6 +980,7 @@ export async function shutdown() {
   // — we don't own it, just use it.
 
   _embedder = null;
+  _toolExecutor = null;
   _defaultAgentId = null;
 
   console.log('[orchestrator] Shutdown complete');
@@ -755,6 +1020,16 @@ export function isReady() {
   return _db !== null;
 }
 
+/**
+ * Get the built-in tool executor (for direct tool invocation).
+ * Returns null if the orchestrator hasn't been initialized.
+ *
+ * @returns {ReturnType<import('../lib/builtin-tools.js').createToolExecutor>|null}
+ */
+export function getToolExecutor() {
+  return _toolExecutor;
+}
+
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                           */
 /* ------------------------------------------------------------------ */
@@ -768,4 +1043,15 @@ function sendJson(ws, msg) {
   if (ws.readyState === 1 /* OPEN */) {
     ws.send(JSON.stringify(msg));
   }
+}
+
+/**
+ * Safely parse a JSON string, returning the parsed object or a { raw } wrapper.
+ * Used for tool call arguments which may be double-encoded or malformed.
+ * @param {string|undefined} str
+ * @returns {Object}
+ */
+function safeParseJson(str) {
+  if (!str) return {};
+  try { return JSON.parse(str); } catch { return { raw: str }; }
 }

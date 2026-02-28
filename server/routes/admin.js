@@ -695,6 +695,47 @@ export function adminRoutes(deps) {
   }
 
   /* ================================================================ */
+  /*  POST /api/admin/deploy/push — deploy (restart service)          */
+  /* ================================================================ */
+
+  /** Restart the scratchy-v2 systemd service to deploy staged version. */
+  async function deployPush(req, res) {
+    const admin = await requireAdmin(req, res);
+    if (!admin) return;
+
+    const { execFile } = await import('node:child_process');
+    const { promisify } = await import('node:util');
+    const execFileAsync = promisify(execFile);
+
+    try {
+      // Read staged version for logging
+      let staged = null;
+      try {
+        const stagePath = resolve(PROJECT_ROOT, '.version-staged');
+        staged = (await readFile(stagePath, 'utf-8')).trim() || null;
+      } catch { /* ignore */ }
+
+      // Respond before restarting (the service will kill this process)
+      json(res, 200, {
+        ok: true,
+        message: `Deploying${staged ? ` version ${staged}` : ''}. Service restarting...`,
+        staged,
+      });
+
+      // Give the response time to flush, then restart
+      setTimeout(async () => {
+        try {
+          await execFileAsync('systemctl', ['--user', 'restart', 'scratchy-v2']);
+        } catch (err) {
+          console.error('[admin] Deploy push failed:', err.message);
+        }
+      }, 500);
+    } catch (err) {
+      return json(res, 500, { error: 'Deploy failed', detail: err.message });
+    }
+  }
+
+  /* ================================================================ */
   /*  Route table                                                     */
   /* ================================================================ */
 
@@ -711,6 +752,7 @@ export function adminRoutes(deps) {
     updateConfig,
     deployStage,
     deployStatus,
+    deployPush,
 
     /**
      * Route table for integration into a router.
@@ -730,6 +772,7 @@ export function adminRoutes(deps) {
       { method: 'PATCH',  path: '/api/admin/config',          handler: updateConfig },
       { method: 'POST',   path: '/api/admin/deploy/stage',    handler: deployStage },
       { method: 'GET',    path: '/api/admin/deploy/status',   handler: deployStatus },
+      { method: 'POST',   path: '/api/admin/deploy/push',     handler: deployPush },
     ],
   };
 }

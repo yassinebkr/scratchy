@@ -22,7 +22,7 @@ const messageCounters = new Map();
 
 setInterval(() => {
   messageCounters.clear();
-}, 1_000);
+}, 1_000).unref();  // .unref() so this timer doesn't prevent process exit (tests)
 
 /* ------------------------------------------------------------------ */
 /*  Client registry — tracks every connected WebSocket by userId      */
@@ -483,15 +483,15 @@ export function createWsHandler(server, opts = {}) {
       const currentState = clients.get(ws);
       if (!currentState) return;
 
-      /* 30-second timeout wrapper */
+      /* 3-minute timeout wrapper (AI responses stream progressively, need longer) */
       const timeout = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('__timeout__')), 30_000),
+        setTimeout(() => reject(new Error('__timeout__')), 180_000),
       );
       try {
         await Promise.race([handleMessage(ws, currentState, msg, opts), timeout]);
       } catch (err) {
         if (err.message === '__timeout__') {
-          sendJson(ws, { type: 'error', message: 'Request timed out (30s limit)' });
+          sendJson(ws, { type: 'error', message: 'Request timed out (3m limit)' });
         } else {
           throw err;
         }
@@ -504,7 +504,8 @@ export function createWsHandler(server, opts = {}) {
       pendingAuth.delete(ws);
       const st = clients.get(ws);
       const label = st ? `${st.userId}` : 'unknown';
-      console.log(`[ws] Client disconnected: ${label} (code=${code}), total: ${clients.size - 1}`);
+      const nextTotal = st ? clients.size - 1 : clients.size;
+      console.log(`[ws] Client disconnected: ${label} (code=${code}), total: ${nextTotal}`);
       unregisterClient(ws);
       messageCounters.delete(ws);
     });

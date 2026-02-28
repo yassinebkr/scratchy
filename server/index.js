@@ -15,6 +15,7 @@ import { McpRegistry } from '../lib/mcp-registry.js';
 import { init as initChat, handleChat, shutdown as shutdownChat } from './chat-handler.js';
 import { init as initOrchestrator, routeMessage, shutdown as shutdownOrchestrator } from './agent-orchestrator.js';
 import { createSurfaceEventHandler } from './surface-events.js';
+import { seedAgents } from './seed-agents.js';
 
 /** Default port — v2 runs on 3002 (v1 is on 3001) */
 const PORT = parseInt(process.env.PORT ?? '3002', 10);
@@ -41,6 +42,9 @@ async function main() {
       dbMod.initSchema(db);
     }
     console.log('[server] Database initialized');
+
+    /* -- Seed default agents -- */
+    seedAgents(db);
   } catch (err) {
     console.warn('[server] Database module not available, running without DB:', err.message);
   }
@@ -106,12 +110,8 @@ async function main() {
     getAgents: agentsModule,
     mcpRegistry,
     onChat: async (userId, msg, ws) => {
-      // Route through orchestrator if agentId specified, else direct chat handler
-      if (msg.agentId) {
-        await routeMessage(userId, msg.agentId, msg, ws);
-      } else {
-        await handleChat(userId, msg, ws);
-      }
+      // Always route through orchestrator — it resolves default agent when agentId is null
+      await routeMessage(userId, msg.agentId || null, msg, ws);
     },
     surfaceHandler,
     onWidgetAction: handleWidgetAction,

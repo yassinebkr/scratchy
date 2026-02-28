@@ -1,0 +1,215 @@
+/*
+ * Scratchy v2 — Mobile Styles
+ * Responsive overrides for viewports <= 767px.
+ * Imports design tokens from ../styles/tokens.css.
+ */
+
+@media (max-width: 767px) {
+
+  /* ── Surface Stack Layout ─────────────────────────────────────────── */
+
+  /* Override grid for mobile — single column stacked */
+  .surface-container {
+    display: block !important;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Chat is always full-screen base */
+  .chat-surface {
+    position: absolute;
+    inset: 0;
+  }
+
+  /* Pushed surfaces slide in from right */
+  .mobile-surface-pushed {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    transform: translateX(100%);
+    transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+    will-change: transform;
+  }
+
+  .mobile-surface-visible {
+    transform: translateX(0);
+  }
+
+  /* Back button overlay */
+  .mobile-back-btn {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    z-index: 20;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--sc-glass-bg);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--sc-border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--sc-text);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: opacity var(--sc-transition-fast), transform var(--sc-transition-fast);
+  }
+
+  .mobile-back-btn:active {
+    transform: scale(0.9);
+    opacity: 0.8;
+  }
+
+  /* Workspace bar mobile adaptation */
+  sc-workspace-bar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40;
+    padding-bottom: var(--sc-safe-bottom);
+  }
+
+  /* ── Surface Picker Bottom Sheet ──────────────────────────────────── */
+
+  .sc-surface-picker-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: var(--sc-z-sheet, 300);
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    pointer-events: none;
+  }
+
+  .sc-surface-picker-overlay.open {
+    pointer-events: auto;
+  }
+
+  /* Backdrop */
+  .sc-surface-picker-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    opacity: 0;
+    transition: opacity 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+  }
+
+  .sc-surface-picker-overlay.open .sc-surface-picker-backdrop {
+    opacity: 1;
+  }
+
+  /* Sheet panel */
+  .sc-surface-picker-sheet {
+    position: relative;
+    background: var(--sc-glass-bg-heavy);
+    backdrop-filter: var(--sc-glass-blur);
+    -webkit-backdrop-filter: var(--sc-glass-blur);
+    border-top: 1px solid var(--sc-border);
+    border-radius: var(--sc-radius-xl) var(--sc-radius-xl) 0 0;
+    padding: var(--sc-space-3) var(--sc-space-4) var(--sc-space-6);
+    padding-bottom: calc(var(--sc-space-6) + var(--sc-safe-bottom));
+    transform: translateY(100%);
+    transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+    max-height: 60vh;
+    overflow-y: auto;
+  }
+
+  .sc-surface-picker-overlay.open .sc-surface-picker-sheet {
+    transform: translateY(0);
+  }
+
+  /* Drag handle */
+  .sc-surface-picker-handle {
+    width: 36px;
+    height: 4px;
+    border-radius: var(--sc-radius-full);
+    background: var(--sc-text-dim);
+    margin: 0 auto var(--sc-space-3);
+    cursor: grab;
+  }
+
+  /* Title */
+  .sc-surface-picker-title {
+    font-family: var(--sc-font);
+    font-size: var(--sc-font-size-lg);
+    font-weight: 600;
+    color: var(--sc-text);
+    margin-bottom: var(--sc-space-4);
+    padding: 0 var(--sc-space-1);
+  }
+
+  /* Cards grid */
+  .sc-surface-picker-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: var(--sc-space-3);
+  }
+
+  /* Individual card */
+  .sc-surface-picker-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--sc-space-2);
+    padding: var(--sc-space-4) var(--sc-space-3);
+    border-radius: var(--sc-radius-lg);
+    background: var(--sc-surface);
+    border: 1px solid var(--sc-border);
+    color: var(--sc-text);
+    cursor: pointer;
+    font-family: var(--sc-font);
+    font-size: var(--sc-font-size-sm);
+    -webkit-tap-highlight-color: transparent;
+    transition: background var(--sc-transition-fast),
+                border-color var(--sc-transition-fast),
+                transform var(--sc-transition-fast);
+  }
+
+  .sc-surface-picker-card:active {
+    transform: scale(0.96);
+  }
+
+  .sc-surface-picker-card.active {
+    border-color: var(--sc-accent);
+    background: var(--sc-surface-active);
+  }
+
+  .sc-surface-picker-card.active .sc-surface-picker-icon {
+    color: var(--sc-accent);
+  }
+
+  /* Card icon */
+  .sc-surface-picker-icon {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--sc-text-muted);
+    transition: color var(--sc-transition-fast);
+  }
+
+  .sc-surface-picker-icon svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  /* Card name */
+  .sc-surface-picker-name {
+    font-weight: 500;
+    color: var(--sc-text);
+  }
+
+  /* Active badge */
+  .sc-surface-picker-badge {
+    font-size: var(--sc-font-size-xs);
+    font-weight: 600;
+    color: var(--sc-accent);
+    background: var(--sc-accent-subtle);
+    padding: 2px 8px;
+    border-radius: var(--sc-radius-full);
+    line-height: 1.4;
+  }
+}

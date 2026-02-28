@@ -1,21 +1,37 @@
-/* Scratchy v2 — Base styles */
+/* Scratchy v2 — Base styles
+ * Layout foundation + component styles
+ * Design: Cursor IDE / Linear / Arc Browser quality
+ */
+
 :root {
-  --bg: #0a0a0f;
-  --surface: #111118;
-  --surface-hover: #1a1a24;
-  --border: rgba(255,255,255,0.06);
-  --text: #e4e4e7;
-  --text-muted: #71717a;
-  --accent: #6366f1;
-  --accent-hover: #4f46e5;
-  --danger: #f87171;
-  --success: #34d399;
-  --warning: #fbbf24;
-  --radius: 8px;
-  --font: 'Geist', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-  --mono: 'Geist Mono', 'SF Mono', 'Fira Code', monospace;
-  --font-size: 14px;
-  --topbar-h: 48px;
+  /* Delegated to tokens.css — single source of truth */
+  --bg: var(--sc-bg);
+  --surface: var(--sc-surface);
+  --surface-hover: var(--sc-surface-hover);
+  --border: var(--sc-border);
+  --border-subtle: var(--sc-border-subtle);
+  --text: var(--sc-text);
+  --text-muted: var(--sc-text-muted);
+  --accent: var(--sc-accent);
+  --accent-hover: var(--sc-accent-hover);
+  --accent-glow: var(--sc-accent-glow);
+  --accent-subtle: var(--sc-accent-subtle);
+  --danger: var(--sc-danger);
+  --success: var(--sc-success);
+  --warning: var(--sc-warning);
+  --radius: var(--sc-radius);
+  --radius-sm: var(--sc-radius-sm);
+  --font: var(--sc-font);
+  --mono: var(--sc-mono);
+  --font-size: var(--sc-font-size);
+  --topbar-h: var(--sc-topbar-h);
+  --sidebar-w: 52px;
+  --glass-bg: var(--sc-glass-bg);
+  --glass-blur: var(--sc-glass-blur);
+  --glass-border: var(--sc-glass-border);
+  --focus-ring: var(--sc-focus-ring);
+  --transition: var(--sc-transition);
+  --transition-fast: var(--sc-transition-fast);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -27,6 +43,32 @@ html, body {
   background: var(--bg);
   color: var(--text);
   overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  touch-action: manipulation;
+}
+
+/* ── Clickable elements ── */
+button, [role="button"], a[href], summary, select,
+label[for], [tabindex="0"] {
+  cursor: pointer;
+}
+
+/* ── Focus-visible global ── */
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+[tabindex]:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-sm);
 }
 
 /* ── Screens ── */
@@ -39,8 +81,22 @@ html, body {
   display: none !important;
 }
 
+/* ── Landing Screen ── */
+#landing-screen {
+  overflow-y: auto;
+  background: var(--bg);
+}
+
 /* ── Auth Screen ── */
 #auth-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+}
+
+/* ── Plans Screen ── */
+#plans-screen {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -52,9 +108,25 @@ html, body {
   display: flex;
   flex-direction: column;
   height: 100%;
+  /* Account for workspace bar height (52px) + padding (12px) + safe area */
+  padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
 }
 
-/* ── Top Bar ── */
+/* Prevent chat surface from extending behind the workspace bar */
+.chat-surface {
+  max-height: 100%;
+  overflow: hidden;
+}
+
+/* Workspace bar sits below content, not overlapping */
+sc-workspace-bar {
+  flex-shrink: 0;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   TOP BAR — Glassmorphism header
+   ══════════════════════════════════════════════════════════════ */
+
 .topbar {
   height: var(--topbar-h);
   min-height: var(--topbar-h);
@@ -62,9 +134,12 @@ html, body {
   align-items: center;
   justify-content: space-between;
   padding: 0 16px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  z-index: 10;
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border-bottom: var(--glass-border);
+  z-index: var(--sc-z-topbar, 50);
+  position: relative;
 }
 
 .topbar-left,
@@ -75,9 +150,11 @@ html, body {
 }
 
 .topbar-brand {
-  font-weight: 600;
+  font-weight: 700;
   font-size: 15px;
   letter-spacing: -0.3px;
+  color: var(--accent);
+  user-select: none;
 }
 
 .topbar-user {
@@ -85,24 +162,77 @@ html, body {
   color: var(--text-muted);
 }
 
-.topbar-logout {
+.topbar-user-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   background: none;
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: var(--radius-sm);
   color: var(--text-muted);
   font-family: var(--font);
-  font-size: 12px;
-  padding: 5px 12px;
+  font-size: 13px;
+  padding: 5px 10px;
   cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
+  transition: color var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast);
+  position: relative;
+}
+.topbar-user-btn:hover {
+  color: var(--text);
+  border-color: var(--accent);
+  background: var(--surface-hover);
+}
+.topbar-user-btn svg { opacity: 0.5; transition: opacity var(--transition-fast); }
+.topbar-user-btn:hover svg { opacity: 1; }
+
+.user-menu {
+  position: absolute;
+  top: calc(var(--topbar-h) - 4px);
+  right: 16px;
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: var(--glass-border);
+  border-radius: var(--radius);
+  padding: 4px;
+  min-width: 160px;
+  z-index: var(--sc-z-dropdown, 100);
+  box-shadow: var(--sc-shadow-lg);
+  animation: menuIn 0.15s ease;
+}
+.user-menu.hidden { display: none; }
+@keyframes menuIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+
+.user-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 13px;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  text-align: left;
+}
+.user-menu-item:hover { background: var(--surface-hover); }
+.user-menu-item.danger { color: var(--danger); }
+.user-menu-item.danger:hover { background: var(--sc-danger-subtle); }
+
+.user-menu-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 8px;
 }
 
-.topbar-logout:hover {
-  color: var(--danger);
-  border-color: var(--danger);
-}
+/* ══════════════════════════════════════════════════════════════
+   CONNECTION STATUS BADGE
+   ══════════════════════════════════════════════════════════════ */
 
-/* ── Connection Status Badge ── */
 .status-badge {
   display: inline-flex;
   align-items: center;
@@ -144,13 +274,61 @@ html, body {
   user-select: none;
 }
 
-/* ── App Main ── */
+.status-badge.clickable {
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 2px 6px;
+  margin: -2px -6px;
+  transition: background var(--transition-fast);
+}
+.status-badge.clickable:hover {
+  background: var(--surface-hover);
+}
+.status-badge.clickable .status-text {
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 2px;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   APP MAIN LAYOUT
+   ══════════════════════════════════════════════════════════════ */
+
 .app-main {
   flex: 1;
   display: flex;
-  flex-direction: column;
-  overflow: hidden;
+  overflow: visible;
+  position: relative;
 }
+
+/* ── Sidebar — 52px Icon Rail ── */
+.app-sidebar {
+  width: var(--sidebar-w);
+  min-width: var(--sidebar-w);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border-right: var(--glass-border);
+  overflow: visible;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: width var(--sc-transition-slow) cubic-bezier(0.4, 0, 0.2, 1),
+              min-width var(--sc-transition-slow) cubic-bezier(0.4, 0, 0.2, 1),
+              opacity var(--sc-transition-slow) cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.app-sidebar.collapsed {
+  width: 0;
+  min-width: 0;
+  overflow: hidden;
+  opacity: 0;
+  border-right: none;
+}
+
+.app-sidebar::-webkit-scrollbar { width: 4px; }
+.app-sidebar::-webkit-scrollbar-track { background: transparent; }
+.app-sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
 
 /* ── Loading Spinner ── */
 @keyframes spin {
@@ -166,36 +344,78 @@ html, body {
   animation: spin 0.6s linear infinite;
 }
 
-/* ── Message Bubbles ── */
+/* ══════════════════════════════════════════════════════════════
+   MESSAGE BUBBLES — Premium chat design
+   ══════════════════════════════════════════════════════════════ */
+
 .msg {
-  margin-bottom: 12px;
-  padding: 10px 14px;
+  margin-bottom: 8px;
+  padding: 12px 16px;
   border-radius: var(--radius);
   font-size: 14px;
-  line-height: 1.5;
-  max-width: 85%;
+  line-height: 1.65;
+  max-width: min(85%, 640px);
   word-wrap: break-word;
   white-space: pre-wrap;
+  animation: msgFadeIn 0.25s var(--sc-ease-out);
+}
+
+@keyframes msgFadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .msg-user {
-  background: var(--accent);
-  color: #fff;
+  background: rgba(249,166,2,0.10);
+  color: var(--text);
+  font-weight: 500;
   margin-left: auto;
+  border: 1px solid rgba(249,166,2,0.15);
   border-bottom-right-radius: 2px;
 }
 
 .msg-assistant {
-  background: var(--surface-hover);
+  background: rgba(255,255,255,0.02);
   color: var(--text);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--agent-accent, var(--sc-accent));
   margin-right: auto;
   border-bottom-left-radius: 2px;
+  padding-left: 16px;
+}
+
+/* Code blocks in messages */
+.msg pre {
+  background: rgba(0,0,0,0.3);
+  border-radius: 6px;
+  padding: 12px;
+  margin: 8px 0;
+  overflow-x: auto;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.msg code {
+  background: rgba(255,255,255,0.06);
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-family: var(--mono);
+  font-size: 13px;
+}
+
+/* Don't double-style code inside pre */
+.msg pre code {
+  background: none;
+  padding: 0;
+  border-radius: 0;
 }
 
 .msg-system {
   background: transparent;
   color: var(--text-muted);
   font-size: 12px;
+  font-style: italic;
   text-align: center;
   margin: 4px auto;
 }
@@ -204,97 +424,346 @@ html, body {
   color: var(--danger);
 }
 
+/* ── Typing Indicator ── */
+.typing-indicator {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 12px 16px;
+  opacity: 0.7;
+}
+
+.typing-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: typingBounce 1.2s ease-in-out infinite;
+}
+
+.typing-dot:nth-child(2) { animation-delay: 0.15s; }
+.typing-dot:nth-child(3) { animation-delay: 0.3s; }
+
+@keyframes typingBounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30% { transform: translateY(-6px); opacity: 1; }
+}
+
 #app {
   height: 100%;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;       /* sidebar + surfaces side by side */
+  min-height: 0;             /* flex child can shrink below content */
 }
 
-/* ── Surface Container ── */
+/* ══════════════════════════════════════════════════════════════
+   SURFACE CONTAINER — CSS Grid workspace
+   Proper gaps, visual separation, no overlaps
+   ══════════════════════════════════════════════════════════════ */
+
 .surface-container {
   flex: 1;
   display: grid;
   gap: 1px;
-  background: var(--border);
+  background: rgba(249,166,2,0.06);
   overflow: hidden;
   position: relative;
-  /* Default: single surface fills everything */
   grid-template-columns: 1fr;
   grid-template-rows: 1fr;
-  transition: grid-template-columns 0.25s ease, grid-template-rows 0.25s ease;
+  transition: grid-template-columns var(--sc-transition-layout),
+              grid-template-rows var(--sc-transition-layout);
 }
 
+/* ── data-layout grid presets ── */
+
+/* chat-only: single column, chat fills everything */
+.surface-container[data-layout="chat-only"] {
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
+  grid-template-areas: "chat";
+}
+
+/* canvas-focus: side-by-side split — canvas + chat */
+.surface-container[data-layout="canvas-focus"] {
+  grid-template-columns: 1fr 400px;
+  grid-template-rows: 1fr;
+  grid-template-areas: "canvas chat";
+}
+.surface-container[data-layout="canvas-focus"] .chat-surface {
+  border-left: 1px solid var(--border);
+}
+
+/* split: primary surface + chat side-by-side */
+.surface-container[data-layout="split"] {
+  grid-template-columns: 1fr 420px;
+  grid-template-rows: 1fr;
+  grid-template-areas: "primary chat";
+}
+
+/* dev: primary + secondary stacked left, chat spanning right */
+.surface-container[data-layout="dev"] {
+  grid-template-columns: 1fr 420px;
+  grid-template-rows: 1fr 280px;
+  grid-template-areas:
+    "primary   chat"
+    "secondary chat";
+}
+
+/* full: three surfaces + chat as right rail */
+.surface-container[data-layout="full"] {
+  grid-template-columns: 1fr 1fr 380px;
+  grid-template-rows: 1fr 1fr;
+  grid-template-areas:
+    "primary   secondary chat"
+    "tertiary  tertiary  chat";
+}
+
+/* research: 50/50 split, two surfaces */
+.surface-container[data-layout="research"] {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr;
+  grid-template-areas: "primary secondary";
+}
+
+/* ── Overflow surface fallback — hide surfaces with no grid slot ── */
+[style*="grid-area: extra"] {
+  display: none;
+}
+
+/* ── Surface base ── */
 .surface {
   background: var(--surface);
   overflow: auto;
   position: relative;
   min-width: 0;
   min-height: 0;
+  transition: box-shadow var(--sc-transition-slow),
+              border-color var(--sc-transition-slow);
 }
 
 /* ── Chat Surface ── */
 .chat-surface {
   display: flex;
   flex-direction: column;
+  background: var(--bg);
+  overflow: hidden;
 }
 
 .messages {
   flex: 1;
   overflow-y: auto;
-  padding: 16px;
+  padding: 20px 24px;
+  scroll-behavior: smooth;
 }
+
+/* ══════════════════════════════════════════════════════════════
+   INPUT AREA — Premium feel
+   ══════════════════════════════════════════════════════════════ */
 
 .input-area {
   display: flex;
   gap: 8px;
-  padding: 12px 16px;
+  padding: 12px 16px 16px;
   border-top: 1px solid var(--border);
   background: var(--bg);
+  align-items: flex-end;
+  flex-shrink: 0;
 }
 
 #msg-input {
   flex: 1;
+  min-height: 48px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: 12px;
   color: var(--text);
   font-family: var(--font);
   font-size: var(--font-size);
-  padding: 10px 14px;
+  padding: 12px 16px;
   resize: none;
   outline: none;
-  transition: border-color 0.15s;
+  line-height: 1.5;
+  transition: border-color var(--transition), box-shadow var(--transition);
 }
 
 #msg-input:focus {
-  border-color: var(--accent);
+  border-color: rgba(249,166,2,0.4);
+  box-shadow: 0 0 0 3px rgba(249,166,2,0.1);
+}
+
+#msg-input::placeholder {
+  color: var(--text-muted);
 }
 
 #send-btn {
-  width: 40px;
-  height: 40px;
-  border-radius: var(--radius);
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
   border: none;
-  background: var(--accent);
-  color: white;
-  font-size: 18px;
+  background: var(--surface-hover);
+  color: var(--text-muted);
+  font-size: 16px;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: all var(--transition);
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-#send-btn:hover { background: var(--accent-hover); }
+#send-btn:hover {
+  background: var(--accent);
+  color: #0d0b07;
+}
 
-/* ── Multi-surface layouts (applied by surface-manager.js via inline styles) ── */
+#send-btn:active {
+  transform: scale(0.94);
+}
 
-/* ── Surface type overrides ── */
+#send-btn svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   SURFACE TYPE OVERRIDES
+   ══════════════════════════════════════════════════════════════ */
+
 .terminal-surface { background: #0d1117; }
 .explorer-surface { background: var(--surface); }
 .editor-surface   { background: #0d1117; }
 .search-surface   { background: var(--surface); }
 
-/* ── Mobile: stack vertically ── */
-@media (max-width: 768px) {
+/* ══════════════════════════════════════════════════════════════
+   CHAT-ONLY — Centered content, breathable
+   ══════════════════════════════════════════════════════════════ */
+
+.surface-container[data-layout="chat-only"] .chat-surface .messages {
+  max-width: var(--sc-chat-max-w, 720px);
+  margin: 0 auto;
+  padding: 24px 32px;
+  width: 100%;
+}
+
+.surface-container[data-layout="chat-only"] .chat-surface .input-area {
+  max-width: var(--sc-chat-max-w, 720px);
+  margin: 0 auto;
+  border-top: none;
+  padding: 0 32px 24px;
+  width: 100%;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   SURFACE GLOW ON ACTIVE TOOL USE
+   ══════════════════════════════════════════════════════════════ */
+
+html[data-activity-state="coding"] sc-terminal,
+html[data-activity-state="coding"] sc-editor {
+  box-shadow: inset 0 0 0 1px var(--agent-accent, var(--sc-accent)),
+              0 0 16px var(--agent-accent-glow, rgba(249,166,2,0.15));
+  transition: box-shadow 0.3s ease, border-color 0.3s ease;
+}
+html[data-activity-state="searching"] sc-search {
+  box-shadow: inset 0 0 0 1px var(--agent-accent, var(--sc-accent)),
+              0 0 16px var(--agent-accent-glow, rgba(249,166,2,0.15));
+  transition: box-shadow 0.3s ease, border-color 0.3s ease;
+}
+html[data-activity-state="reading"] sc-filetree,
+html[data-activity-state="reading"] sc-editor {
+  box-shadow: inset 0 0 0 1px var(--agent-accent, var(--sc-accent)),
+              0 0 16px var(--agent-accent-glow, rgba(249,166,2,0.15));
+  transition: box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   SURFACE ENTRY / EXIT ANIMATIONS
+   ══════════════════════════════════════════════════════════════ */
+
+.surface-enter {
+  animation: surface-enter 0.35s var(--sc-spring) both;
+}
+
+.surface-exit {
+  animation: surface-exit 0.25s cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+@keyframes surface-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes surface-exit {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   MOBILE
+   ══════════════════════════════════════════════════════════════ */
+
+.mobile-only {
+  display: none !important;
+}
+
+.topbar-agent-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--accent-subtle);
+  color: var(--text);
+  font-size: 18px;
+  cursor: pointer;
+  transition: border-color var(--transition), background var(--transition), box-shadow var(--transition), transform var(--transition-fast);
+  flex-shrink: 0;
+  padding: 0;
+  line-height: 1;
+}
+
+.topbar-agent-btn:hover {
+  border-color: var(--accent);
+  background: rgba(249,166,2,0.15);
+}
+
+.topbar-agent-btn:active {
+  transform: scale(0.92);
+  box-shadow: var(--sc-shadow-glow);
+}
+
+@keyframes agent-btn-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(249,166,2,0); }
+  50% { box-shadow: 0 0 10px 2px rgba(249,166,2,0.25); }
+}
+
+.topbar-agent-btn.pulse {
+  animation: agent-btn-pulse 0.6s ease;
+}
+
+@media (max-width: 767px) {
+  .mobile-only {
+    display: flex !important;
+  }
+
+  .app-sidebar {
+    display: none;
+  }
+
   .surface-container {
     grid-template-columns: 1fr !important;
     grid-template-rows: auto !important;
@@ -304,20 +773,81 @@ html, body {
     grid-area: auto !important;
     min-height: 200px;
   }
+
+  .messages {
+    padding: 12px 16px;
+  }
+
+  .input-area {
+    padding: 8px 12px 12px;
+  }
+
+  #msg-input {
+    min-height: 44px;
+    padding: 10px 14px;
+  }
+
+  #send-btn {
+    width: 44px;
+    height: 44px;
+  }
 }
 
-/* ── Scrollbar ── */
+/* ══════════════════════════════════════════════════════════════
+   SCROLLBAR
+   ══════════════════════════════════════════════════════════════ */
+
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.15); }
 
-/* ── Transitions ── */
-.surface-enter {
-  animation: surfaceIn 0.2s ease-out;
+/* ══════════════════════════════════════════════════════════════
+   SELECTION
+   ══════════════════════════════════════════════════════════════ */
+
+::selection {
+  background: rgba(249,166,2,0.25);
+  color: var(--text);
 }
 
-@keyframes surfaceIn {
-  from { opacity: 0; transform: scale(0.98); }
-  to { opacity: 1; transform: scale(1); }
+/* ══════════════════════════════════════════════════════════════
+   REDUCED MOTION
+   ══════════════════════════════════════════════════════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+  .surface-enter,
+  .surface-exit {
+    animation: none !important;
+  }
+
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01s !important;
+  }
+
+  .topbar,
+  .app-sidebar,
+  .user-menu,
+  .surface-container {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  .msg-thinking .dot,
+  .typing-dot {
+    animation: none !important;
+    opacity: 0.6;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   INPUT FOCUS RING
+   ══════════════════════════════════════════════════════════════ */
+
+.input-area textarea:focus,
+.input-area input:focus {
+  box-shadow: var(--sc-focus-ring);
+  border-color: var(--agent-accent, var(--sc-accent));
 }

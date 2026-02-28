@@ -27,9 +27,9 @@ import { on, emit } from './ws-client.js';
 
 /** @type {Record<string, SurfaceDef>} */
 const SURFACE_DEFS = {
-  terminal: { triggers: ['exec'], component: 'sc-terminal', priority: 2, label: 'Terminal' },
-  explorer: { triggers: ['read', 'read_dir', 'list_files'], component: 'sc-filetree', priority: 1, label: 'Files' },
-  editor:   { triggers: ['write', 'edit'], component: 'sc-editor', priority: 2, label: 'Editor' },
+  terminal: { triggers: ['shell', 'exec'], component: 'sc-terminal', priority: 2, label: 'Terminal' },
+  explorer: { triggers: ['file_read', 'read', 'read_dir', 'list_files', 'list_dir'], component: 'sc-filetree', priority: 1, label: 'Files' },
+  editor:   { triggers: ['file_write', 'file_edit', 'file_append', 'write', 'edit'], component: 'sc-editor', priority: 2, label: 'Editor' },
   search:   { triggers: ['web_search', 'web_fetch'], component: 'sc-search', priority: 1, label: 'Search' },
   canvas:   { triggers: ['canvas_op'], component: 'sc-canvas', priority: 3, label: 'Canvas' },
 };
@@ -56,7 +56,7 @@ let _chatSurface = null;
 /** @type {import('../components/sc-surface-toolbar.js').ScSurfaceToolbar|null} */
 let _toolbar = null;
 
-const IDLE_TIMEOUT = 30_000; // 30s after last activity before auto-hide
+const IDLE_TIMEOUT = 300_000; // 5 min after last activity before auto-hide (canvas/surfaces persist)
 
 /* ------------------------------------------------------------------ */
 /*  Initialization                                                    */
@@ -91,6 +91,24 @@ export function initSurfaceManager() {
       toggleSurface(e.detail.type);
     });
   }
+
+  // Note: surface-toggle events from workspace-bar are handled in app.js
+  // (which routes mobile vs desktop). Don't add a duplicate listener here.
+
+  // Wire canvas activation with ops forwarding
+  window.addEventListener('surface-activate', (e) => {
+    const type = e.detail?.type;
+    if (!type) return;
+    activateSurface(type);
+    _resetIdleTimer(type); // keep surface alive
+    // Forward ops to the canvas component
+    if (type === 'canvas' && e.detail.ops) {
+      const s = _surfaces.get('canvas');
+      if (s?.el?.applyOps) {
+        s.el.applyOps(e.detail.ops);
+      }
+    }
+  });
 }
 
 /* ------------------------------------------------------------------ */
@@ -104,13 +122,15 @@ export function activateSurface(type) {
 
   s.active = true;
   s.el.style.display = '';
-  s.el.classList.add('surface-enter');
-  // Remove animation class after it plays
-  s.el.addEventListener('animationend', () => s.el.classList.remove('surface-enter'), { once: true });
 
   if (_container && !_container.contains(s.el)) {
     _container.appendChild(s.el);
   }
+
+  // Entry animation: spring-based slide-up with blur
+  s.el.classList.remove('surface-exit');
+  s.el.classList.add('surface-enter');
+  s.el.addEventListener('animationend', () => s.el.classList.remove('surface-enter'), { once: true });
 
   _resetIdleTimer(type);
   _updateLayout();
@@ -124,14 +144,29 @@ export function deactivateSurface(type) {
   if (!s || !s.active) return;
 
   s.active = false;
-  s.el.style.display = 'none';
-
-  if (_container && _container.contains(s.el)) {
-    _container.removeChild(s.el);
-  }
-
   _clearIdleTimer(type);
-  _updateLayout();
+
+  // Exit animation: scale-down + fade, then remove from DOM
+  s.el.classList.remove('surface-enter');
+  s.el.classList.add('surface-exit');
+
+  const onExit = () => {
+    s.el.classList.remove('surface-exit');
+    s.el.style.display = 'none';
+    s.el.style.gridArea = '';
+    if (_container && _container.contains(s.el)) {
+      _container.removeChild(s.el);
+    }
+    _updateLayout();
+  };
+
+  s.el.addEventListener('animationend', onExit, { once: true });
+
+  // Safety: if animationend never fires (e.g. display:none race), clean up
+  setTimeout(() => {
+    if (s.el.classList.contains('surface-exit')) onExit();
+  }, 300);
+
   _updateToolbar();
   emit('surface:deactivated', { type });
 }
@@ -162,72 +197,110 @@ export function deactivateAll() {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Layout configurations (data-layout → CSS grid)                    */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Layout presets keyed by data-layout attribute value.
+ * Each defines named grid areas and the grid template.
+ *
+ *   chat-only : single column, chat fills everything
+ *   split     : 1fr 420px — primary surface + chat
+ *   dev       : 1fr 420px cols, 1fr 280px rows — primary + secondary + chat spanning right
+ *   full      : 1fr 1fr 380px cols, 1fr 1fr rows — three surfaces + chat right rail
+ *   research  : 1fr 1fr — 50/50 split (two surfaces, no separate chat column)
+ */
+const LAYOUT_CONFIGS = {
+  'chat-only': {
+    areas: [],          // no non-chat surfaces
+  },
+  'canvas-focus': {
+    areas: ['canvas'],  // canvas dominates, chat is bottom strip
+  },
+  'split': {
+    areas: ['primary'], // one surface
+  },
+  'dev': {
+    areas: ['primary', 'secondary'],
+  },
+  'full': {
+    areas: ['primary', 'secondary', 'tertiary'],
+  },
+  'research': {
+    areas: ['primary', 'secondary'],
+  },
+};
+
+/* ------------------------------------------------------------------ */
 /*  Layout engine                                                     */
 /* ------------------------------------------------------------------ */
+
+/**
+ * Determine which layout preset fits the current surface count.
+ * @param {number} count — number of active (non-chat) surfaces
+ * @returns {string} layout name
+ */
+function _pickLayout(count) {
+  if (count === 0) return 'chat-only';
+  // Check if canvas is the primary active surface
+  const active = getActiveSurfaces();
+  const hasCanvas = active.includes('canvas');
+  if (count === 1 && hasCanvas) return 'canvas-focus';
+  if (count === 1) return 'split';
+  if (count === 2) return 'dev';
+  return 'full'; // 3+
+}
 
 function _updateLayout() {
   if (!_container || !_chatSurface) return;
 
   const active = getActiveSurfaces();
+  const layoutName = _pickLayout(active.length);
 
-  // Remove all layout classes
-  _container.classList.remove('layout-single', 'layout-split', 'layout-chat-plus', 'layout-grid', 'layout-triple');
+  // Set the data-layout attribute (CSS handles grid templates)
+  _container.dataset.layout = layoutName;
+
+  // Clear any leftover inline grid styles — CSS rules drive the grid now
+  _container.style.display = '';
+  _container.style.gridTemplateColumns = '';
+  _container.style.gridTemplateRows = '';
+
+  // Chat always occupies the 'chat' grid area
+  _chatSurface.style.gridArea = 'chat';
+  _chatSurface.style.display = '';
 
   if (active.length === 0) {
-    // Chat-only: put chat back in its natural flow
-    _container.style.cssText = '';
-    _chatSurface.style.cssText = '';
+    _chatSurface.style.gridArea = '';
     return;
   }
 
-  // Move chat surface into the grid container if not already
+  // Move chat surface into grid container if not already there
   if (!_container.contains(_chatSurface)) {
     _container.appendChild(_chatSurface);
   }
-  _chatSurface.style.display = '';
 
   // Sort active surfaces by priority (descending)
-  const sorted = active.sort((a, b) => {
+  const sorted = [...active].sort((a, b) => {
     const pa = SURFACE_DEFS[a]?.priority ?? 0;
     const pb = SURFACE_DEFS[b]?.priority ?? 0;
     return pb - pa;
   });
 
-  if (sorted.length === 1) {
-    // One surface + chat: 60/40 split
-    _container.style.display = 'grid';
-    _container.style.gridTemplateColumns = '3fr 2fr';
-    _container.style.gridTemplateRows = '1fr';
+  // Named area slots from the chosen layout config
+  const config = LAYOUT_CONFIGS[layoutName];
+  const areaSlots = config?.areas ?? [];
 
-    const s = _surfaces.get(sorted[0]);
-    if (s) s.el.style.gridArea = '1 / 1 / 2 / 2';
-    _chatSurface.style.gridArea = '1 / 2 / 2 / 3';
-
-  } else if (sorted.length === 2) {
-    // Two surfaces + chat: left column stacked, chat right
-    _container.style.display = 'grid';
-    _container.style.gridTemplateColumns = '7fr 3fr';
-    _container.style.gridTemplateRows = '1fr 1fr';
-
-    const s0 = _surfaces.get(sorted[0]);
-    const s1 = _surfaces.get(sorted[1]);
-    if (s0) s0.el.style.gridArea = '1 / 1 / 2 / 2';
-    if (s1) s1.el.style.gridArea = '2 / 1 / 3 / 2';
-    _chatSurface.style.gridArea = '1 / 2 / 3 / 3';
-
-  } else {
-    // 3+ surfaces: grid with chat spanning right column
-    const rows = sorted.length;
-    _container.style.display = 'grid';
-    _container.style.gridTemplateColumns = '7fr 3fr';
-    _container.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
-
-    sorted.forEach((type, i) => {
-      const s = _surfaces.get(type);
-      if (s) s.el.style.gridArea = `${i + 1} / 1 / ${i + 2} / 2`;
-    });
-    _chatSurface.style.gridArea = `1 / 2 / ${rows + 1} / 3`;
-  }
+  sorted.forEach((type, i) => {
+    const s = _surfaces.get(type);
+    if (!s) return;
+    if (i < areaSlots.length) {
+      // Assign grid area name from the layout config
+      s.el.style.gridArea = areaSlots[i];
+    } else {
+      // Overflow: deactivate surfaces that exceed available grid slots
+      deactivateSurface(type);
+    }
+  });
 }
 
 /* ------------------------------------------------------------------ */
@@ -317,15 +390,26 @@ function _pushToolCallData(surfaceType, msg) {
     case 'terminal': {
       const el = /** @type {import('../components/sc-terminal.js').ScTerminal} */ (s.el);
       if (el.addCommand) {
-        el.addCommand(msg.requestId || msg.id || Date.now().toString(), msg.command || msg.args?.command || '', msg.cwd);
+        // NullClaw shell tool uses "command" arg; may also have "timeout_secs"
+        const cmd = msg.args?.command || msg.command || '';
+        el.addCommand(msg.requestId || msg.id || Date.now().toString(), cmd, msg.args?.cwd || msg.cwd);
+      }
+      break;
+    }
+    case 'explorer': {
+      const el = /** @type {import('../components/sc-filetree.js').ScFiletree} */ (s.el);
+      // NullClaw file_read uses "file_path" or "path" arg
+      const path = msg.args?.file_path || msg.args?.path || msg.args?.directory || '';
+      if (path && el.highlightPath) {
+        el.highlightPath?.(path);
       }
       break;
     }
     case 'editor': {
       const el = /** @type {import('../components/sc-editor.js').ScEditor} */ (s.el);
-      if (msg.args?.file_path || msg.args?.path) {
-        const path = msg.args.file_path || msg.args.path;
-        // Will receive content in tool_result
+      // NullClaw file_write/file_edit use "file_path" or "path" arg
+      const path = msg.args?.file_path || msg.args?.path || '';
+      if (path) {
         el.openFile?.(path, '// Loading…');
       }
       break;
@@ -334,6 +418,9 @@ function _pushToolCallData(surfaceType, msg) {
       const el = /** @type {import('../components/sc-search.js').ScSearch} */ (s.el);
       if (msg.args?.query) {
         el.setResults?.(msg.args.query, []);
+      } else if (msg.args?.url) {
+        // web_fetch — show URL being fetched
+        el.setResults?.(msg.args.url, []);
       }
       break;
     }
@@ -359,6 +446,11 @@ function _pushToolResultData(surfaceType, msg) {
   switch (surfaceType) {
     case 'terminal': {
       const el = /** @type {import('../components/sc-terminal.js').ScTerminal} */ (s.el);
+      // Push the command output text before marking complete
+      const output = msg.result?.content || msg.result?.text || '';
+      if (output && el.appendOutput) {
+        el.appendOutput(msg.requestId || msg.id || '', output, 'stdout');
+      }
       if (el.completeCommand) {
         el.completeCommand(msg.requestId || msg.id || '', msg.exitCode ?? msg.exit_code);
       }
@@ -426,12 +518,7 @@ function _wireKeyboard() {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Auto-init when DOM is ready                                       */
+/*  Auto-init removed — app.js calls initSurfaceManager() explicitly  */
+/*  to avoid double-init (which registered event listeners twice and   */
+/*  created duplicate surface elements).                              */
 /* ------------------------------------------------------------------ */
-
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initSurfaceManager);
-} else {
-  // Defer to let components register first
-  queueMicrotask(initSurfaceManager);
-}

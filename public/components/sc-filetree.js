@@ -11,19 +11,39 @@
  * - Search/filter within tree
  */
 
-const FILE_ICONS = {
-  js: '📜', ts: '📘', json: '📋', md: '📝', html: '🌐', css: '🎨',
-  py: '🐍', rs: '🦀', go: '🔵', sh: '⚙️', yml: '📐', yaml: '📐',
-  toml: '📐', txt: '📄', log: '📃', env: '🔒', lock: '🔒',
-  png: '🖼️', jpg: '🖼️', gif: '🖼️', svg: '🖼️', webp: '🖼️',
-  mp3: '🎵', wav: '🎵', mp4: '🎬', zip: '📦', tar: '📦',
-  default: '📄', folder: '📁', folderOpen: '📂',
-};
+// SVG file type icons (14×14)
+const _DOC = 'M4 1.5A1 1 0 015 .5h4.5L13 4v10a1 1 0 01-1 1H5a1 1 0 01-1-1z';
+const _FOLD = 'M9.5.5V4H13';
+function _fileDoc(fill, stroke) {
+  return `<svg width="14" height="14" viewBox="0 0 14 16" fill="none"><path d="${_DOC}" fill="${fill}" stroke="${stroke}" stroke-width="0.8"/><path d="${_FOLD}" fill="none" stroke="${stroke}" stroke-width="0.8" opacity="0.5"/></svg>`;
+}
 
-function getIcon(name, isDir, isOpen) {
-  if (isDir) return isOpen ? FILE_ICONS.folderOpen : FILE_ICONS.folder;
+function getFileIcon(name, isDir, isOpen) {
+  if (isDir) {
+    const opacity = isOpen ? '0.45' : '0.65';
+    return `<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M2 5a1 1 0 011-1h3.5L8 5.5h5a1 1 0 011 1V12a1 1 0 01-1 1H3a1 1 0 01-1-1V5z" fill="rgba(249,166,2,${opacity})"/></svg>`;
+  }
   const ext = name.split('.').pop()?.toLowerCase();
-  return FILE_ICONS[ext] || FILE_ICONS.default;
+  switch (ext) {
+    case 'js': case 'jsx': case 'mjs':
+      return _fileDoc('rgba(250,204,21,0.1)', 'rgba(250,204,21,0.5)');
+    case 'ts': case 'tsx':
+      return _fileDoc('rgba(250,204,21,0.1)', 'rgba(250,204,21,0.5)');
+    case 'css': case 'scss': case 'less':
+      return _fileDoc('rgba(59,130,246,0.1)', 'rgba(59,130,246,0.5)');
+    case 'html': case 'htm':
+      return _fileDoc('rgba(249,115,22,0.1)', 'rgba(249,115,22,0.5)');
+    case 'json':
+      return _fileDoc('rgba(34,197,94,0.1)', 'rgba(34,197,94,0.5)');
+    case 'py':
+      return _fileDoc('rgba(59,130,246,0.1)', 'rgba(59,130,246,0.5)');
+    case 'rs':
+      return _fileDoc('rgba(249,115,22,0.1)', 'rgba(249,115,22,0.5)');
+    case 'md': case 'mdx':
+      return _fileDoc('rgba(168,162,158,0.1)', 'rgba(168,162,158,0.5)');
+    default:
+      return _fileDoc('rgba(255,255,255,0.04)', 'rgba(255,255,255,0.2)');
+  }
 }
 
 function escapeHtml(s) {
@@ -35,13 +55,87 @@ TEMPLATE.innerHTML = `
 <style>
   :host {
     display: flex;
-    flex-direction: row;
-    background: var(--surface, #111118);
-    color: var(--text, #e4e4e7);
+    flex-direction: column;
+    background: var(--sc-bg, #0e0c09);
+    color: var(--sc-text, #e8e0d2);
     font-family: var(--font, 'Geist', system-ui, sans-serif);
     font-size: 13px;
     overflow: hidden;
     height: 100%;
+    min-width: 0;
+    min-height: 0;
+    contain: layout style;
+  }
+
+  /* Surface header — 36px uniform glassmorphism */
+  .surface-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 36px;
+    min-height: 36px;
+    padding: 0 12px;
+    background: var(--sc-glass-bg, rgba(26,22,16,0.85));
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--sc-border, rgba(249,166,2,0.12));
+    flex-shrink: 0;
+    gap: 8px;
+  }
+  .surface-header-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--sc-text-muted, #8a7e6a);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+    letter-spacing: 0.3px;
+  }
+  .surface-header-icon {
+    color: var(--sc-accent, #F9A602);
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+  }
+  .surface-breadcrumb {
+    flex: 1;
+    font-family: var(--mono, 'Geist Mono', monospace);
+    font-size: 11px;
+    color: var(--sc-text-dim, #5a5040);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .surface-close {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    color: var(--sc-text-dim, #5a5040);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  .surface-close:hover {
+    background: rgba(239,68,68,0.12);
+    color: #ef4444;
+  }
+  .surface-close:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(249,166,2,0.35);
+  }
+
+  .content-row {
+    display: flex;
+    flex-direction: row;
+    flex: 1;
+    overflow: hidden;
+    min-height: 0;
   }
 
   /* Tree panel */
@@ -49,7 +143,7 @@ TEMPLATE.innerHTML = `
     width: 260px;
     min-width: 200px;
     max-width: 400px;
-    border-right: 1px solid rgba(255,255,255,0.06);
+    border-right: 1px solid var(--sc-border, rgba(249,166,2,0.12));
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -61,15 +155,15 @@ TEMPLATE.innerHTML = `
     align-items: center;
     gap: 6px;
     padding: 6px 10px;
-    background: rgba(255,255,255,0.02);
-    border-bottom: 1px solid rgba(255,255,255,0.06);
+    background: rgba(14,12,9,0.5);
+    border-bottom: 1px solid var(--sc-border, rgba(249,166,2,0.12));
     flex-shrink: 0;
   }
 
   .tree-title {
     font-size: 11px;
     font-weight: 600;
-    color: #71717a;
+    color: var(--sc-text-dim, #5a5040);
     letter-spacing: 0.5px;
     text-transform: uppercase;
     flex: 1;
@@ -79,16 +173,16 @@ TEMPLATE.innerHTML = `
     width: 100%;
     padding: 4px 8px;
     background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.08);
+    border: 1px solid var(--sc-border, rgba(249,166,2,0.12));
     border-radius: 4px;
-    color: var(--text, #e4e4e7);
+    color: var(--sc-text, #e8e0d2);
     font-family: inherit;
     font-size: 12px;
     outline: none;
   }
 
-  .filter-input:focus { border-color: var(--accent, #6366f1); }
-  .filter-input::placeholder { color: #484f58; }
+  .filter-input:focus { border-color: var(--sc-accent, #F9A602); }
+  .filter-input::placeholder { color: var(--sc-text-dim, #5a5040); }
 
   .tree-items {
     flex: 1;
@@ -96,11 +190,12 @@ TEMPLATE.innerHTML = `
     padding: 4px 0;
   }
 
-  .tree-item {
+  .filetree-item {
     display: flex;
     align-items: center;
-    gap: 4px;
-    padding: 3px 8px 3px calc(var(--depth, 0) * 16px + 8px);
+    gap: 6px;
+    padding: 4px 12px;
+    font-size: 13px;
     cursor: pointer;
     user-select: none;
     border-radius: 4px;
@@ -109,13 +204,37 @@ TEMPLATE.innerHTML = `
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    color: var(--sc-text, #f0ead6);
   }
 
-  .tree-item:hover { background: rgba(255,255,255,0.04); }
-  .tree-item.selected { background: rgba(99,102,241,0.15); color: #a5b4fc; }
+  .filetree-item:hover { background: rgba(249,166,2,0.06); }
+  .filetree-item:focus-visible { outline: none; box-shadow: 0 0 0 2px rgba(249,166,2,0.35); }
+  .filetree-item.selected { background: rgba(249,166,2,0.10); color: var(--sc-text, #f0ead6); }
+  .filetree-item.directory { font-weight: 500; }
 
-  .tree-icon { flex-shrink: 0; font-size: 14px; width: 18px; text-align: center; }
-  .tree-chevron { flex-shrink: 0; width: 14px; font-size: 10px; color: #484f58; transition: transform 0.15s; }
+  .filetree-indent {
+    width: 16px;
+    flex-shrink: 0;
+    position: relative;
+    align-self: stretch;
+  }
+
+  .filetree-indent::before {
+    content: '';
+    position: absolute;
+    left: 7px;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: rgba(255,255,255,0.06);
+  }
+
+  .filetree-indent.last-in-group::before {
+    bottom: 50%;
+  }
+
+  .filetree-icon { flex-shrink: 0; width: 14px; height: 14px; display: flex; align-items: center; }
+  .tree-chevron { flex-shrink: 0; width: 14px; font-size: 10px; color: var(--sc-text-dim, #5a5040); transition: transform 0.15s; }
   .tree-chevron.open { transform: rotate(90deg); }
   .tree-chevron.leaf { visibility: hidden; }
   .tree-name { overflow: hidden; text-overflow: ellipsis; }
@@ -133,8 +252,8 @@ TEMPLATE.innerHTML = `
     align-items: center;
     gap: 8px;
     padding: 6px 12px;
-    background: rgba(255,255,255,0.02);
-    border-bottom: 1px solid rgba(255,255,255,0.06);
+    background: rgba(14,12,9,0.5);
+    border-bottom: 1px solid var(--sc-border, rgba(249,166,2,0.12));
     flex-shrink: 0;
     min-height: 32px;
   }
@@ -144,14 +263,14 @@ TEMPLATE.innerHTML = `
     align-items: center;
     gap: 4px;
     font-size: 12px;
-    color: #71717a;
+    color: var(--sc-text-dim, #5a5040);
     flex: 1;
     overflow: hidden;
   }
 
   .breadcrumb span { white-space: nowrap; }
-  .breadcrumb .sep { color: #484f58; }
-  .breadcrumb .current { color: var(--text, #e4e4e7); font-weight: 500; }
+  .breadcrumb .sep { color: var(--sc-text-dim, #5a5040); }
+  .breadcrumb .current { color: var(--sc-text, #e8e0d2); font-weight: 500; }
 
   .viewer-content {
     flex: 1;
@@ -188,7 +307,7 @@ TEMPLATE.innerHTML = `
     align-items: center;
     justify-content: center;
     height: 100%;
-    color: #484f58;
+    color: var(--sc-text-dim, #5a5040);
     font-size: 13px;
     font-family: var(--font, 'Geist', system-ui, sans-serif);
     gap: 8px;
@@ -213,15 +332,42 @@ TEMPLATE.innerHTML = `
     flex-shrink: 0;
   }
   .resize-handle:hover,
-  .resize-handle.dragging { background: var(--accent, #6366f1); }
+  .resize-handle.dragging { background: var(--sc-accent, #F9A602); }
 
-  @media (max-width: 640px) {
-    :host { flex-direction: column; }
-    .tree-panel { width: 100%; max-width: none; height: 180px; border-right: none; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  @media (max-width: 767px) {
+    .surface-header {
+      padding-left: 48px;
+    }
+    .content-row { flex-direction: column; }
+    .tree-panel {
+      width: 100%;
+      max-width: none;
+      height: 40%;
+      min-height: 120px;
+      max-height: 50%;
+      border-right: none;
+      border-bottom: 1px solid var(--sc-border, rgba(249,166,2,0.12));
+    }
+    .tree-toolbar {
+      display: none;
+    }
     .resize-handle { display: none; }
   }
 </style>
 
+<div class="surface-header">
+  <span class="surface-header-title">
+    <svg class="surface-header-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M2 4h4l2 2h6v7a1 1 0 01-1 1H3a1 1 0 01-1-1V4z"/>
+    </svg>
+    Explorer
+  </span>
+  <span class="surface-breadcrumb" id="surface-breadcrumb"></span>
+  <button class="surface-close" id="surface-close-btn" title="Close explorer">
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/></svg>
+  </button>
+</div>
+<div class="content-row">
 <div class="tree-panel" id="tree-panel">
   <div class="tree-toolbar">
     <span class="tree-title">Explorer</span>
@@ -237,6 +383,7 @@ TEMPLATE.innerHTML = `
   <div class="viewer-content" id="viewer-content">
     <div class="empty-state"><span class="icon">📂</span><span>Select a file to view</span></div>
   </div>
+</div>
 </div>
 `;
 
@@ -269,12 +416,17 @@ export class ScFiletree extends HTMLElement {
     /** @type {Map<string, string>} path → content cache */
     this._contentCache = new Map();
     this._filterText = '';
+    this._surfaceBreadcrumb = this.shadowRoot.getElementById('surface-breadcrumb');
   }
 
   connectedCallback() {
     this._filter.addEventListener('input', (e) => {
       this._filterText = e.target.value.toLowerCase();
       this._renderTree();
+    });
+
+    this.shadowRoot.getElementById('surface-close-btn').addEventListener('click', () => {
+      this.dispatchEvent(new CustomEvent('surface-close', { detail: { type: 'explorer' }, bubbles: true, composed: true }));
     });
 
     // Resize handle
@@ -308,6 +460,7 @@ export class ScFiletree extends HTMLElement {
   showFile(path, content) {
     this._contentCache.set(path, content);
     this._selected = path;
+    if (this._surfaceBreadcrumb) this._surfaceBreadcrumb.textContent = path;
     this._renderViewer(path, content);
     this._renderTree(); // update selection highlight
   }
@@ -360,19 +513,34 @@ export class ScFiletree extends HTMLElement {
       return a.name.localeCompare(b.name);
     });
 
-    for (const node of sorted) {
-      if (this._filterText && !node.name.toLowerCase().includes(this._filterText) && !node.isDir) continue;
+    // Filter out hidden items for accurate last-child detection
+    const visible = sorted.filter(node =>
+      !(this._filterText && !node.name.toLowerCase().includes(this._filterText) && !node.isDir)
+    );
+
+    for (let idx = 0; idx < visible.length; idx++) {
+      const node = visible[idx];
+      const isLast = idx === visible.length - 1;
 
       const el = document.createElement('div');
-      el.className = 'tree-item' + (node.path === this._selected ? ' selected' : '');
-      el.style.setProperty('--depth', depth);
+      let cls = 'filetree-item';
+      if (node.path === this._selected) cls += ' selected';
+      if (node.isDir) cls += ' directory';
+      el.className = cls;
+
+      // Build indent blocks
+      const indents = Array.from({ length: depth }, (_, j) =>
+        (j === depth - 1 && isLast)
+          ? '<span class="filetree-indent last-in-group"></span>'
+          : '<span class="filetree-indent"></span>'
+      ).join('');
 
       const chevron = node.isDir
         ? `<span class="tree-chevron${node.expanded ? ' open' : ''}">▶</span>`
         : '<span class="tree-chevron leaf">▶</span>';
-      const icon = getIcon(node.name, node.isDir, node.expanded);
+      const icon = getFileIcon(node.name, node.isDir, node.expanded);
 
-      el.innerHTML = `${chevron}<span class="tree-icon">${icon}</span><span class="tree-name">${escapeHtml(node.name)}</span>`;
+      el.innerHTML = `${indents}${chevron}<span class="filetree-icon">${icon}</span><span class="tree-name">${escapeHtml(node.name)}</span>`;
 
       el.addEventListener('click', () => {
         if (node.isDir) {

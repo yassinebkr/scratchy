@@ -3,7 +3,11 @@
  * Handles connection, reconnect, and message routing to surfaces.
  */
 
-const WS_URL = `ws://${location.host}/ws`;
+/** Build WS URL at call time so location.protocol is always correct */
+function getWsUrl() {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  return `${proto}//${location.host}/ws`;
+}
 let _ws = null;
 let _token = null;
 let _authenticated = false;
@@ -72,7 +76,7 @@ export function connect(token) {
   if (_ws) _ws.close();
   
   // No token in URL — auth happens as first message after connect
-  _ws = new WebSocket(WS_URL);
+  _ws = new WebSocket(getWsUrl());
   
   _ws.onopen = () => {
     console.log('[ws] connected, sending auth');
@@ -123,6 +127,9 @@ function scheduleReconnect() {
   _reconnectTimer = setTimeout(() => {
     _reconnectTimer = null;
     _reconnectDelay = Math.min(_reconnectDelay * 1.5, MAX_RECONNECT_DELAY);
+    if (_reconnectDelay >= MAX_RECONNECT_DELAY) {
+      emit('reconnect-stalled', { delay: _reconnectDelay });
+    }
     if (_token) connect(_token);
   }, _reconnectDelay);
 }

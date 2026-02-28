@@ -103,7 +103,7 @@ export async function login(username, password) {
   createSession(user.id, token);
   return {
     token,
-    user: { id: user.id, username: user.username, displayName: user.displayName },
+    user: { id: user.id, username: user.username, displayName: user.displayName, role: user.role },
   };
 }
 

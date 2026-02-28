@@ -19,11 +19,11 @@
  */
 
 const STEP_META = [
-  { icon: '✨', title: 'Welcome to Scratchy',    subtitle: "Let's set things up — it only takes a minute." },
-  { icon: '👤', title: 'Create Your Profile',    subtitle: 'Tell us a bit about yourself.' },
-  { icon: '🔑', title: 'Connect Your AI',        subtitle: 'Add an API key for direct model access.' },
-  { icon: '⚙️', title: 'Your Preferences',       subtitle: 'Tailor the experience to your liking.' },
-  { icon: '🚀', title: "You're All Set!",        subtitle: 'Everything is ready. Time to build something amazing.' },
+  { icon: '<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>', title: 'Welcome to Scratchy',    subtitle: "Let's set things up — it only takes a minute." },
+  { icon: '<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>', title: 'Create Your Profile',    subtitle: 'Tell us a bit about yourself.' },
+  { icon: '<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>', title: 'Connect Your AI',        subtitle: 'Choose how to connect your AI provider.' },
+  { icon: '<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>', title: 'Your Preferences',       subtitle: 'Tailor the experience to your liking.' },
+  { icon: '<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg>', title: "You're All Set!",        subtitle: 'Everything is ready. Time to build something amazing.' },
 ];
 
 const API_PROVIDERS = [
@@ -60,8 +60,8 @@ tpl.innerHTML = /* html */ `
   height: 100%;
   font-family: 'Geist', system-ui, -apple-system, sans-serif;
   font-size: 14px;
-  color: #e4e4e7;
-  background: #0a0a0f;
+  color: #f0ead6;
+  background: #0d0b07;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -86,7 +86,7 @@ tpl.innerHTML = /* html */ `
 .progress-bar-track {
   width: 100%;
   height: 3px;
-  background: rgba(255,255,255,0.06);
+  background: rgba(249,166,2,0.10);
   border-radius: 3px;
   overflow: hidden;
   margin-bottom: 24px;
@@ -95,7 +95,7 @@ tpl.innerHTML = /* html */ `
 .progress-bar-fill {
   height: 100%;
   border-radius: 3px;
-  background: linear-gradient(90deg, #6366f1, #818cf8, #6366f1);
+  background: linear-gradient(90deg, #F9A602, #818cf8, #F9A602);
   background-size: 200% 100%;
   animation: progressShimmer 2s linear infinite;
   transition: width 0.4s cubic-bezier(0.4,0,0.2,1);
@@ -124,7 +124,7 @@ tpl.innerHTML = /* html */ `
 .step-line {
   width: 40px;
   height: 2px;
-  background: rgba(255,255,255,0.06);
+  background: rgba(249,166,2,0.10);
   transition: background 0.4s cubic-bezier(0.4,0,0.2,1);
 }
 
@@ -145,17 +145,17 @@ tpl.innerHTML = /* html */ `
   transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
   position: relative;
   cursor: default;
-  border: 2px solid rgba(255,255,255,0.06);
-  background: #0a0a0f;
-  color: #71717a;
+  border: 2px solid rgba(249,166,2,0.10);
+  background: #0d0b07;
+  color: #8a7e6a;
 }
 
 .step-dot.current {
-  border-color: #6366f1;
-  background: #6366f1;
+  border-color: #F9A602;
+  background: #F9A602;
   color: #fff;
   transform: scale(1.1);
-  box-shadow: 0 0 0 4px rgba(99,102,241,0.15), 0 0 16px rgba(99,102,241,0.3);
+  box-shadow: 0 0 0 4px rgba(249,166,2,0.15), 0 0 16px rgba(249,166,2,0.3);
 }
 
 .step-dot.completed {
@@ -209,17 +209,17 @@ tpl.innerHTML = /* html */ `
 
 /* ── Step Card ────────────────────────────────────────────────────────── */
 .step-card {
-  background: #111118;
-  border: 1px solid rgba(255,255,255,0.06);
+  background: #1a1610;
+  border: 1px solid rgba(249,166,2,0.10);
   border-radius: 12px;
   padding: 36px 32px 32px;
 }
 
 .step-icon {
-  font-size: 40px;
   text-align: center;
   margin-bottom: 12px;
   line-height: 1;
+  color: #F9A602;
 }
 
 .step-title {
@@ -228,12 +228,12 @@ tpl.innerHTML = /* html */ `
   text-align: center;
   letter-spacing: -0.3px;
   margin-bottom: 6px;
-  color: #e4e4e7;
+  color: #f0ead6;
 }
 
 .step-subtitle {
   font-size: 14px;
-  color: #71717a;
+  color: #8a7e6a;
   text-align: center;
   margin-bottom: 28px;
   line-height: 1.5;
@@ -286,10 +286,10 @@ tpl.innerHTML = /* html */ `
 .float-field input,
 .float-field select {
   width: 100%;
-  background: #0a0a0f;
-  border: 1px solid rgba(255,255,255,0.06);
+  background: #0d0b07;
+  border: 1px solid rgba(249,166,2,0.10);
   border-radius: 8px;
-  color: #e4e4e7;
+  color: #f0ead6;
   font-family: inherit;
   font-size: 14px;
   padding: 18px 14px 8px;
@@ -300,8 +300,8 @@ tpl.innerHTML = /* html */ `
 
 .float-field input:focus,
 .float-field select:focus {
-  border-color: #6366f1;
-  box-shadow: 0 0 0 2px rgba(99,102,241,0.12);
+  border-color: #F9A602;
+  box-shadow: 0 0 0 2px rgba(249,166,2,0.12);
 }
 
 .float-field label {
@@ -310,7 +310,7 @@ tpl.innerHTML = /* html */ `
   top: 50%;
   transform: translateY(-50%);
   font-size: 14px;
-  color: #71717a;
+  color: #8a7e6a;
   pointer-events: none;
   transition: all 0.2s cubic-bezier(0.4,0,0.2,1);
   background: transparent;
@@ -324,13 +324,13 @@ tpl.innerHTML = /* html */ `
   top: 10px;
   transform: translateY(0);
   font-size: 11px;
-  color: #6366f1;
+  color: #F9A602;
 }
 
 /* ── Avatar Grid ──────────────────────────────────────────────────────── */
 .avatar-section-label {
   font-size: 13px;
-  color: #71717a;
+  color: #8a7e6a;
   margin-bottom: 10px;
   font-weight: 500;
 }
@@ -363,13 +363,13 @@ tpl.innerHTML = /* html */ `
 }
 
 .avatar-cell:focus-visible {
-  outline: 2px solid #6366f1;
+  outline: 2px solid #F9A602;
   outline-offset: 2px;
 }
 
 .avatar-cell.selected {
-  border-color: #6366f1;
-  background: rgba(99,102,241,0.12);
+  border-color: #F9A602;
+  background: rgba(249,166,2,0.12);
   transform: scale(1.15);
 }
 
@@ -383,13 +383,13 @@ tpl.innerHTML = /* html */ `
 .provider-card {
   flex: 1;
   padding: 12px;
-  border: 1px solid rgba(255,255,255,0.06);
+  border: 1px solid rgba(249,166,2,0.10);
   border-radius: 8px;
   cursor: pointer;
   text-align: center;
   font-size: 13px;
   font-weight: 500;
-  color: #71717a;
+  color: #8a7e6a;
   background: transparent;
   transition: all 0.2s ease;
   font-family: inherit;
@@ -403,19 +403,19 @@ tpl.innerHTML = /* html */ `
 }
 
 .provider-card:hover {
-  border-color: rgba(99,102,241,0.3);
-  color: #e4e4e7;
+  border-color: rgba(249,166,2,0.3);
+  color: #f0ead6;
 }
 
 .provider-card:focus-visible {
-  outline: 2px solid #6366f1;
+  outline: 2px solid #F9A602;
   outline-offset: 2px;
 }
 
 .provider-card.active {
-  border-color: #6366f1;
-  background: rgba(99,102,241,0.08);
-  color: #e4e4e7;
+  border-color: #F9A602;
+  background: rgba(249,166,2,0.08);
+  color: #f0ead6;
 }
 
 .provider-card .check {
@@ -440,7 +440,7 @@ tpl.innerHTML = /* html */ `
   background: transparent;
   border: 1px solid rgba(255,255,255,0.08);
   border-radius: 8px;
-  color: #e4e4e7;
+  color: #f0ead6;
   font-family: inherit;
   font-size: 13px;
   font-weight: 500;
@@ -456,7 +456,7 @@ tpl.innerHTML = /* html */ `
 }
 
 .test-btn:focus-visible {
-  outline: 2px solid #6366f1;
+  outline: 2px solid #F9A602;
   outline-offset: 2px;
 }
 
@@ -489,18 +489,345 @@ tpl.innerHTML = /* html */ `
   text-align: center;
   margin-top: 16px;
   font-size: 12px;
-  color: #71717a;
+  color: #8a7e6a;
 }
 
 .skip-hint a {
-  color: #71717a;
+  color: #8a7e6a;
   cursor: pointer;
   text-decoration: underline;
   text-underline-offset: 2px;
   transition: color 0.15s;
 }
 
-.skip-hint a:hover { color: #e4e4e7; }
+.skip-hint a:hover { color: #f0ead6; }
+
+/* ── Auth Method Tabs ─────────────────────────────────────────────────── */
+.auth-tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 20px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(249,166,2,0.15);
+  background: #0d0b07;
+}
+
+.auth-tab {
+  flex: 1;
+  padding: 10px 16px;
+  background: transparent;
+  border: none;
+  color: #8a7e6a;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
+  position: relative;
+  min-height: 40px;
+}
+
+.auth-tab:hover {
+  color: #f0ead6;
+  background: rgba(249,166,2,0.05);
+}
+
+.auth-tab.active {
+  color: #f0ead6;
+  background: rgba(249,166,2,0.12);
+}
+
+.auth-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #F9A602;
+}
+
+.auth-tab:focus-visible {
+  outline: 2px solid #F9A602;
+  outline-offset: -2px;
+}
+
+/* ── Auth Tab Content ─────────────────────────────────────────────────── */
+.auth-tab-content {
+  display: none;
+}
+
+.auth-tab-content.active {
+  display: block;
+  animation: fieldIn 0.25s ease forwards;
+}
+
+/* ── OAuth Section ────────────────────────────────────────────────────── */
+.oauth-desc {
+  font-size: 13px;
+  color: #8a7e6a;
+  line-height: 1.6;
+  margin-bottom: 20px;
+}
+
+.oauth-providers {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.oauth-provider-btn {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 14px 16px;
+  background: #0d0b07;
+  border: 1px solid rgba(249,166,2,0.12);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+  text-align: left;
+}
+
+.oauth-provider-btn:hover {
+  border-color: rgba(249,166,2,0.35);
+  background: rgba(249,166,2,0.04);
+}
+
+.oauth-provider-btn:focus-visible {
+  outline: 2px solid #F9A602;
+  outline-offset: 2px;
+}
+
+.oauth-provider-btn.connected {
+  border-color: #22c55e;
+  background: rgba(34,197,94,0.06);
+}
+
+.oauth-provider-btn.connecting {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.oauth-provider-icon {
+  font-size: 24px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: rgba(249,166,2,0.08);
+  flex-shrink: 0;
+}
+
+.oauth-provider-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.oauth-provider-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #f0ead6;
+}
+
+.oauth-provider-status {
+  font-size: 12px;
+  color: #8a7e6a;
+}
+
+.oauth-provider-status.connecting {
+  color: #F9A602;
+}
+
+.oauth-provider-status.connected {
+  color: #22c55e;
+}
+
+.oauth-provider-arrow {
+  font-size: 16px;
+  color: #8a7e6a;
+  transition: transform 0.2s ease;
+}
+
+.oauth-provider-btn:hover .oauth-provider-arrow {
+  transform: translateX(3px);
+}
+
+.oauth-provider-btn.connected .oauth-provider-arrow {
+  color: #22c55e;
+}
+
+.oauth-note {
+  font-size: 12px;
+  color: #8a7e6a;
+  line-height: 1.5;
+  padding: 10px 12px;
+  background: rgba(249,166,2,0.04);
+  border-radius: 8px;
+  border-left: 2px solid rgba(249,166,2,0.3);
+}
+
+/* ── Token Paste Sections ─────────────────────────────────────────────── */
+.token-provider {
+  border: 1px solid rgba(249,166,2,0.12);
+  border-radius: 10px;
+  margin-bottom: 10px;
+  overflow: hidden;
+  transition: border-color 0.2s ease;
+}
+
+.token-provider.connected {
+  border-color: #34d399;
+}
+
+.token-provider-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 14px 16px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  font-family: inherit;
+  text-align: left;
+}
+
+.token-provider-header:hover {
+  background: rgba(249,166,2,0.04);
+}
+
+.token-provider-header:focus-visible {
+  outline: 2px solid #F9A602;
+  outline-offset: -2px;
+}
+
+.token-provider-chevron {
+  font-size: 18px;
+  color: #8a7e6a;
+  transition: transform 0.25s cubic-bezier(0.4,0,0.2,1);
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.token-provider.expanded .token-provider-chevron {
+  transform: rotate(90deg);
+}
+
+.token-provider.connected .token-provider-chevron {
+  color: #34d399;
+}
+
+.token-provider-body {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-height 0.3s cubic-bezier(0.4,0,0.2,1),
+              opacity 0.25s ease,
+              padding 0.3s ease;
+  padding: 0 16px;
+}
+
+.token-provider.expanded .token-provider-body {
+  max-height: 300px;
+  opacity: 1;
+  padding: 0 16px 16px;
+}
+
+.token-instructions {
+  font-size: 13px;
+  color: #8a7e6a;
+  line-height: 1.6;
+  margin-bottom: 12px;
+}
+
+.token-instructions code {
+  font-family: 'Geist Mono', 'SF Mono', monospace;
+  background: rgba(249,166,2,0.08);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #F9A602;
+}
+
+.token-input-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.token-input {
+  flex: 1;
+  background: #0d0b07;
+  border: 1px solid rgba(249,166,2,0.10);
+  border-radius: 8px;
+  color: #f0ead6;
+  font-family: 'Geist Mono', 'SF Mono', monospace;
+  font-size: 13px;
+  padding: 10px 14px;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  min-height: 44px;
+  min-width: 0;
+}
+
+.token-input:focus {
+  border-color: #F9A602;
+  box-shadow: 0 0 0 2px rgba(249,166,2,0.12);
+}
+
+.token-input::placeholder {
+  color: #5a5245;
+}
+
+.token-save-btn {
+  padding: 0 18px;
+  background: #F9A602;
+  color: #0d0b07;
+  border: none;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, opacity 0.2s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+  min-height: 44px;
+}
+
+.token-save-btn:hover:not(:disabled) {
+  background: #DAA520;
+}
+
+.token-save-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.token-save-btn:focus-visible {
+  outline: 2px solid #F9A602;
+  outline-offset: 2px;
+}
+
+.token-feedback {
+  font-size: 12px;
+  margin-top: 6px;
+  min-height: 0;
+  transition: opacity 0.2s;
+}
+
+.token-feedback.success { color: #34d399; }
+.token-feedback.error   { color: #f87171; }
 
 /* ── Preference Groups ────────────────────────────────────────────────── */
 .pref-group {
@@ -510,7 +837,7 @@ tpl.innerHTML = /* html */ `
 .pref-label {
   font-size: 13px;
   font-weight: 500;
-  color: #71717a;
+  color: #8a7e6a;
   margin-bottom: 8px;
 }
 
@@ -524,12 +851,12 @@ tpl.innerHTML = /* html */ `
   flex: 1;
   min-width: 0;
   padding: 10px 14px;
-  border: 1px solid rgba(255,255,255,0.06);
+  border: 1px solid rgba(249,166,2,0.10);
   border-radius: 8px;
   cursor: pointer;
   text-align: center;
   font-size: 13px;
-  color: #71717a;
+  color: #8a7e6a;
   background: transparent;
   transition: all 0.15s ease;
   font-family: inherit;
@@ -543,27 +870,27 @@ tpl.innerHTML = /* html */ `
 }
 
 .option-card:hover {
-  border-color: rgba(99,102,241,0.3);
-  color: #e4e4e7;
+  border-color: rgba(249,166,2,0.3);
+  color: #f0ead6;
 }
 
 .option-card:focus-visible {
-  outline: 2px solid #6366f1;
+  outline: 2px solid #F9A602;
   outline-offset: 2px;
 }
 
 .option-card.selected {
-  border-color: #6366f1;
-  background: rgba(99,102,241,0.08);
-  color: #e4e4e7;
+  border-color: #F9A602;
+  background: rgba(249,166,2,0.08);
+  color: #f0ead6;
 }
 
 .model-select {
   width: 100%;
-  background: #0a0a0f;
-  border: 1px solid rgba(255,255,255,0.06);
+  background: #0d0b07;
+  border: 1px solid rgba(249,166,2,0.10);
   border-radius: 8px;
-  color: #e4e4e7;
+  color: #f0ead6;
   font-family: inherit;
   font-size: 14px;
   padding: 12px 14px;
@@ -579,13 +906,13 @@ tpl.innerHTML = /* html */ `
 }
 
 .model-select:focus {
-  border-color: #6366f1;
-  box-shadow: 0 0 0 2px rgba(99,102,241,0.12);
+  border-color: #F9A602;
+  box-shadow: 0 0 0 2px rgba(249,166,2,0.12);
 }
 
 .model-select option {
-  background: #111118;
-  color: #e4e4e7;
+  background: #1a1610;
+  color: #f0ead6;
 }
 
 /* ── Success / Complete Step ──────────────────────────────────────────── */
@@ -655,8 +982,8 @@ tpl.innerHTML = /* html */ `
 .start-btn {
   margin-top: 8px;
   padding: 14px 36px;
-  background: #6366f1;
-  color: #fff;
+  background: #F9A602;
+  color: #0d0b07;
   border: none;
   border-radius: 10px;
   font-family: inherit;
@@ -670,12 +997,12 @@ tpl.innerHTML = /* html */ `
 }
 
 .start-btn:hover {
-  background: #4f46e5;
+  background: #DAA520;
   transform: translateY(-1px);
 }
 
 .start-btn:focus-visible {
-  outline: 2px solid #6366f1;
+  outline: 2px solid #F9A602;
   outline-offset: 3px;
 }
 
@@ -709,29 +1036,29 @@ tpl.innerHTML = /* html */ `
 }
 
 .btn:focus-visible {
-  outline: 2px solid #6366f1;
+  outline: 2px solid #F9A602;
   outline-offset: 2px;
 }
 
 .btn-ghost {
   background: transparent;
-  color: #71717a;
-  border: 1px solid rgba(255,255,255,0.06);
+  color: #8a7e6a;
+  border: 1px solid rgba(249,166,2,0.10);
 }
 
 .btn-ghost:hover {
-  color: #e4e4e7;
+  color: #f0ead6;
   background: rgba(255,255,255,0.04);
   border-color: rgba(255,255,255,0.1);
 }
 
 .btn-primary {
-  background: #6366f1;
-  color: #fff;
+  background: #F9A602;
+  color: #0d0b07;
 }
 
 .btn-primary:hover {
-  background: #4f46e5;
+  background: #DAA520;
 }
 
 .btn-primary:active {
@@ -740,7 +1067,7 @@ tpl.innerHTML = /* html */ `
 
 .skip-link {
   font-size: 12px;
-  color: #71717a;
+  color: #8a7e6a;
   cursor: pointer;
   text-decoration: none;
   background: none;
@@ -750,8 +1077,8 @@ tpl.innerHTML = /* html */ `
   padding: 8px 4px;
 }
 
-.skip-link:hover { color: #e4e4e7; }
-.skip-link:focus-visible { outline: 2px solid #6366f1; outline-offset: 2px; }
+.skip-link:hover { color: #f0ead6; }
+.skip-link:focus-visible { outline: 2px solid #F9A602; outline-offset: 2px; }
 
 /* ── Reduced Motion ───────────────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
@@ -840,6 +1167,7 @@ export class ScSetupWizard extends HTMLElement {
     this._data = {
       profile: { displayName: '', avatar: '' },
       apiKey: { provider: 'anthropic', key: '', validated: false },
+      oauth: { anthropic: { status: 'disconnected', email: '' }, google: { status: 'disconnected', email: '' } },
       preferences: { theme: 'dark', language: 'en', model: 'auto' },
     };
 
@@ -866,11 +1194,12 @@ export class ScSetupWizard extends HTMLElement {
     this._nextBtn.addEventListener('click', () => this._goNext());
     this._skipBtn.addEventListener('click', () => this._skip());
 
-    document.addEventListener('keydown', this._onKeyDown);
+    if (!this.hasAttribute('tabindex')) this.setAttribute('tabindex', '-1');
+    this.addEventListener('keydown', this._onKeyDown);
   }
 
   disconnectedCallback() {
-    document.removeEventListener('keydown', this._onKeyDown);
+    this.removeEventListener('keydown', this._onKeyDown);
   }
 
   attributeChangedCallback(name, _old, val) {
@@ -932,6 +1261,7 @@ export class ScSetupWizard extends HTMLElement {
       const dot = document.createElement('div');
       dot.className = 'step-dot';
       dot.dataset.index = i;
+      dot.setAttribute('aria-label', `Step ${i + 1} of ${this._totalSteps}: ${STEP_META[i].title}`);
       dot.innerHTML = `<span>${i + 1}</span>`;
       this._indicatorsEl.appendChild(dot);
     }
@@ -947,7 +1277,7 @@ export class ScSetupWizard extends HTMLElement {
         <div class="step-icon">${STEP_META[0].icon}</div>
         <h2 class="step-title">${STEP_META[0].title}</h2>
         <p class="step-subtitle">${STEP_META[0].subtitle}</p>
-        <p style="text-align:center;color:#71717a;font-size:13px;line-height:1.6;margin-top:8px;">
+        <p style="text-align:center;color:#8a7e6a;font-size:13px;line-height:1.6;margin-top:8px;">
           We'll walk you through a few quick steps to personalize<br>
           your experience and connect your AI provider.
         </p>
@@ -971,23 +1301,72 @@ export class ScSetupWizard extends HTMLElement {
       </div>
     `));
 
-    // Step 2 — API Key
+    // Step 2 — API Key / OAuth
     this._viewportEl.appendChild(this._makePanel(2, `
       <div class="step-card">
         <div class="step-icon">${STEP_META[2].icon}</div>
         <h2 class="step-title">${STEP_META[2].title}</h2>
         <p class="step-subtitle">${STEP_META[2].subtitle}</p>
 
-        <div class="provider-cards" id="provider-cards" data-stagger="0"></div>
-
-        <div class="apikey-row" data-stagger="1">
-          <div class="float-field">
-            <input id="inp-apikey" type="password" placeholder=" " autocomplete="off" spellcheck="false" />
-            <label for="inp-apikey" id="apikey-label">API Key</label>
-          </div>
-          <button class="test-btn" id="test-btn">Test</button>
+        <div class="auth-tabs" role="tablist" aria-label="Connection method" data-stagger="0">
+          <button class="auth-tab active" data-tab="apikey" role="tab" aria-selected="true" aria-controls="tab-apikey" id="tab-btn-apikey">API Key</button>
+          <button class="auth-tab" data-tab="oauth" role="tab" aria-selected="false" aria-controls="tab-oauth" id="tab-btn-oauth">Subscription (OAuth)</button>
         </div>
-        <div class="key-feedback" id="key-feedback"></div>
+
+        <div class="auth-tab-content active" id="tab-apikey" role="tabpanel" aria-labelledby="tab-btn-apikey" data-stagger="1">
+          <div class="provider-cards" id="provider-cards"></div>
+          <div class="apikey-row">
+            <div class="float-field">
+              <input id="inp-apikey" type="password" placeholder=" " autocomplete="off" spellcheck="false" />
+              <label for="inp-apikey" id="apikey-label">API Key</label>
+            </div>
+            <button class="test-btn" id="test-btn">Test</button>
+          </div>
+          <div class="key-feedback" id="key-feedback"></div>
+        </div>
+
+        <div class="auth-tab-content" id="tab-oauth" role="tabpanel" aria-labelledby="tab-btn-oauth" data-stagger="1">
+          <p class="oauth-desc">Use your existing Claude or Gemini subscription instead of an API key. Your credentials stay on this server.</p>
+          <div class="oauth-providers">
+            <div class="token-provider" id="token-provider-anthropic" data-provider="anthropic">
+              <button class="token-provider-header" type="button">
+                <span class="oauth-provider-icon"><svg width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#F97316"/></svg></span>
+                <span class="oauth-provider-info">
+                  <span class="oauth-provider-name">Claude (Anthropic)</span>
+                  <span class="oauth-provider-status" id="oauth-status-anthropic">Not connected</span>
+                </span>
+                <span class="token-provider-chevron">›</span>
+              </button>
+              <div class="token-provider-body">
+                <p class="token-instructions">Run <code>claude setup-token</code> in your terminal, then paste the token below.</p>
+                <div class="token-input-row">
+                  <input class="token-input" id="token-input-anthropic" type="password" placeholder="Paste your setup token..." autocomplete="off" spellcheck="false" />
+                  <button class="token-save-btn" id="token-save-anthropic" type="button">Save</button>
+                </div>
+                <div class="token-feedback" id="token-feedback-anthropic"></div>
+              </div>
+            </div>
+            <div class="token-provider" id="token-provider-google" data-provider="google">
+              <button class="token-provider-header" type="button">
+                <span class="oauth-provider-icon"><svg width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#4285F4"/></svg></span>
+                <span class="oauth-provider-info">
+                  <span class="oauth-provider-name">Gemini (Google)</span>
+                  <span class="oauth-provider-status" id="oauth-status-google">Not connected</span>
+                </span>
+                <span class="token-provider-chevron">›</span>
+              </button>
+              <div class="token-provider-body">
+                <p class="token-instructions">Paste your Gemini OAuth refresh token below. You can find it in <code>~/.gemini/oauth_creds.json</code> (the <code>refresh_token</code> field).</p>
+                <div class="token-input-row">
+                  <input class="token-input" id="token-input-google" type="password" placeholder="Paste your refresh token..." autocomplete="off" spellcheck="false" />
+                  <button class="token-save-btn" id="token-save-google" type="button">Save</button>
+                </div>
+                <div class="token-feedback" id="token-feedback-google"></div>
+              </div>
+            </div>
+          </div>
+          <p class="oauth-note">Tokens are stored securely on this server. No API charges — uses your subscription quota.</p>
+        </div>
 
         <div class="skip-hint" data-stagger="2">
           <a id="skip-apikey">Skip — you can add this later in Settings</a>
@@ -1005,15 +1384,15 @@ export class ScSetupWizard extends HTMLElement {
         <div class="pref-group" data-stagger="0">
           <div class="pref-label">Theme</div>
           <div class="option-cards" id="theme-cards">
-            <div class="option-card selected" data-value="dark" tabindex="0">🌙 Dark</div>
+            <div class="option-card selected" data-value="dark" tabindex="0"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg> Dark</div>
           </div>
         </div>
 
         <div class="pref-group" data-stagger="1">
           <div class="pref-label">Language</div>
           <div class="option-cards" id="lang-cards">
-            <div class="option-card selected" data-value="en" tabindex="0">🇬🇧 English</div>
-            <div class="option-card" data-value="fr" tabindex="0">🇫🇷 Français</div>
+            <div class="option-card selected" data-value="en" tabindex="0"><svg width="20" height="20" viewBox="0 0 24 24"><text x="12" y="16" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor" font-family="inherit">EN</text></svg> English</div>
+            <div class="option-card" data-value="fr" tabindex="0"><svg width="20" height="20" viewBox="0 0 24 24"><text x="12" y="16" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor" font-family="inherit">FR</text></svg> Français</div>
           </div>
         </div>
 
@@ -1045,7 +1424,9 @@ export class ScSetupWizard extends HTMLElement {
 
     // ── Wire up interactions ──
     this._wireProfile();
+    this._wireAuthTabs();
     this._wireApiKey();
+    this._wireOAuth();
     this._wirePreferences();
     this._wireComplete();
   }
@@ -1092,6 +1473,209 @@ export class ScSetupWizard extends HTMLElement {
     grid.querySelectorAll('.avatar-cell').forEach(c => c.classList.remove('selected'));
     cell.classList.add('selected');
     this._data.profile.avatar = emoji;
+  }
+
+  /* ── Wire: Auth Tabs ──────────────────────────────────────────────────── */
+  _wireAuthTabs() {
+    const tabs = this.shadowRoot.querySelectorAll('.auth-tab');
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        const target = tab.dataset.tab;
+        // Update tab active state
+        tabs.forEach(t => {
+          const isActive = t.dataset.tab === target;
+          t.classList.toggle('active', isActive);
+          t.setAttribute('aria-selected', String(isActive));
+        });
+        // Update tab content
+        const apiPanel = this.shadowRoot.getElementById('tab-apikey');
+        const oauthPanel = this.shadowRoot.getElementById('tab-oauth');
+        if (apiPanel) {
+          apiPanel.classList.toggle('active', target === 'apikey');
+        }
+        if (oauthPanel) {
+          oauthPanel.classList.toggle('active', target === 'oauth');
+        }
+      });
+    });
+  }
+
+  /* ── Wire: OAuth / Token Paste ────────────────────────────────────── */
+  _wireOAuth() {
+    // Toggle expand/collapse on provider headers
+    const providers = this.shadowRoot.querySelectorAll('.token-provider');
+    providers.forEach(provider => {
+      const header = provider.querySelector('.token-provider-header');
+      header?.addEventListener('click', () => {
+        provider.classList.toggle('expanded');
+      });
+    });
+
+    // Wire save buttons for each provider
+    this._wireTokenSave('anthropic', 'token');
+    this._wireTokenSave('google', 'oauth');
+
+    // Check existing provider tokens on load
+    this._checkProviderTokens();
+  }
+
+  /**
+   * Wire a token save button for a given provider.
+   * @param {string} provider - 'anthropic' or 'google'
+   * @param {string} type - 'token' or 'oauth'
+   */
+  _wireTokenSave(provider, type) {
+    const saveBtn = this.shadowRoot.getElementById(`token-save-${provider}`);
+    const input = this.shadowRoot.getElementById(`token-input-${provider}`);
+    const feedback = this.shadowRoot.getElementById(`token-feedback-${provider}`);
+
+    saveBtn?.addEventListener('click', async () => {
+      const token = input?.value?.trim();
+      if (!token) {
+        if (feedback) {
+          feedback.textContent = 'Please paste a token first.';
+          feedback.className = 'token-feedback error';
+        }
+        return;
+      }
+
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Saving…';
+      if (feedback) { feedback.textContent = ''; feedback.className = 'token-feedback'; }
+
+      try {
+        const authToken = localStorage.getItem('scratchy_token');
+        const headers = { 'Content-Type': 'application/json' };
+        if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+
+        const res = await fetch('/api/auth/provider-token', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ provider, type, token }),
+        });
+
+        if (res.ok) {
+          saveBtn.textContent = '✓ Saved';
+          if (feedback) {
+            feedback.textContent = 'Connected successfully.';
+            feedback.className = 'token-feedback success';
+          }
+          this._updateOAuthStatus(provider, 'connected');
+          // Collapse and mark connected after a short delay
+          setTimeout(() => {
+            const el = this.shadowRoot.getElementById(`token-provider-${provider}`);
+            if (el) {
+              el.classList.remove('expanded');
+              el.classList.add('connected');
+            }
+          }, 800);
+        } else {
+          const data = await res.json().catch(() => ({}));
+          saveBtn.textContent = 'Save';
+          saveBtn.disabled = false;
+          if (feedback) {
+            feedback.textContent = data.error || 'Failed to save token.';
+            feedback.className = 'token-feedback error';
+          }
+        }
+      } catch {
+        saveBtn.textContent = 'Save';
+        saveBtn.disabled = false;
+        if (feedback) {
+          feedback.textContent = 'Network error — try again.';
+          feedback.className = 'token-feedback error';
+        }
+      }
+    });
+  }
+
+  /**
+   * Check which providers already have tokens configured.
+   * Called on component mount — marks connected providers.
+   */
+  async _checkProviderTokens() {
+    try {
+      const authToken = localStorage.getItem('scratchy_token');
+      const headers = {};
+      if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+
+      const res = await fetch('/api/auth/provider-tokens', { headers });
+      if (!res.ok) return;
+
+      const data = await res.json();
+      const providers = Array.isArray(data) ? data : [];
+
+      for (const p of providers) {
+        const name = typeof p === 'string' ? p : p?.provider;
+        if (!name) continue;
+        this._updateOAuthStatus(name, 'connected');
+        const el = this.shadowRoot.getElementById(`token-provider-${name}`);
+        if (el) el.classList.add('connected');
+      }
+
+      // Also handle object-style response { anthropic: true, google: true }
+      if (!Array.isArray(data) && typeof data === 'object') {
+        for (const [name, val] of Object.entries(data)) {
+          if (val) {
+            this._updateOAuthStatus(name, 'connected');
+            const el = this.shadowRoot.getElementById(`token-provider-${name}`);
+            if (el) el.classList.add('connected');
+          }
+        }
+      }
+    } catch {
+      // Silent fail — tokens just won't show as connected
+    }
+  }
+
+  /**
+   * Update OAuth status for a provider.
+   * @param {string} provider - 'anthropic' or 'google'
+   * @param {'disconnected'|'connecting'|'connected'} status
+   * @param {string} [email] - email for connected state
+   */
+  setOAuthStatus(provider, status, email = '') {
+    if (this._data.oauth[provider]) {
+      this._data.oauth[provider].status = status;
+      this._data.oauth[provider].email = email;
+    }
+    this._updateOAuthStatus(provider, status, email);
+  }
+
+  _updateOAuthStatus(provider, status, email = '') {
+    // Update data
+    if (this._data.oauth[provider]) {
+      this._data.oauth[provider].status = status;
+      if (email) this._data.oauth[provider].email = email;
+    }
+
+    // Update provider container state
+    const container = this.shadowRoot.getElementById(`token-provider-${provider}`);
+    if (container) {
+      container.classList.remove('connected');
+      if (status === 'connected') container.classList.add('connected');
+    }
+
+    // Update status text
+    const statusEl = this.shadowRoot.getElementById(`oauth-status-${provider}`);
+    if (statusEl) {
+      statusEl.classList.remove('connecting', 'connected');
+      if (status === 'disconnected') {
+        statusEl.textContent = 'Not connected';
+      } else if (status === 'connecting') {
+        statusEl.textContent = 'Saving…';
+        statusEl.classList.add('connecting');
+      } else if (status === 'connected') {
+        statusEl.textContent = email ? `Connected as ${email}` : 'Connected';
+        statusEl.classList.add('connected');
+      }
+    }
+
+    // Update chevron for connected state
+    const chevron = container?.querySelector('.token-provider-chevron');
+    if (chevron) {
+      chevron.textContent = status === 'connected' ? '✓' : '›';
+    }
   }
 
   /* ── Wire: API Key ──────────────────────────────────────────────────── */
@@ -1513,6 +2097,7 @@ export class ScSetupWizard extends HTMLElement {
           key: this._data.apiKey.key ? '••••' + this._data.apiKey.key.slice(-4) : '',
           validated: this._data.apiKey.validated,
         },
+        oauth: JSON.parse(JSON.stringify(this._data.oauth)),
         preferences: { ...this._data.preferences },
       },
     }));

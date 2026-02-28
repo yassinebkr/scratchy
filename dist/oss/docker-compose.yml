@@ -1,0 +1,25 @@
+version: "3.8"
+
+services:
+  # ─── Scratchy v2 OSS — AI Chat Workbench ───────────────────────────────────
+  scratchy:
+    build: .
+    container_name: scratchy
+    restart: unless-stopped
+    ports:
+      - "${SCRATCHY_PORT:-3002}:3002"
+    volumes:
+      - scratchy-data:/app/data
+    environment:
+      - PORT=3002
+      - DATABASE_PATH=/app/data/scratchy.db
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3002/api/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+
+volumes:
+  scratchy-data:

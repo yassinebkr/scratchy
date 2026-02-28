@@ -15,7 +15,7 @@ import crypto from 'node:crypto';
 
 import { NullClawAdapter } from '../lib/nullclaw-adapter.js';
 import { searchContext, searchMemory, formatResultsAsToon } from '../lib/context-search.js';
-import { createOpenAIProvider, createMockProvider } from '../lib/embeddings.js';
+import { createBestGeminiProvider, createOpenAIProvider, createMockProvider } from '../lib/embeddings.js';
 import { extractMemories } from '../lib/memory-extraction.js';
 import { maskObservations } from '../lib/observation-masking.js';
 import { MemoryConsolidator } from '../lib/memory-consolidation.js';
@@ -24,12 +24,13 @@ import { compact, estimateTokens } from '../lib/compaction.js';
 import * as memory from '../state/memory.js';
 import * as contextIndex from '../state/context-index.js';
 import { isA2UIMessage, parseA2UIMessage, a2uiToGenUI } from '../protocol/a2ui.js';
+import { parseGenUIResponse } from '../lib/genui-response-parser.js';
 
 /* ------------------------------------------------------------------ */
 /*  Constants                                                         */
 /* ------------------------------------------------------------------ */
 
-const NULLCLAW_BIN = '/home/nonbios/nullclaw/zig-out/bin/nullclaw';
+const NULLCLAW_BIN = '/home/nonbios/nullclaw-gateway-streaming/zig-out/bin/nullclaw';
 const NULLCLAW_TIMEOUT = 60_000; // 60s max per response (fallback spawn)
 
 /** Max context tokens before compaction kicks in */
@@ -93,14 +94,18 @@ export function init(db) {
   memory.init(db);
   contextIndex.init(db);
 
-  // ── Embedding provider ──
+  // ── Embedding provider (priority: Gemini OAuth → Gemini API key → OpenAI → Mock) ──
+  const geminiProvider = createBestGeminiProvider();
   const openaiKey = process.env.OPENAI_API_KEY;
-  if (openaiKey) {
+  if (geminiProvider) {
+    _embedder = geminiProvider;
+    console.log('[chat] Embedding provider: Gemini text-embedding-004 (OAuth)');
+  } else if (openaiKey) {
     _embedder = createOpenAIProvider(openaiKey);
     console.log('[chat] Embedding provider: OpenAI text-embedding-3-small');
   } else {
     _embedder = createMockProvider();
-    console.warn('[chat] No OPENAI_API_KEY — using mock embedding provider (no real semantic search)');
+    console.warn('[chat] No Gemini OAuth/API key or OpenAI key — using mock embeddings (semantic search disabled)');
   }
 
   // ── NullClaw adapter pool ──
@@ -304,36 +309,17 @@ function buildAugmentedPrompt(userMessage, history, contextBlock) {
 /* ------------------------------------------------------------------ */
 
 /**
- * Send a message through the NullClaw adapter (per-user gateway instance).
- * Returns the response body from the webhook endpoint.
+ * Send a message through the NullClaw adapter via /api/message with SSE streaming.
+ * Calls onChunk for each incremental delta, returns full accumulated text.
  *
  * @param {string} userId
  * @param {string} augmentedPrompt
- * @returns {Promise<{text: string}>}
+ * @param {(chunk: string) => void} onChunk — called for each streaming delta
+ * @returns {Promise<string>} — full response text
  */
-async function sendViaAdapter(userId, augmentedPrompt) {
+async function sendViaAdapter(userId, augmentedPrompt, onChunk) {
   if (!_adapter) throw new Error('Adapter not initialized');
-
-  const payload = {
-    type: 'chat',
-    message: augmentedPrompt,
-    userId,
-    ts: Date.now(),
-  };
-
-  const { status, body } = await _adapter.routeWebhook(userId, payload);
-
-  if (status >= 400) {
-    const errMsg = typeof body === 'object' ? (body.error || JSON.stringify(body)) : String(body);
-    throw new Error(`NullClaw webhook returned ${status}: ${errMsg}`);
-  }
-
-  // Extract response text from body
-  const text = typeof body === 'object'
-    ? (body.response || body.text || body.message || JSON.stringify(body))
-    : String(body);
-
-  return { text };
+  return _adapter.routeMessageStreaming(userId, augmentedPrompt, onChunk);
 }
 
 /**
@@ -344,6 +330,42 @@ async function sendViaAdapter(userId, augmentedPrompt) {
  * @param {(chunk: string) => void} onChunk
  * @returns {Promise<string>} full response text
  */
+/**
+ * Filter NullClaw stdout to strip debug output, tool calls, and status messages.
+ * Returns clean AI response text, or null if the chunk should be suppressed.
+ *
+ * @param {string} text — raw stdout chunk
+ * @returns {string|null}
+ */
+function filterNullClawOutput(text) {
+  // Strip NullClaw debug/status lines
+  const lines = text.split('\n');
+  const filtered = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    // Skip tool call XML blocks
+    if (trimmed.startsWith('<tool_call>') || trimmed.startsWith('</tool_call>') ||
+        trimmed.startsWith('<tool_result>') || trimmed.startsWith('</tool_result>')) continue;
+
+    // Skip JSON tool call bodies (inside <tool_call> blocks)
+    if (trimmed.startsWith('{"name":') && trimmed.includes('"arguments"')) continue;
+
+    // Skip NullClaw status/debug lines
+    if (/^(Model:|Provider:|Sending to |info\(|debug\(|warn\(|error\()/i.test(trimmed)) continue;
+    if (/^(Thinking|Searching|Reading|Writing)\.\.\./i.test(trimmed)) continue;
+
+    // Skip empty lines between filtered blocks
+    if (trimmed === '' && filtered.length === 0) continue;
+
+    filtered.push(line);
+  }
+
+  const result = filtered.join('\n');
+  return result.trim() ? result : null;
+}
+
 function runNullClawDirect(message, onChunk) {
   return new Promise((resolve, reject) => {
     let fullOutput = '';
@@ -357,7 +379,10 @@ function runNullClawDirect(message, onChunk) {
     proc.stdout.on('data', (data) => {
       const text = data.toString();
       fullOutput += text;
-      onChunk(text);
+
+      // Filter NullClaw debug/tool output — only forward clean AI response text
+      const filtered = filterNullClawOutput(text);
+      if (filtered) onChunk(filtered);
     });
 
     proc.stderr.on('data', (data) => {
@@ -496,16 +521,15 @@ export async function handleChat(userId, msg, ws) {
 
     if (_adapter) {
       try {
-        const result = await sendViaAdapter(userId, augmentedPrompt);
-        response = result.text;
-        usedAdapter = true;
-
-        // Send full response as a single stream message (adapter returns complete response)
-        sendJson(ws, {
-          type: 'chat-stream',
-          delta: response,
-          ts: Date.now(),
+        // Send raw user text — NullClaw manages its own session context
+        response = await sendViaAdapter(userId, text, (chunk) => {
+          sendJson(ws, {
+            type: 'chat-stream',
+            delta: chunk,
+            ts: Date.now(),
+          });
         });
+        usedAdapter = true;
       } catch (adapterErr) {
         console.warn(`[chat] Adapter failed for ${userId}, falling back to direct spawn:`, adapterErr.message);
         // Fall through to direct spawn
@@ -527,7 +551,23 @@ export async function handleChat(userId, msg, ws) {
     sendJson(ws, { type: 'chat-stream-end', ts: Date.now() });
     sendJson(ws, { type: 'typing', status: 'stop', ts: Date.now() });
 
-    // ── Step 5b: A2UI detection — convert A2UI envelopes to GenUI canvas ops ──
+    // ── Step 5b: GenUI code block detection → canvas ops ──
+    if (response) {
+      const { text: cleanText, ops, hasOps } = parseGenUIResponse(response);
+      if (hasOps && ops.length > 0) {
+        sendJson(ws, {
+          type: 'canvas-ops',
+          ops,
+          source: 'genui',
+          ts: Date.now(),
+        });
+        console.log(`[chat] GenUI: ${ops.length} canvas ops extracted for ${userId}`);
+        // Use cleaned text (without code blocks) for history storage
+        response = cleanText;
+      }
+    }
+
+    // ── Step 5c: A2UI detection — convert A2UI envelopes to GenUI canvas ops ──
     if (response && isA2UIMessage(response)) {
       try {
         const parsed = parseA2UIMessage(response);

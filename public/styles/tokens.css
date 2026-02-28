@@ -1,0 +1,137 @@
+/*
+ * Scratchy v2 — Unified Design Tokens
+ *
+ * Single source of truth for all visual properties.
+ * Import this before any other stylesheet.
+ *
+ * Usage:
+ *   @import './tokens.css';
+ *   background: var(--sc-surface);
+ *   color: var(--sc-text);
+ */
+
+:root {
+  /* ── Color Palette ── */
+  --sc-gold: #F9A602;
+  --sc-goldenrod: #DAA520;
+  --sc-amber: #FFBF00;
+  --sc-dark: #0d0b07;
+  --sc-dark-alt: #111009;
+
+  /* ── Semantic Colors ── */
+  --sc-bg: var(--sc-dark);
+  --sc-bg-alt: var(--sc-dark-alt);
+  --sc-surface: #1a1610;
+  --sc-surface-hover: #252015;
+  --sc-surface-active: rgba(249, 166, 2, 0.04);
+  --sc-text: #f0ead6;
+  --sc-text-muted: #8a7e6a;
+  --sc-text-dim: #5a5040;
+  --sc-accent: var(--sc-gold);
+  --sc-accent-hover: var(--sc-goldenrod);
+  --sc-accent-glow: rgba(249, 166, 2, 0.20);
+  --sc-accent-subtle: rgba(249, 166, 2, 0.08);
+  --sc-danger: #ef4444;
+  --sc-danger-subtle: rgba(239, 68, 68, 0.12);
+  --sc-success: #22c55e;
+  --sc-success-subtle: rgba(34, 197, 94, 0.12);
+  --sc-warning: #fbbf24;
+  --sc-info: #3b82f6;
+
+  /* ── Borders ── */
+  --sc-border: rgba(249, 166, 2, 0.10);
+  --sc-border-subtle: rgba(249, 166, 2, 0.05);
+  --sc-border-strong: rgba(249, 166, 2, 0.22);
+  --sc-border-active: rgba(249, 166, 2, 0.50);
+  --sc-border-divider: rgba(249, 166, 2, 0.06);
+
+  /* ── Glass Morphism ── */
+  --sc-glass-bg: rgba(26, 22, 16, 0.85);
+  --sc-glass-bg-heavy: rgba(26, 22, 16, 0.95);
+  --sc-glass-blur: blur(20px);
+  --sc-glass-border: 1px solid rgba(249, 166, 2, 0.08);
+
+  /* ── Typography ── */
+  --sc-font: 'Geist', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --sc-mono: 'Geist Mono', 'SF Mono', 'Fira Code', monospace;
+  --sc-font-size: 14px;
+  --sc-font-size-sm: 12px;
+  --sc-font-size-xs: 11px;
+  --sc-font-size-lg: 16px;
+  --sc-font-size-xl: 20px;
+
+  /* ── Spacing ── */
+  --sc-space-1: 4px;
+  --sc-space-2: 8px;
+  --sc-space-3: 12px;
+  --sc-space-4: 16px;
+  --sc-space-5: 20px;
+  --sc-space-6: 24px;
+  --sc-space-8: 32px;
+  --sc-space-10: 40px;
+  --sc-space-12: 48px;
+
+  /* ── Radii ── */
+  --sc-radius-xs: 4px;
+  --sc-radius-sm: 6px;
+  --sc-radius: 8px;
+  --sc-radius-md: 10px;
+  --sc-radius-lg: 14px;
+  --sc-radius-xl: 16px;
+  --sc-radius-full: 9999px;
+
+  /* ── Shadows ── */
+  --sc-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --sc-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
+  --sc-shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.4);
+  --sc-shadow-xl: 0 24px 80px rgba(0, 0, 0, 0.5);
+  --sc-shadow-glow: 0 0 20px var(--sc-accent-glow);
+
+  /* ── Focus ── */
+  --sc-focus-ring: 0 0 0 2px rgba(249, 166, 2, 0.3);
+  --sc-focus-ring-strong: 0 0 0 2px rgba(249, 166, 2, 0.5);
+
+  /* ── Z-Index Scale ── */
+  --sc-z-surface: 1;
+  --sc-z-toolbar: 20;
+  --sc-z-bar: 40;
+  --sc-z-topbar: 50;
+  --sc-z-dropdown: 100;
+  --sc-z-drawer: 200;
+  --sc-z-sheet: 300;
+  --sc-z-modal: 500;
+  --sc-z-command: 1000;
+  --sc-z-toast: 1100;
+
+  /* ── Layout ── */
+  --sc-topbar-h: 48px;
+  --sc-sidebar-w: 200px;
+  --sc-bar-h: 52px;
+  --sc-chat-max-w: 720px;
+
+  /* ── Transitions ── */
+  --sc-transition-fast: 150ms ease;
+  --sc-transition: 200ms ease;
+  --sc-transition-slow: 300ms ease;
+  --sc-transition-layout: 350ms cubic-bezier(0.4, 0, 0.2, 1);
+  --sc-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --sc-ease-out: cubic-bezier(0.32, 0.72, 0, 1);
+
+  /* ── Animation Curves ── */
+  --sc-anim-enter: 0.4s var(--sc-spring);
+  --sc-anim-exit: 0.25s cubic-bezier(0.4, 0, 1, 1);
+  --sc-anim-reflow: 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ── Agent (dynamic, overridden per agent) ── */
+  --agent-accent: var(--sc-accent);
+  --agent-accent-fg: #0d0b07;
+  --agent-accent-glow: var(--sc-accent-glow);
+  --agent-accent-subtle: var(--sc-accent-subtle);
+
+  /* ── Safe Areas ── */
+  --sc-safe-top: env(safe-area-inset-top, 0px);
+  --sc-safe-right: env(safe-area-inset-right, 0px);
+  --sc-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --sc-safe-left: env(safe-area-inset-left, 0px);
+  --sc-keyboard-height: 0px;
+}
