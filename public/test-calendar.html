@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test sc-calendar</title>
+    <script src="/components/sc-calendar.js"></script>
+    <style>
+        body {
+            background-color: #0d0b07;
+            color: #f0ead6;
+            font-family: 'Geist', system-ui, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+    </style>
+</head>
+<body>
+    <button id="open-calendar">Open Calendar</button>
+    <sc-calendar></sc-calendar>
+    <script>
+        const calendar = document.querySelector('sc-calendar');
+        const openBtn = document.querySelector('#open-calendar');
+        openBtn.addEventListener('click', () => {
+            calendar.setAttribute('open', '');
+        });
+        calendar.addEventListener('calendar-close', () => {
+            console.log('Calendar closed');
+        });
+    </script>
+</body>
+</html>
