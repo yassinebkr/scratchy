@@ -58,6 +58,7 @@ function defaultGetSearchItems() {
     { type: 'action', id: 'clear-chat', title: 'Clear Chat History', subtitle: 'Remove all messages', action: 'clear-chat', icon: ACTION_ICONS['clear-chat'] },
     { type: 'action', id: 'close-all', title: 'Close All Surfaces', subtitle: 'Return to chat-only view', action: 'close-all-surfaces', icon: ACTION_ICONS['close-all-surfaces'] },
     { type: 'action', id: 'settings', title: 'Open Settings', subtitle: 'Configure preferences', action: 'open-settings', icon: ACTION_ICONS['open-settings'] },
+    { type: 'action', id: 'open-webapp', title: 'Open Web App', subtitle: 'Embed a website in the workspace', action: 'open-webapp', icon: '🌐' },
   );
 
   return items;

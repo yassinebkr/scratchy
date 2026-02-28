@@ -385,45 +385,47 @@ function resolveAgent(agentId) {
 /* ------------------------------------------------------------------ */
 
 /**
- * Retrieve conversation history for a user, oldest-first.
- * Reads from the same `conversation_history` table that chat-handler uses.
+ * Retrieve conversation history for a user+agent pair, oldest-first.
+ * Per-agent isolation: each agent has its own conversation thread.
  *
  * @param {string} userId
+ * @param {string} agentId — agent ID for conversation isolation
  * @param {number} [limit=20]
  * @returns {Array<{role: string, content: string}>}
  */
-function getHistory(userId, limit = HISTORY_TURNS) {
+function getHistory(userId, agentId, limit = HISTORY_TURNS) {
   if (!_db) return [];
   const rows = _db.prepare(
-    'SELECT role, content FROM conversation_history WHERE userId = ? ORDER BY createdAt DESC LIMIT ?'
-  ).all(userId, limit);
+    'SELECT role, content FROM conversation_history WHERE userId = ? AND agentId = ? ORDER BY createdAt DESC LIMIT ?'
+  ).all(userId, agentId, limit);
   return rows.reverse();
 }
 
 /**
- * Append a message to conversation history and prune old entries.
+ * Append a message to per-agent conversation history and prune old entries.
  *
  * @param {string} userId
+ * @param {string} agentId — agent ID for conversation isolation
  * @param {string} role
  * @param {string} content
  * @param {string} [model]
  */
-function appendHistory(userId, role, content, model) {
+function appendHistory(userId, agentId, role, content, model) {
   if (!_db) return;
   _db.prepare(
-    'INSERT INTO conversation_history (userId, role, content, model, createdAt) VALUES (?, ?, ?, ?, ?)'
-  ).run(userId, role, content, model || null, new Date().toISOString());
+    'INSERT INTO conversation_history (userId, agentId, role, content, model, createdAt) VALUES (?, ?, ?, ?, ?, ?)'
+  ).run(userId, agentId, role, content, model || null, new Date().toISOString());
 
-  // Prune old entries (keep last 100)
+  // Prune old entries per agent (keep last 100 per agent)
   const count = _db.prepare(
-    'SELECT COUNT(*) as c FROM conversation_history WHERE userId = ?'
-  ).get(userId)?.c || 0;
+    'SELECT COUNT(*) as c FROM conversation_history WHERE userId = ? AND agentId = ?'
+  ).get(userId, agentId)?.c || 0;
   if (count > 100) {
     _db.prepare(`
       DELETE FROM conversation_history WHERE id IN (
-        SELECT id FROM conversation_history WHERE userId = ? ORDER BY createdAt ASC LIMIT ?
+        SELECT id FROM conversation_history WHERE userId = ? AND agentId = ? ORDER BY createdAt ASC LIMIT ?
       )
-    `).run(userId, count - 100);
+    `).run(userId, agentId, count - 100);
   }
 }
 
@@ -773,8 +775,8 @@ export async function routeMessage(userId, agentId, message, ws) {
   const agent = resolveAgent(agentId);
   const effectiveAgentId = agent.id;
 
-  // Save user message to history
-  appendHistory(userId, 'user', text);
+  // Save user message to per-agent history
+  appendHistory(userId, effectiveAgentId, 'user', text);
 
   // Typing indicator
   sendJson(ws, { type: 'typing', status: 'start', agentId: effectiveAgentId, ts: Date.now() });
@@ -783,8 +785,8 @@ export async function routeMessage(userId, agentId, message, ws) {
     // ── Step 2: Activate MCP servers (if agent has any configured) ──
     const tools = await ensureMcpServers(agent);
 
-    // ── Step 3: Retrieve conversation history ──
-    const history = getHistory(userId, HISTORY_TURNS);
+    // ── Step 3: Retrieve per-agent conversation history ──
+    const history = getHistory(userId, effectiveAgentId, HISTORY_TURNS);
 
     // ── Step 4: Semantic context retrieval ──
     const contextBlock = await retrieveContext(text, userId);
@@ -934,7 +936,7 @@ export async function routeMessage(userId, agentId, message, ws) {
       const modelLabel = usedAdapter
         ? `nullclaw-gateway:${agent.model || 'default'}`
         : 'nullclaw';
-      appendHistory(userId, 'assistant', response, modelLabel);
+      appendHistory(userId, effectiveAgentId, 'assistant', response, modelLabel);
     }
 
     // ── Async post-response pipeline (memory extraction) ──

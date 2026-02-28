@@ -80,6 +80,7 @@ export function init(db) {
     CREATE TABLE IF NOT EXISTS conversation_history (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       userId TEXT NOT NULL,
+      agentId TEXT,
       role TEXT NOT NULL CHECK(role IN ('user', 'assistant')),
       content TEXT NOT NULL,
       model TEXT,
@@ -89,6 +90,17 @@ export function init(db) {
   _db.exec(`
     CREATE INDEX IF NOT EXISTS idx_conv_user ON conversation_history(userId, createdAt)
   `);
+  // Migrate: add agentId column if missing (existing installs)
+  try {
+    const cols = _db.pragma('table_info(conversation_history)').map(c => c.name);
+    if (!cols.includes('agentId')) {
+      _db.exec(`ALTER TABLE conversation_history ADD COLUMN agentId TEXT`);
+      _db.exec(`CREATE INDEX IF NOT EXISTS idx_conv_agent ON conversation_history(userId, agentId, createdAt)`);
+      console.log('[chat] Migrated conversation_history: added agentId column');
+    }
+  } catch { /* column already exists */ }
+  // Ensure per-agent index exists
+  _db.exec(`CREATE INDEX IF NOT EXISTS idx_conv_agent ON conversation_history(userId, agentId, createdAt)`);
 
   // ── State modules ──
   memory.init(db);

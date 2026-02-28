@@ -166,7 +166,9 @@ function sendMessage() {
   // Show user bubble immediately
   appendMessage('user', escapeHtml(text));
 
-  sendChat(text);
+  // Send with active agent ID for per-agent conversation isolation
+  const activeAgentId = $agentSwitcher?._activeAgentId || null;
+  sendChat(text, activeAgentId);
   $msgInput.value = '';
   autoResize($msgInput);
   $msgInput.focus();
@@ -196,16 +198,20 @@ function formatMarkdown(text) {
 /*  Chat history loading                                              */
 /* ------------------------------------------------------------------ */
 
-/** Track whether history has been loaded this session (avoid re-loading on reconnect) */
-let _historyLoaded = false;
+/** Track which agent's history has been loaded (null = none) */
+let _historyLoadedForAgent = null;
 
-async function loadChatHistory() {
-  if (_historyLoaded) return;
+async function loadChatHistory(agentId) {
+  const effectiveAgentId = agentId || $agentSwitcher?._activeAgentId || null;
+  // Skip if already loaded for this agent (unless switching)
+  if (_historyLoadedForAgent === effectiveAgentId) return;
   const token = localStorage.getItem('scratchy_token') || '';
   if (!token) return;
 
   try {
-    const res = await fetch('/api/chat/history?limit=50', {
+    const params = new URLSearchParams({ limit: '50' });
+    if (effectiveAgentId) params.set('agentId', effectiveAgentId);
+    const res = await fetch(`/api/chat/history?${params}`, {
       headers: { 'Authorization': `Bearer ${token}` },
     });
     if (!res.ok) return;
@@ -241,7 +247,7 @@ async function loadChatHistory() {
       $messages.scrollTop = $messages.scrollHeight;
     }
 
-    _historyLoaded = true;
+    _historyLoadedForAgent = effectiveAgentId;
   } catch (err) {
     console.warn('[app] Failed to load chat history:', err);
   }
@@ -368,10 +374,24 @@ function wireWsEvents() {
       if (placeholder) placeholder.remove();
     }
 
-    // Activate canvas surface (surface-manager handles layout shift)
-    window.dispatchEvent(new CustomEvent('surface-activate', {
-      detail: { type: 'canvas', ops: msg.ops },
-    }));
+    // Check for webapp ops (open_webapp tool results or agent-generated)
+    const webappOps = msg.ops.filter(op => op.type === 'webapp' || op.op === 'webapp');
+    const canvasOps = msg.ops.filter(op => op.type !== 'webapp' && op.op !== 'webapp');
+
+    // Open webapp surfaces
+    for (const op of webappOps) {
+      const data = op.data || op;
+      if (data.url) {
+        import('./surface-manager.js').then(sm => sm.openWebApp(data.url, data.title));
+      }
+    }
+
+    // Activate canvas surface for regular ops
+    if (canvasOps.length > 0) {
+      window.dispatchEvent(new CustomEvent('surface-activate', {
+        detail: { type: 'canvas', ops: canvasOps },
+      }));
+    }
   });
 
   // --- A2UI community widget loading ---
@@ -650,6 +670,13 @@ function wireNewUIModules() {
         settings.setAttribute('open', '');
         break;
       }
+      case 'open-webapp': {
+        const url = prompt('Enter web app URL:');
+        if (url) {
+          import('./surface-manager.js').then(sm => sm.openWebApp(url));
+        }
+        break;
+      }
     }
   });
 
@@ -789,6 +816,11 @@ async function init() {
     const { agentId } = e.detail;
     if (agentId) {
       send('agent-switch', { agentId });
+
+      // Clear chat and load per-agent conversation history
+      if ($messages) $messages.innerHTML = '';
+      _historyLoadedForAgent = null; // force reload
+      loadChatHistory(agentId);
     }
   });
 

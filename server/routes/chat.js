@@ -25,6 +25,7 @@ export function createChatRoutes({ authenticate, getDb }) {
       const url = new URL(req.url, 'http://localhost');
       const limit = Math.min(parseInt(url.searchParams.get('limit') || '50', 10), 200);
       const before = url.searchParams.get('before') || null;
+      const agentId = url.searchParams.get('agentId') || null;
 
       const db = getDb();
       if (!db) {
@@ -34,14 +35,28 @@ export function createChatRoutes({ authenticate, getDb }) {
       }
 
       let rows;
-      if (before) {
-        rows = db.prepare(
-          'SELECT id, role, content, model, createdAt FROM conversation_history WHERE userId = ? AND id < ? ORDER BY id DESC LIMIT ?'
-        ).all(user.id, before, limit);
+      if (agentId) {
+        // Per-agent conversation history
+        if (before) {
+          rows = db.prepare(
+            'SELECT id, agentId, role, content, model, createdAt FROM conversation_history WHERE userId = ? AND agentId = ? AND id < ? ORDER BY id DESC LIMIT ?'
+          ).all(user.id, agentId, before, limit);
+        } else {
+          rows = db.prepare(
+            'SELECT id, agentId, role, content, model, createdAt FROM conversation_history WHERE userId = ? AND agentId = ? ORDER BY id DESC LIMIT ?'
+          ).all(user.id, agentId, limit);
+        }
       } else {
-        rows = db.prepare(
-          'SELECT id, role, content, model, createdAt FROM conversation_history WHERE userId = ? ORDER BY id DESC LIMIT ?'
-        ).all(user.id, limit);
+        // All conversations (legacy / no agent filter)
+        if (before) {
+          rows = db.prepare(
+            'SELECT id, agentId, role, content, model, createdAt FROM conversation_history WHERE userId = ? AND id < ? ORDER BY id DESC LIMIT ?'
+          ).all(user.id, before, limit);
+        } else {
+          rows = db.prepare(
+            'SELECT id, agentId, role, content, model, createdAt FROM conversation_history WHERE userId = ? ORDER BY id DESC LIMIT ?'
+          ).all(user.id, limit);
+        }
       }
 
       // Reverse to chronological order
@@ -51,6 +66,7 @@ export function createChatRoutes({ authenticate, getDb }) {
       res.end(JSON.stringify({
         messages: rows.map(r => ({
           id: r.id,
+          agentId: r.agentId || null,
           role: r.role,
           content: r.content,
           model: r.model,
@@ -78,7 +94,13 @@ export function createChatRoutes({ authenticate, getDb }) {
         return true;
       }
 
-      db.prepare('DELETE FROM conversation_history WHERE userId = ?').run(user.id);
+      const delUrl = new URL(req.url, 'http://localhost');
+      const delAgentId = delUrl.searchParams.get('agentId') || null;
+      if (delAgentId) {
+        db.prepare('DELETE FROM conversation_history WHERE userId = ? AND agentId = ?').run(user.id, delAgentId);
+      } else {
+        db.prepare('DELETE FROM conversation_history WHERE userId = ?').run(user.id);
+      }
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: true }));

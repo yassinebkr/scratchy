@@ -196,6 +196,46 @@ export function deactivateAll() {
   }
 }
 
+/**
+ * Open a web app in a sandboxed iframe surface.
+ * Creates a dynamic webapp surface with a unique key.
+ *
+ * @param {string} url — URL to embed
+ * @param {string} [title] — display title
+ * @returns {string} — surface key (for later closing)
+ */
+let _webappCounter = 0;
+export function openWebApp(url, title) {
+  const key = `webapp-${++_webappCounter}`;
+  const el = document.createElement('sc-webapp');
+  el.setAttribute('url', url);
+  el.setAttribute('title', title || new URL(url).hostname);
+  el.classList.add('surface', `${key}-surface`);
+
+  // Listen for close event
+  el.addEventListener('webapp-close', () => {
+    const s = _surfaces.get(key);
+    if (s) {
+      s.active = false;
+      el.remove();
+      _surfaces.delete(key);
+      _updateLayout();
+      _updateToolbar();
+      emit('surface:deactivated', { type: key });
+    }
+  });
+
+  // Register and activate
+  _surfaces.set(key, { el, active: true, idleTimer: null });
+  if (_container) _container.appendChild(el);
+
+  _updateLayout();
+  _updateToolbar();
+  emit('surface:activated', { type: key });
+
+  return key;
+}
+
 /* ------------------------------------------------------------------ */
 /*  Layout configurations (data-layout → CSS grid)                    */
 /* ------------------------------------------------------------------ */

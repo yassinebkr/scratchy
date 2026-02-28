@@ -149,9 +149,9 @@ export function send(type, payload) {
   return true;
 }
 
-/** Send a chat message */
-export function sendChat(text) {
-  return send('chat', { text });
+/** Send a chat message to the active agent */
+export function sendChat(text, agentId) {
+  return send('chat', { text, agentId: agentId || undefined });
 }
 
 /** Send a widget action */
