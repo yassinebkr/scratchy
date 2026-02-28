@@ -670,6 +670,18 @@ export function createRouter(opts = {}) {
       }
 
       /* ---------- Widget APIs (Notes, Calendar, Email) ---------- */
+      // GET /api/widget-catalog — curated list of available widgets
+      if (method === 'GET' && pathname === '/api/widget-catalog') {
+        try {
+          const catalogPath = resolve(__dirname, '..', 'config', 'widget-catalog.json');
+          const data = await readFile(catalogPath, 'utf-8');
+          const catalog = JSON.parse(data);
+          return json(res, 200, catalog);
+        } catch (err) {
+          return json(res, 500, { error: 'Failed to load widget catalog' });
+        }
+      }
+
       if (pathname.startsWith('/api/notes') || pathname.startsWith('/api/calendar') || pathname.startsWith('/api/emails')) {
         if (!_widgetHandler) {
           _widgetHandler = createWidgetRoutes({

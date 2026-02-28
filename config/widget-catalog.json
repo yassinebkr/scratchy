@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "widgets": [
+    {
+      "id": "notes",
+      "name": "Notes",
+      "description": "Create and organize personal notes with auto-save",
+      "icon": "📝",
+      "category": "productivity",
+      "builtin": true,
+      "component": "sc-notes",
+      "tier": "free"
+    },
+    {
+      "id": "calendar",
+      "name": "Calendar",
+      "description": "Visual calendar with event management",
+      "icon": "📅",
+      "category": "productivity",
+      "builtin": true,
+      "component": "sc-calendar",
+      "tier": "free"
+    },
+    {
+      "id": "email",
+      "name": "Email",
+      "description": "Compose and send emails via Resend",
+      "icon": "✉️",
+      "category": "communication",
+      "builtin": true,
+      "component": "sc-email",
+      "tier": "free"
+    },
+    {
+      "id": "excalidraw",
+      "name": "Excalidraw",
+      "description": "Collaborative whiteboard for sketching and diagrams",
+      "icon": "🎨",
+      "category": "tools",
+      "builtin": false,
+      "url": "https://excalidraw.com",
+      "tier": "free"
+    },
+    {
+      "id": "codepen",
+      "name": "CodePen",
+      "description": "Live code playground for HTML/CSS/JS",
+      "icon": "💻",
+      "category": "development",
+      "builtin": false,
+      "url": "https://codepen.io/pen",
+      "tier": "free"
+    },
+    {
+      "id": "figma",
+      "name": "Figma",
+      "description": "Design and prototype interface in your workspace",
+      "icon": "🎯",
+      "category": "design",
+      "builtin": false,
+      "url": "https://www.figma.com",
+      "tier": "pro",
+      "mcp": true
+    },
+    {
+      "id": "notion",
+      "name": "Notion",
+      "description": "All-in-one workspace for docs and projects",
+      "icon": "📋",
+      "category": "productivity",
+      "builtin": false,
+      "url": "https://www.notion.so",
+      "tier": "pro"
+    },
+    {
+      "id": "terminal",
+      "name": "Web Terminal",
+      "description": "Browser-based terminal emulator",
+      "icon": "⬛",
+      "category": "development",
+      "builtin": false,
+      "url": "https://xtermjs.org/demo/",
+      "tier": "free"
+    }
+  ],
+  "categories": [
+    { "id": "productivity", "name": "Productivity", "icon": "⚡" },
+    { "id": "communication", "name": "Communication", "icon": "💬" },
+    { "id": "development", "name": "Development", "icon": "🛠️" },
+    { "id": "design", "name": "Design", "icon": "🎨" },
+    { "id": "tools", "name": "Tools", "icon": "🔧" }
+  ]
+}
