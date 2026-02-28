@@ -411,12 +411,40 @@ function _updateToolbar() {
 /*  WS event wiring                                                   */
 /* ------------------------------------------------------------------ */
 
+/* ------------------------------------------------------------------ */
+/*  Smart tool → surface routing                                      */
+/* ------------------------------------------------------------------ */
+
+/** Filesystem browsing commands that should open file explorer, not terminal */
+const FS_COMMANDS = /^\s*(ls|find|tree|stat|du|df|file|readlink|realpath|dirname|basename|wc\s+-l|head|tail|cat)\b/;
+
+/**
+ * Detect if a shell command is a filesystem browsing operation.
+ * These should route to the file explorer surface, not the terminal.
+ */
+function _isFilesystemCommand(cmd) {
+  if (!cmd) return false;
+  // Handle piped commands: check the first command in the pipe chain
+  const firstCmd = cmd.split('|')[0].trim();
+  return FS_COMMANDS.test(firstCmd);
+}
+
 function _wireEvents() {
   // Tool call started → activate relevant surface
   on('tool_call', (msg) => {
     const tool = msg.tool || msg.name;
     if (!tool) return;
-    const surfaceType = TOOL_TO_SURFACE.get(tool);
+    let surfaceType = TOOL_TO_SURFACE.get(tool);
+
+    // Smart routing: detect filesystem shell commands → route to file explorer
+    // instead of terminal (ls, find, tree, stat, du, etc. are browsing, not execution)
+    if (surfaceType === 'terminal' && tool === 'shell') {
+      const cmd = (msg.args?.command || '').trim();
+      if (_isFilesystemCommand(cmd)) {
+        surfaceType = 'explorer';
+      }
+    }
+
     if (surfaceType) {
       activateSurface(surfaceType);
       _pushToolCallData(surfaceType, msg);
@@ -427,7 +455,10 @@ function _wireEvents() {
   on('tool_stream', (msg) => {
     const tool = msg.tool || msg.name;
     if (!tool) return;
-    const surfaceType = TOOL_TO_SURFACE.get(tool);
+    let surfaceType = TOOL_TO_SURFACE.get(tool);
+    if (surfaceType === 'terminal' && tool === 'shell' && _isFilesystemCommand(msg.args?.command || msg.command)) {
+      surfaceType = 'explorer';
+    }
     if (surfaceType) {
       _resetIdleTimer(surfaceType);
       _pushStreamData(surfaceType, msg);
@@ -438,7 +469,10 @@ function _wireEvents() {
   on('tool_result', (msg) => {
     const tool = msg.tool || msg.name;
     if (!tool) return;
-    const surfaceType = TOOL_TO_SURFACE.get(tool);
+    let surfaceType = TOOL_TO_SURFACE.get(tool);
+    if (surfaceType === 'terminal' && tool === 'shell' && _isFilesystemCommand(msg.args?.command || msg.command)) {
+      surfaceType = 'explorer';
+    }
     if (surfaceType) {
       _resetIdleTimer(surfaceType);
       _pushToolResultData(surfaceType, msg);
