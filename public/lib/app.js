@@ -528,6 +528,17 @@ function wireWsEvents() {
   on('canvas-ops', (msg) => {
     if (!msg.ops || msg.ops.length === 0) return;
 
+    // Restored canvas state: load silently into canvas without activating surface
+    // (prevents flash/layout shift on reconnect)
+    if (msg.restored) {
+      const canvas = document.querySelector('sc-canvas');
+      if (canvas && canvas.applyOps) {
+        canvas.applyOps(msg.ops);
+      }
+      console.log('[canvas] Restored', msg.ops.length, 'ops silently');
+      return;
+    }
+
     // Remove any "rendering" placeholder
     if ($messages) {
       const placeholder = $messages.querySelector('.genui-rendering');

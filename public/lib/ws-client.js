@@ -13,6 +13,7 @@ let _token = null;
 let _authenticated = false;
 let _reconnectTimer = null;
 let _reconnectDelay = 1000;
+let _connecting = false;
 const MAX_RECONNECT_DELAY = 30000;
 
 /* -- Offline message queue (max 50) -- */
@@ -71,15 +72,21 @@ function stopKeepalive() {
 
 /** Connect to WebSocket */
 export function connect(token) {
+  // Guard: don't re-enter if already connecting or connected
+  if (_connecting) return;
+  if (_ws && _ws.readyState === WebSocket.OPEN && _authenticated && token === _token) return;
+
   _token = token;
   _authenticated = false;
-  if (_ws) _ws.close();
+  _connecting = true;
+  if (_ws) { try { _ws.close(); } catch {} _ws = null; }
   
   // No token in URL — auth happens as first message after connect
   _ws = new WebSocket(getWsUrl());
   
   _ws.onopen = () => {
     console.log('[ws] connected, sending auth');
+    _connecting = false;
     _reconnectDelay = 1000;
     // Send auth as first message instead of URL param
     _ws.send(JSON.stringify({ type: 'auth', token: _token }));
@@ -112,13 +119,18 @@ export function connect(token) {
   _ws.onclose = (e) => {
     console.log('[ws] disconnected', e.code);
     _authenticated = false;
+    _connecting = false;
     stopKeepalive();
     emit('disconnected', { code: e.code });
-    scheduleReconnect();
+    // Only reconnect if we have a token and this wasn't an auth rejection
+    if (_token && e.code !== 4003 && e.code !== 4002) {
+      scheduleReconnect();
+    }
   };
   
   _ws.onerror = (e) => {
     console.error('[ws] error', e);
+    _connecting = false;
   };
 }
 
