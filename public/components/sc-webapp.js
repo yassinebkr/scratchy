@@ -1,17 +1,26 @@
 /**
- * sc-webapp — Web App Embedding Surface (Tier 1)
+ * sc-webapp — Web App Embedding Surface (Tier 1 + Tier 2)
  *
  * Loads any URL in a sandboxed iframe inside the canvas workspace.
- * Tier 1 = "dumb embed" — no postMessage bridge, just iframe.
+ * Tier 1 = "dumb embed" — just an iframe, no communication.
+ * Tier 2 = "smart widget" — postMessage bridge via Widget SDK.
+ *          Auto-upgrades to Tier 2 when widget sends scratchy:ready.
  *
  * Usage:
  *   <sc-webapp url="https://excalidraw.com" title="Whiteboard"></sc-webapp>
  *
  * Events dispatched:
- *   'webapp-close' — user clicked close button
- *   'webapp-reload' — user clicked reload
- *   'webapp-popout' — user clicked popout (open in new tab)
+ *   'webapp-close'      — user clicked close button
+ *   'webapp-reload'     — user clicked reload
+ *   'webapp-popout'     — user clicked popout (open in new tab)
+ *   'webapp-action'     — widget triggered an action (Tier 2)
+ *   'webapp-canvas-ops' — widget pushed canvas ops (Tier 2)
+ *   'webapp-toast'      — widget wants to show a toast (Tier 2)
+ *   'webapp-navigate'   — widget wants to navigate (Tier 2)
+ *   'webapp-ready'      — widget upgraded to Tier 2
  */
+
+import { WidgetBridge } from '../lib/widget-bridge.js';
 
 const SANDBOX_FLAGS = [
   'allow-scripts',
@@ -164,6 +173,9 @@ export class ScWebapp extends HTMLElement {
     this._iframe = null;
     this._url = '';
     this._title = '';
+    /** @type {WidgetBridge|null} */
+    this._bridge = null;
+    this._tier = 1; // 1 = dumb embed, 2 = smart widget
 
     // Wire header button actions
     this.shadowRoot.querySelectorAll('.header-btn').forEach(btn => {
@@ -241,6 +253,63 @@ export class ScWebapp extends HTMLElement {
     container.appendChild(iframe);
     this._iframe = iframe;
 
+    // Destroy old bridge if any
+    if (this._bridge) {
+      this._bridge.destroy();
+      this._bridge = null;
+      this._tier = 1;
+    }
+
+    // Set up Tier 2 bridge — auto-upgrades if widget sends scratchy:ready
+    this._bridge = new WidgetBridge(iframe, {
+      url,
+      widgetId: this.getAttribute('widget-id') || `webapp-${Date.now()}`,
+      userId: this.getAttribute('user-id') || undefined,
+      agentId: this.getAttribute('agent-id') || undefined,
+      onAction: (action, data) => {
+        this._tier = 2;
+        this.dispatchEvent(new CustomEvent('webapp-action', {
+          bubbles: true, composed: true,
+          detail: { action, data, url: this._url },
+        }));
+      },
+      onResize: ({ width, height }) => {
+        if (width) this.style.width = `${width}px`;
+        if (height) this.style.height = `${height}px`;
+      },
+      onCanvasOps: (ops) => {
+        this.dispatchEvent(new CustomEvent('webapp-canvas-ops', {
+          bubbles: true, composed: true,
+          detail: { ops, url: this._url },
+        }));
+      },
+      onToast: (message, severity) => {
+        this.dispatchEvent(new CustomEvent('webapp-toast', {
+          bubbles: true, composed: true,
+          detail: { message, severity },
+        }));
+      },
+      onNavigate: (navUrl, target) => {
+        this.dispatchEvent(new CustomEvent('webapp-navigate', {
+          bubbles: true, composed: true,
+          detail: { url: navUrl, target },
+        }));
+      },
+      onRequest: async (method, params) => {
+        // Extensible request handler — widgets can request data from host
+        if (method === 'getAgents') {
+          // Return list of agents (requires fetch to server)
+          const res = await fetch('/api/agents', { credentials: 'same-origin' });
+          if (!res.ok) throw new Error('Failed to fetch agents');
+          return await res.json();
+        }
+        if (method === 'getTheme') {
+          return this._bridge?._getTheme();
+        }
+        throw new Error(`Unknown method: ${method}`);
+      },
+    });
+
     // Update URL display in header
     const urlEl = this.shadowRoot.querySelector('.header-url');
     if (urlEl) urlEl.textContent = parsed.hostname;
@@ -263,15 +332,44 @@ export class ScWebapp extends HTMLElement {
   }
 
   _close() {
+    if (this._bridge) {
+      this._bridge.destroy();
+      this._bridge = null;
+    }
     this.dispatchEvent(new CustomEvent('webapp-close', { bubbles: true, composed: true, detail: { url: this._url } }));
     this.remove();
   }
 
-  /** Public API: set URL programmatically */
+  disconnectedCallback() {
+    if (this._bridge) {
+      this._bridge.destroy();
+      this._bridge = null;
+    }
+  }
+
+  // ── Public API ─────────────────────────────────────────────
+
+  /** Set URL programmatically */
   set url(val) { this.setAttribute('url', val); }
   get url() { return this._url; }
 
   set title(val) { this.setAttribute('title', val); }
+
+  /** Current tier (1 = dumb embed, 2 = smart widget with bridge) */
+  get tier() { return this._tier; }
+
+  /** The widget bridge (Tier 2 only) */
+  get bridge() { return this._bridge; }
+
+  /** Send data to the widget (Tier 2) */
+  sendData(key, value) {
+    if (this._bridge) this._bridge.sendData(key, value);
+  }
+
+  /** Send a command to the widget (Tier 2) */
+  sendCommand(command, args = {}) {
+    if (this._bridge) this._bridge.sendCommand(command, args);
+  }
 }
 
 customElements.define('sc-webapp', ScWebapp);
