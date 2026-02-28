@@ -18,6 +18,7 @@ import * as adminConfig from '../state/admin-config.js';
 import * as preferences from '../state/preferences.js';
 import { adminRoutes } from './routes/admin.js';
 import { createChatRoutes } from './routes/chat.js';
+import { createWidgetRoutes } from './routes/widgets.js';
 
 /** @type {import('../lib/mcp-registry.js').McpRegistry|null} */
 let _mcpRegistry = null;
@@ -297,6 +298,9 @@ export function createRouter(opts = {}) {
 
   /** Lazily initialized chat route handler */
   let _chatHandler = null;
+
+    /** Lazily initialized widget route handler */
+    let _widgetHandler = null;
 
   /**
    * Lazily initialize state modules when we have a db.
@@ -662,6 +666,18 @@ export function createRouter(opts = {}) {
           });
         }
         const handled = await _chatHandler(req, res, pathname);
+        if (handled) return;
+      }
+
+      /* ---------- Widget APIs (Notes, Calendar, Email) ---------- */
+      if (pathname.startsWith('/api/notes') || pathname.startsWith('/api/calendar') || pathname.startsWith('/api/emails')) {
+        if (!_widgetHandler) {
+          _widgetHandler = createWidgetRoutes({
+            authenticate,
+            getDb: () => getDb ? getDb() : null,
+          });
+        }
+        const handled = await _widgetHandler.handle(req, res, pathname);
         if (handled) return;
       }
 
