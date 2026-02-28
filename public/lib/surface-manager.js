@@ -135,6 +135,7 @@ export function activateSurface(type) {
   _resetIdleTimer(type);
   _updateLayout();
   _updateToolbar();
+  _saveActiveSurfaces();
   emit('surface:activated', { type });
 }
 
@@ -168,6 +169,7 @@ export function deactivateSurface(type) {
   }, 300);
 
   _updateToolbar();
+  _saveActiveSurfaces();
   emit('surface:deactivated', { type });
 }
 
@@ -344,6 +346,37 @@ function _updateLayout() {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Surface state persistence (across tab switches / reconnects)      */
+/* ------------------------------------------------------------------ */
+
+const SURFACE_STATE_KEY = 'scratchy-active-surfaces';
+
+function _saveActiveSurfaces() {
+  try {
+    const active = [];
+    for (const [type, s] of _surfaces) {
+      if (s.active) active.push(type);
+    }
+    localStorage.setItem(SURFACE_STATE_KEY, JSON.stringify(active));
+  } catch {}
+}
+
+function _restoreActiveSurfaces() {
+  try {
+    const raw = localStorage.getItem(SURFACE_STATE_KEY);
+    if (!raw) return;
+    const types = JSON.parse(raw);
+    if (!Array.isArray(types)) return;
+    for (const type of types) {
+      const s = _surfaces.get(type);
+      if (s && !s.active) {
+        activateSurface(type);
+      }
+    }
+  } catch {}
+}
+
+/* ------------------------------------------------------------------ */
 /*  Idle timers                                                       */
 /* ------------------------------------------------------------------ */
 
@@ -412,9 +445,20 @@ function _wireEvents() {
     }
   });
 
-  // Clean up on disconnect
+  // On disconnect: save active surfaces but DON'T deactivate — user expects
+  // surfaces to persist across tab switches / brief disconnects.
+  // Only clean up on explicit logout.
   on('disconnected', () => {
-    deactivateAll();
+    _saveActiveSurfaces();
+    // Clear idle timers so nothing auto-hides during reconnect
+    for (const [type, s] of _surfaces) {
+      if (s.active) _clearIdleTimer(type);
+    }
+  });
+
+  // On reconnect: restore any surfaces that were saved
+  on('connected', () => {
+    _restoreActiveSurfaces();
   });
 }
 
