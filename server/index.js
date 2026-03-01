@@ -62,6 +62,15 @@ async function main() {
       console.warn('[server] BYOK manager init failed:', err.message);
     }
 
+    /* -- Stripe schema -- */
+    try {
+      const { ensureStripeSchema } = await import('../lib/stripe.js');
+      ensureStripeSchema(db);
+      console.log('[server] Stripe schema ready');
+    } catch (err) {
+      console.warn('[server] Stripe schema init failed:', err.message);
+    }
+
     /* -- Seed default agents -- */
     seedAgents(db);
   } catch (err) {

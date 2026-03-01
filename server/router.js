@@ -21,6 +21,7 @@ import { createChatRoutes } from './routes/chat.js';
 import { createWidgetRoutes } from './routes/widgets.js';
 import { registerUsageRoutes } from './routes/usage.js';
 import { handleBYOK } from './routes/byok.js';
+import { handleBilling } from './routes/billing.js';
 
 /** @type {import('../lib/mcp-registry.js').McpRegistry|null} */
 let _mcpRegistry = null;
@@ -681,6 +682,25 @@ export function createRouter(opts = {}) {
           return json(res, 200, catalog);
         } catch (err) {
           return json(res, 500, { error: 'Failed to load widget catalog' });
+        }
+      }
+
+      /* ---------- Billing API ---------- */
+      if (pathname.startsWith('/api/billing')) {
+        // Webhook endpoint doesn't require auth (Stripe signs it)
+        const isWebhook = pathname === '/api/billing/webhook' && method === 'POST';
+        let user = null;
+        if (!isWebhook) {
+          user = await requireAuth(req, res);
+          if (!user) return;
+        }
+        const body = method === 'POST' && !isWebhook ? await parseJsonBody(req).catch(() => ({})) : {};
+        const baseUrl = `${req.headers['x-forwarded-proto'] || 'https'}://${req.headers.host}`;
+        try {
+          const handled = await handleBilling(method, pathname, user, body, json, res, req, getDb, baseUrl);
+          if (handled !== false) return;
+        } catch (err) {
+          return json(res, 500, { error: 'Billing error: ' + err.message });
         }
       }
 
