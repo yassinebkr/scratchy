@@ -1,3 +1,5 @@
+import { ICONS, icon } from '../lib/icons.js';
+
 class SCWorkspaces extends HTMLElement {
   constructor() {
     super();
@@ -84,7 +86,13 @@ class SCWorkspaces extends HTMLElement {
           gap: 10px;
         }
         .active-workspace-icon {
-          font-size: 24px;
+          color: var(--sc-accent);
+          display: flex;
+          align-items: center;
+        }
+        .active-workspace-icon svg {
+          width: 22px;
+          height: 22px;
         }
         .active-workspace-info {
           display: flex;
@@ -249,14 +257,19 @@ class SCWorkspaces extends HTMLElement {
           gap: 12px;
         }
         .card-icon {
-          font-size: 24px;
           background: var(--sc-surface-hover);
+          color: var(--sc-accent);
           width: 40px;
           height: 40px;
           display: flex;
           align-items: center;
           justify-content: center;
           border-radius: var(--sc-radius);
+          flex-shrink: 0;
+        }
+        .card-icon svg {
+          width: 20px;
+          height: 20px;
         }
         .card-title-area {
           flex: 1;
@@ -522,7 +535,7 @@ class SCWorkspaces extends HTMLElement {
     
     const icon = document.createElement('div');
     icon.className = 'active-workspace-icon';
-    icon.textContent = activeWs.icon || '📁';
+    icon.innerHTML = ICONS[activeWs.icon] ? icon(activeWs.icon, 22) : (activeWs.icon || '📁');
     
     const info = document.createElement('div');
     info.className = 'active-workspace-info';
@@ -574,7 +587,7 @@ class SCWorkspaces extends HTMLElement {
       
       const icon = document.createElement('div');
       icon.className = 'card-icon';
-      icon.textContent = ws.icon || '📁';
+      icon.innerHTML = ICONS[ws.icon] ? icon(ws.icon, 20) : (ws.icon || '📁');
       
       const titleArea = document.createElement('div');
       titleArea.className = 'card-title-area';
@@ -691,7 +704,7 @@ class SCWorkspaces extends HTMLElement {
       
       const icon = document.createElement('div');
       icon.className = 'card-icon';
-      icon.textContent = tpl.icon || '📄';
+      icon.innerHTML = ICONS[tpl.icon] ? icon(tpl.icon, 20) : (tpl.icon || '📄');
       
       const titleArea = document.createElement('div');
       titleArea.className = 'card-title-area';
