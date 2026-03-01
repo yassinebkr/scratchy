@@ -1,6 +1,7 @@
+import { ICONS } from '../lib/icons.js';
+
 // sc-command-palette.js — Scratchy v2 Command Palette
 // Raycast-style ⌘K command palette with fuzzy search, keyboard nav, and focus trapping.
-import { ICONS } from '../lib/icons.js';
 
 const SURFACE_ICONS = {
   terminal: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 6 7 9 4 12"/><line x1="9" y1="12" x2="13" y2="12"/></svg>`,
@@ -59,14 +60,14 @@ function defaultGetSearchItems() {
     { type: 'action', id: 'clear-chat', title: 'Clear Chat History', subtitle: 'Remove all messages', action: 'clear-chat', icon: ACTION_ICONS['clear-chat'] },
     { type: 'action', id: 'close-all', title: 'Close All Surfaces', subtitle: 'Return to chat-only view', action: 'close-all-surfaces', icon: ACTION_ICONS['close-all-surfaces'] },
     { type: 'action', id: 'settings', title: 'Open Settings', subtitle: 'Configure preferences', action: 'open-settings', icon: ACTION_ICONS['open-settings'] },
-    { type: 'action', id: 'open-webapp', title: 'Open Web App', subtitle: 'Embed a website in the workspace', action: 'open-webapp', icon: ICONS.search },
-    { type: 'action', id: 'open-notes', title: 'Open Notes', subtitle: 'View and edit your notes', action: 'open-notes', icon: ICONS.notes },
-    { type: 'action', id: 'open-calendar', title: 'Open Calendar', subtitle: 'View upcoming events', action: 'open-calendar', icon: ICONS.calendar },
-    { type: 'action', id: 'open-email', title: 'Open Email', subtitle: 'Check your inbox', action: 'open-email', icon: ICONS.email },
-    { type: 'action', id: 'billing', title: 'Billing & Plans', subtitle: 'Manage subscription and API keys', action: 'open-billing', icon: ICONS.billing },
-    { type: 'action', id: 'widget-store', title: 'Widget Store', subtitle: 'Browse and install widgets', action: 'open-widget-store', icon: ICONS['widget-store'] },
-    { type: 'action', id: 'teams', title: 'Teams', subtitle: 'Manage agent teams and collaboration', action: 'open-teams', icon: ICONS.teams },
-    { type: 'action', id: 'workspaces', title: 'Workspaces', subtitle: 'Save, load, and manage canvas layouts', action: 'open-workspaces', icon: ICONS.workspaces },
+    { type: 'action', id: 'open-webapp', title: 'Open Web App', subtitle: 'Embed a website in the workspace', action: 'open-webapp', icon: 'search' },
+    { type: 'action', id: 'open-notes', title: 'Open Notes', subtitle: 'View and edit your notes', action: 'open-notes', icon: 'notes' },
+    { type: 'action', id: 'open-calendar', title: 'Open Calendar', subtitle: 'View upcoming events', action: 'open-calendar', icon: 'calendar' },
+    { type: 'action', id: 'open-email', title: 'Open Email', subtitle: 'Check your inbox', action: 'open-email', icon: 'email' },
+    { type: 'action', id: 'billing', title: 'Billing & Plans', subtitle: 'Manage subscription and API keys', action: 'open-billing', icon: 'billing' },
+    { type: 'action', id: 'widget-store', title: 'Widget Store', subtitle: 'Browse and install widgets', action: 'open-widget-store', icon: 'widget-store' },
+    { type: 'action', id: 'teams', title: 'Teams', subtitle: 'Manage agent teams and collaboration', action: 'open-teams', icon: 'teams' },
+    { type: 'action', id: 'workspaces', title: 'Workspaces', subtitle: 'Save, load, and manage canvas layouts', action: 'open-workspaces', icon: 'workspaces' },
   );
 
   return items;

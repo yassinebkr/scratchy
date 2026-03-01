@@ -87,12 +87,16 @@ class SCWorkspaces extends HTMLElement {
         }
         .active-workspace-icon {
           color: var(--sc-accent);
+          width: 40px;
+          height: 40px;
           display: flex;
           align-items: center;
+          justify-content: center;
+          border-radius: var(--sc-radius);
         }
         .active-workspace-icon svg {
-          width: 22px;
-          height: 22px;
+          width: 20px;
+          height: 20px;
         }
         .active-workspace-info {
           display: flex;
@@ -535,7 +539,7 @@ class SCWorkspaces extends HTMLElement {
     
     const icon = document.createElement('div');
     icon.className = 'active-workspace-icon';
-    icon.innerHTML = ICONS[activeWs.icon] ? icon(activeWs.icon, 22) : (activeWs.icon || '📁');
+    icon.innerHTML = this._icon(activeWs.icon || 'workspaces');
     
     const info = document.createElement('div');
     info.className = 'active-workspace-info';
@@ -587,7 +591,7 @@ class SCWorkspaces extends HTMLElement {
       
       const icon = document.createElement('div');
       icon.className = 'card-icon';
-      icon.innerHTML = ICONS[ws.icon] ? icon(ws.icon, 20) : (ws.icon || '📁');
+      icon.innerHTML = this._icon(ws.icon || 'workspaces');
       
       const titleArea = document.createElement('div');
       titleArea.className = 'card-title-area';
@@ -704,7 +708,7 @@ class SCWorkspaces extends HTMLElement {
       
       const icon = document.createElement('div');
       icon.className = 'card-icon';
-      icon.innerHTML = ICONS[tpl.icon] ? icon(tpl.icon, 20) : (tpl.icon || '📄');
+      icon.innerHTML = this._icon(tpl.icon || 'dashboard');
       
       const titleArea = document.createElement('div');
       titleArea.className = 'card-title-area';

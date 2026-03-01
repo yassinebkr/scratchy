@@ -28,7 +28,7 @@ const STYLES = /* css */ `
   position: fixed;
   inset: 0;
   z-index: 5000;
-  display: flex;
+  display: none;
   align-items: flex-start;
   justify-content: center;
   width: 100%;
@@ -38,6 +38,9 @@ const STYLES = /* css */ `
   color: var(--text);
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
+}
+:host([open]) {
+  display: flex;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
