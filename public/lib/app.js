@@ -969,6 +969,17 @@ function wireNewUIModules() {
         teams.setAttribute('open', '');
         break;
       }
+      case 'open-workspaces': {
+        let workspaces = document.querySelector('sc-workspaces');
+        if (!workspaces) {
+          workspaces = document.createElement('sc-workspaces');
+          document.body.appendChild(workspaces);
+        }
+        const token = localStorage.getItem('scratchyToken') || '';
+        workspaces.setAttribute('token', token);
+        workspaces.setAttribute('open', '');
+        break;
+      }
     }
   });
 
@@ -1242,6 +1253,53 @@ async function init() {
     if (chat) {
       chat.teamId = teamId;
       chat.teamName = teamName;
+    }
+  });
+
+  // Workspaces panel events
+  document.addEventListener('workspaces-close', () => {
+    const w = document.querySelector('sc-workspaces');
+    if (w) w.removeAttribute('open');
+  });
+  document.addEventListener('workspace-load', (e) => {
+    const { workspace } = e.detail || {};
+    if (!workspace) return;
+    // Apply workspace ops to canvas
+    const canvas = document.querySelector('sc-canvas');
+    if (canvas) {
+      canvas.clear();
+      if (workspace.ops && workspace.ops.length > 0) {
+        canvas.applyOps(workspace.ops);
+      }
+    }
+    // Activate canvas surface
+    window.dispatchEvent(new CustomEvent('surface-activate', { detail: { type: 'canvas' } }));
+  });
+  document.addEventListener('workspace-save', async (e) => {
+    const { name } = e.detail || {};
+    if (!name) return;
+    // Collect current canvas state from sc-canvas
+    const canvas = document.querySelector('sc-canvas');
+    let ops = [];
+    if (canvas && canvas.getState) {
+      const stateMap = canvas.getState();
+      for (const [id, s] of Object.entries(stateMap)) {
+        ops.push({ op: 'upsert', id, type: s.type, data: s.data, layout: s.layout });
+      }
+    }
+    try {
+      const token = localStorage.getItem('scratchyToken') || '';
+      const resp = await fetch('/api/workspaces/save-current', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, ops })
+      });
+      if (resp.ok) {
+        const w = document.querySelector('sc-workspaces');
+        if (w && w.hasAttribute('open')) w.fetchData();
+      }
+    } catch (err) {
+      console.error('[workspaces] Save failed:', err);
     }
   });
 

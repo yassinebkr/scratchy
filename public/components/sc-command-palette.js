@@ -65,6 +65,7 @@ function defaultGetSearchItems() {
     { type: 'action', id: 'billing', title: 'Billing & Plans', subtitle: 'Manage subscription and API keys', action: 'open-billing', icon: '💳' },
     { type: 'action', id: 'widget-store', title: 'Widget Store', subtitle: 'Browse and install widgets', action: 'open-widget-store', icon: '🧩' },
     { type: 'action', id: 'teams', title: 'Teams', subtitle: 'Manage agent teams and collaboration', action: 'open-teams', icon: '👥' },
+    { type: 'action', id: 'workspaces', title: 'Workspaces', subtitle: 'Save, load, and manage canvas layouts', action: 'open-workspaces', icon: '📐' },
   );
 
   return items;
