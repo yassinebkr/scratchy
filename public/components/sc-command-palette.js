@@ -306,6 +306,8 @@ template.innerHTML = /* html */ `
     flex-shrink: 0;
     background: rgba(255, 255, 255, 0.04);
     border: 1px solid var(--sc-border-subtle, rgba(249, 166, 2, 0.05));
+    font-size: 16px;
+    line-height: 1;
   }
 
   .cp-item[data-focused] .cp-item-icon {
@@ -713,7 +715,7 @@ class ScCommandPalette extends HTMLElement {
           const initials = item.title.substring(0, 2);
           leadEl = `<div class="cp-item-avatar" style="background:${item.color || '#F9A602'}">${this._escapeHtml(initials)}</div>`;
         } else {
-          const iconHtml = item.icon || ACTION_ICONS[item.action] || SEARCH_ICON;
+          const iconHtml = ICONS[item.icon] || item.icon || ACTION_ICONS[item.action] || SEARCH_ICON;
           leadEl = `<div class="cp-item-icon">${iconHtml}</div>`;
         }
 
