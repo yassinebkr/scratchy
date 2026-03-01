@@ -13,10 +13,11 @@ import { createWsHandler, broadcastToUser } from './ws.js';
 import { initWidgets, destroyWidgets } from './widgets.js';
 import { McpRegistry } from '../lib/mcp-registry.js';
 import { init as initChat, handleChat, shutdown as shutdownChat } from './chat-handler.js';
-import { init as initOrchestrator, routeMessage, shutdown as shutdownOrchestrator } from './agent-orchestrator.js';
+import { init as initOrchestrator, routeMessage, routeTeamChat, shutdown as shutdownOrchestrator } from './agent-orchestrator.js';
 import { createSurfaceEventHandler } from './surface-events.js';
 import { seedAgents } from './seed-agents.js';
 import * as canvasState from '../state/canvas.js';
+import * as teamsState from '../state/teams.js';
 
 /** Default port — v2 runs on 3002 (v1 is on 3001) */
 const PORT = parseInt(process.env.PORT ?? '3002', 10);
@@ -70,6 +71,10 @@ async function main() {
     } catch (err) {
       console.warn('[server] Stripe schema init failed:', err.message);
     }
+
+    /* -- Teams state -- */
+    teamsState.init(db);
+    console.log('[server] Teams state initialized');
 
     /* -- Seed default agents -- */
     seedAgents(db);
@@ -144,8 +149,13 @@ async function main() {
     getAgents: agentsModule,
     mcpRegistry,
     onChat: async (userId, msg, ws) => {
-      // Always route through orchestrator — it resolves default agent when agentId is null
-      await routeMessage(userId, msg.agentId || null, msg, ws);
+      // Team routing: if msg has teamId, route through team pipeline
+      if (msg.teamId) {
+        await routeTeamChat(userId, msg.teamId, msg, ws);
+      } else {
+        // Single-agent: route through orchestrator (resolves default agent when agentId is null)
+        await routeMessage(userId, msg.agentId || null, msg, ws);
+      }
     },
     surfaceHandler,
     onWidgetAction: handleWidgetAction,

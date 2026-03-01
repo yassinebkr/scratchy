@@ -24,6 +24,8 @@
  */
 
 import * as teams from '../../state/teams.js';
+import { TEAM_PACKAGES } from '../../lib/team-router.js';
+import * as agents from '../../state/agents.js';
 
 /**
  * Create the team routes handler.
@@ -174,6 +176,56 @@ export function createTeamRoutes({ authenticate, matchRoute }) {
           json(res, 400, { error: err.message });
         }
         return true;
+      }
+
+      // ── Pre-built packages (must be before /:id to avoid conflict) ──
+      // GET /api/teams/packages
+      if (method === 'GET' && pathname === '/api/teams/packages') {
+        json(res, 200, TEAM_PACKAGES);
+        return true;
+      }
+
+      // POST /api/teams/packages/:key
+      {
+        const m = matchRoute('/api/teams/packages/:key', pathname);
+        if (m && method === 'POST') {
+          const user = await requireAuth(req, res);
+          if (!user) return true;
+
+          const pkg = TEAM_PACKAGES[m.key];
+          if (!pkg) {
+            json(res, 404, { error: `Package "${m.key}" not found` });
+            return true;
+          }
+
+          try {
+            const team = teams.createTeam(pkg.name, user.id, {
+              description: pkg.description,
+              icon: pkg.icon,
+              color: pkg.color,
+            });
+
+            const builtins = agents.getBuiltinAgents();
+            for (const agentDef of pkg.agents) {
+              const builtin = builtins.find(a =>
+                a.name.toLowerCase() === agentDef.builtinId.toLowerCase() ||
+                a.name.toLowerCase() === agentDef.name.toLowerCase()
+              );
+              if (builtin) {
+                teams.addAgent(team.id, builtin.id, {
+                  role: agentDef.role,
+                  addedBy: user.id,
+                });
+              }
+            }
+
+            const fullTeam = teams.getTeam(team.id);
+            json(res, 201, fullTeam);
+          } catch (err) {
+            json(res, 400, { error: err.message });
+          }
+          return true;
+        }
       }
 
       // ── Team memory routes (must be before /:id to avoid conflict) ──

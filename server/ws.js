@@ -130,6 +130,22 @@ export function getUserConnectionCount(userId) {
   return userSockets.get(userId)?.size ?? 0;
 }
 
+/**
+ * Get the first WebSocket connection for a user (for internal use).
+ * Returns null if the user has no active connections.
+ * @param {string} userId
+ * @returns {import('ws').WebSocket|null}
+ */
+export function getWsForUser(userId) {
+  const sockets = userSockets.get(userId);
+  if (!sockets || sockets.size === 0) return null;
+  // Return the first open socket
+  for (const ws of sockets) {
+    if (ws.readyState === 1) return ws;
+  }
+  return null;
+}
+
 /* ------------------------------------------------------------------ */
 /*  Connection lifecycle                                              */
 /* ------------------------------------------------------------------ */

@@ -35,6 +35,8 @@ import * as agents from '../state/agents.js';
 import * as memory from '../state/memory.js';
 import * as contextIndex from '../state/context-index.js';
 import { getUsageTracker } from '../lib/usage-tracker.js';
+import { routeTeamMessage, handleDelegation } from '../lib/team-router.js';
+import * as teamsState from '../state/teams.js';
 
 /* ------------------------------------------------------------------ */
 /*  Constants                                                         */
@@ -1059,6 +1061,101 @@ export async function routeMessage(userId, agentId, message, ws) {
       ts: Date.now(),
     });
   }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Team message routing                                              */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Route a message through a team's multi-agent pipeline.
+ * Called when the client sends { type: 'chat', teamId: '...' }.
+ *
+ * @param {string} userId
+ * @param {string} teamId
+ * @param {{ text?: string, content?: string }} message
+ * @param {import('ws').WebSocket} ws
+ */
+export async function routeTeamChat(userId, teamId, message, ws) {
+  const text = message.text ?? message.content ?? '';
+  if (!text.trim()) return;
+
+  console.log(`[orchestrator] ${userId} → team:${teamId}: ${text.slice(0, 100)}`);
+
+  // Rate limiting (same as single-agent)
+  try {
+    const tracker = getUsageTracker();
+    const burst = tracker.checkBurst(userId);
+    if (!burst.allowed) {
+      sendJson(ws, {
+        type: 'chat', from: 'system',
+        text: `⏳ Rate limit reached. Try again in ${Math.ceil(burst.retryAfterMs / 1000)}s.`,
+        ts: Date.now(),
+      });
+      return;
+    }
+    const quota = tracker.check(userId, 'message');
+    if (!quota.allowed) {
+      sendJson(ws, {
+        type: 'chat', from: 'system',
+        text: `📊 Daily message limit reached. Upgrade your plan for more.`,
+        ts: Date.now(),
+      });
+      return;
+    }
+  } catch (e) {
+    console.warn('[orchestrator] Rate limit check skipped:', e.message);
+  }
+
+  try {
+    const response = await routeTeamMessage({
+      userId,
+      teamId,
+      text,
+      ws,
+      adapter: _adapter,
+      sendJson,
+      getHistory,
+      appendHistory,
+      retrieveContext,
+      parseGenUIResponse: (await import('../lib/genui-response-parser.js')).parseGenUIResponse,
+      canvasState: await import('../state/canvas.js'),
+    });
+
+    // Usage tracking
+    if (response) {
+      try {
+        const tracker = getUsageTracker();
+        tracker.log(userId, 'message', 1, { teamId, model: 'team' });
+        const tokens = Math.ceil((text.length + response.length) / 4);
+        tracker.log(userId, 'tokens', tokens, { teamId });
+      } catch {}
+    }
+  } catch (err) {
+    console.error(`[orchestrator] Team routing error for ${userId}:${teamId}:`, err.message);
+    sendJson(ws, {
+      type: 'chat', from: 'system',
+      text: `❌ Team error: ${err.message}`,
+      ts: Date.now(),
+    });
+  }
+}
+
+/**
+ * Handle a delegation request from NullClaw (via /api/internal/team-delegate).
+ * Exposed for the router to call.
+ *
+ * @param {Object} params — { userId, teamId, agentId, task, context }
+ * @param {import('ws').WebSocket|null} ws
+ * @returns {Promise<{ content: string, isError?: boolean }>}
+ */
+export async function handleTeamDelegation(params, ws) {
+  return handleDelegation({
+    ...params,
+    adapter: _adapter,
+    ws,
+    sendJson,
+  });
 }
 
 /* ------------------------------------------------------------------ */

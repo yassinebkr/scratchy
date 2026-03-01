@@ -1040,6 +1040,35 @@ export function createRouter(opts = {}) {
         }
       }
 
+      /* ---------- Internal Team Delegation (for NullClaw → orchestrator) ---------- */
+
+      // POST /api/internal/team-delegate — Orchestrator delegates to worker
+      if (method === 'POST' && pathname === '/api/internal/team-delegate') {
+        const remoteAddr = req.socket?.remoteAddress || '';
+        const isLocalhost = remoteAddr === '127.0.0.1' || remoteAddr === '::1' || remoteAddr === '::ffff:127.0.0.1';
+        if (!isLocalhost) {
+          return json(res, 403, { error: 'Internal endpoint — localhost only' });
+        }
+
+        const body = await parseJsonBody(req);
+        const { userId, teamId, agentId, task, context } = body;
+        if (!userId || !teamId || !agentId || !task) {
+          return json(res, 400, { error: 'userId, teamId, agentId, and task are required' });
+        }
+
+        try {
+          const { handleTeamDelegation } = await import('./agent-orchestrator.js');
+          // Find user's WS connection for streaming (best-effort)
+          const { getWsForUser } = await import('./ws.js').catch(() => ({ getWsForUser: () => null }));
+          const ws = getWsForUser ? getWsForUser(userId) : null;
+
+          const result = await handleTeamDelegation({ userId, teamId, agentId, task, context }, ws);
+          return json(res, 200, result);
+        } catch (err) {
+          return json(res, 500, { error: err.message });
+        }
+      }
+
       /* ---------- Internal MCP Proxy (for NullClaw → MCP bridge) ---------- */
 
       // POST /api/internal/mcp — NullClaw calls this via http_request tool
