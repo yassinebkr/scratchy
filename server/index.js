@@ -53,6 +53,15 @@ async function main() {
       console.warn('[server] Usage tracker init failed:', err.message);
     }
 
+    /* -- BYOK manager -- */
+    try {
+      const { initBYOK } = await import('../lib/byok.js');
+      initBYOK(db);
+      console.log('[server] BYOK manager initialized');
+    } catch (err) {
+      console.warn('[server] BYOK manager init failed:', err.message);
+    }
+
     /* -- Seed default agents -- */
     seedAgents(db);
   } catch (err) {

@@ -20,6 +20,7 @@ import { adminRoutes } from './routes/admin.js';
 import { createChatRoutes } from './routes/chat.js';
 import { createWidgetRoutes } from './routes/widgets.js';
 import { registerUsageRoutes } from './routes/usage.js';
+import { handleBYOK } from './routes/byok.js';
 
 /** @type {import('../lib/mcp-registry.js').McpRegistry|null} */
 let _mcpRegistry = null;
@@ -680,6 +681,19 @@ export function createRouter(opts = {}) {
           return json(res, 200, catalog);
         } catch (err) {
           return json(res, 500, { error: 'Failed to load widget catalog' });
+        }
+      }
+
+      /* ---------- BYOK API ---------- */
+      if (pathname.startsWith('/api/byok')) {
+        const user = await requireAuth(req, res);
+        if (!user) return;
+        const body = method === 'POST' || method === 'DELETE' ? await parseJsonBody(req).catch(() => ({})) : {};
+        try {
+          const handled = await handleBYOK(method, pathname, user, body, json, res);
+          if (handled !== false) return;
+        } catch (err) {
+          return json(res, 500, { error: 'BYOK service error: ' + err.message });
         }
       }
 

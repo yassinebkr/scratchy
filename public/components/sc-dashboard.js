@@ -8,142 +8,40 @@ class ScDashboard extends HTMLElement {
   }
 
   static get observedAttributes() {
-    return [];
-  }
-
-  connectedCallback() {
-    this.render();
-    this.shadowRoot.addEventListener('click', this._handleClicks.bind(this));
-    this.refresh();
-  }
-
-  disconnectedCallback() {
-    // Clean up event listeners if any were added to the document or window
+    return ['user-name'];
   }
 
   attributeChangedCallback(name, oldValue, newValue) {
-    // Handle attribute changes if needed
-  }
-
-  // Public API
-  set userName(name) {
-    this._userName = name || 'there';
-    this._updateGreeting();
+    if (name === 'user-name' && oldValue !== newValue) {
+      this.userName = newValue;
+    }
   }
 
   get userName() {
     return this._userName;
   }
 
-  set activeAgent(agent) {
-    this._activeAgent = agent;
-    // Potentially update a part of the UI to show the active agent
+  set userName(name) {
+    if (this._userName === name) return;
+    this._userName = name;
+    const greetingNameEl = this.shadowRoot.querySelector('.greeting-name');
+    if (greetingNameEl) {
+      greetingNameEl.textContent = this._userName;
+    }
   }
 
   get activeAgent() {
     return this._activeAgent;
   }
 
-  async refresh() {
-    const today = new Date();
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const from = today.toISOString().split('T')[0];
-    const to = tomorrow.toISOString().split('T')[0];
-
-    const urls = [
-      `/api/notes?count=true`,
-      `/api/calendar?from=${from}&to=${to}&count=true`,
-      `/api/emails?status=unread&count=true`,
-      `/api/chat/history?limit=5`
-    ];
-
-    const results = await Promise.allSettled(urls.map(url =>
-      fetch(url, { credentials: 'same-origin' }).then(res => {
-        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-        return res.json();
-      })
-    ));
-
-    const [notes, calendar, email, history] = results;
-
-    this._updateWidgetCount('notes', notes.status === 'fulfilled' ? notes.value.count : '—');
-    this._updateWidgetCount('calendar', calendar.status === 'fulfilled' ? calendar.value.count : '—');
-    this._updateWidgetCount('email', email.status === 'fulfilled' ? email.value.count : '—');
-
-    if (history.status === 'fulfilled') {
-      this._updateRecentConversations(history.value);
-    } else {
-      console.error('Failed to fetch chat history:', history.reason);
-      this._updateRecentConversations([]);
-    }
+  set activeAgent(agent) {
+    this._activeAgent = agent;
+    // Future use: Update an agent display element
   }
 
-  // Private methods
-  _updateGreeting() {
-    const greetingEl = this.shadowRoot.querySelector('.greeting-text');
-    if (greetingEl) {
-      const hour = new Date().getHours();
-      let greeting = 'Good evening';
-      if (hour < 12) {
-        greeting = 'Good morning';
-      } else if (hour < 18) {
-        greeting = 'Good afternoon';
-      }
-      greetingEl.textContent = `${greeting}, ${this._userName}.`;
-    }
-  }
-
-  _updateWidgetCount(widget, count) {
-    const el = this.shadowRoot.querySelector(`.widget-card[data-widget="${widget}"] .widget-count`);
-    if (el) {
-      el.textContent = count;
-    }
-  }
-
-  _updateRecentConversations(conversations) {
-    const container = this.shadowRoot.querySelector('.conversations-list');
-    if (!container) return;
-
-    if (!conversations || conversations.length === 0) {
-        container.innerHTML = '<div class="conversation-item empty">No recent conversations.</div>';
-        return;
-    }
-
-    container.innerHTML = conversations.map(convo => `
-      <div class="conversation-item" data-id="${convo.id}">
-        <div class="convo-icon">💬</div>
-        <div class="convo-title">${convo.title || 'Untitled Conversation'}</div>
-      </div>
-    `).join('');
-  }
-
-  _handleClicks(event) {
-    const widgetCard = event.target.closest('.widget-card');
-    if (widgetCard) {
-      const widget = widgetCard.dataset.widget;
-      this.dispatchEvent(new CustomEvent('dashboard-open-widget', {
-        detail: { widget },
-        bubbles: true,
-        composed: true
-      }));
-      return;
-    }
-
-    const suggestionChip = event.target.closest('.suggestion-chip');
-    if (suggestionChip) {
-      const text = suggestionChip.dataset.text;
-      this.dispatchEvent(new CustomEvent('dashboard-suggestion', {
-        detail: { text },
-        bubbles: true,
-        composed: true
-      }));
-      return;
-    }
-  }
-
-  render() {
-    this.shadowRoot.innerHTML = `
+  connectedCallback() {
+    const template = document.createElement('template');
+    template.innerHTML = `
       <style>
         :host {
           --bg: #0d0b07;
@@ -152,15 +50,148 @@ class ScDashboard extends HTMLElement {
           --text: #f0ead6;
           --muted: #8a7e6a;
           --accent: #F9A602;
-          --font: 'Geist', system-ui, sans-serif;
+          --font: 'Geist', system-ui, -apple-system, sans-serif;
 
           display: block;
-          width: 100%;
-          height: 100%;
+          padding: 2rem;
           font-family: var(--font);
           color: var(--text);
+          height: 100%;
           overflow-y: auto;
-          padding: 2rem;
+        }
+
+        .dashboard-grid {
+          display: grid;
+          gap: 24px;
+          max-width: 1200px;
+          margin: 0 auto;
+        }
+
+        .greeting-bar {
+          font-size: 1.75rem;
+          font-weight: 500;
+          opacity: 0;
+          animation: fadeIn 0.5s 0.1s ease-out forwards;
+        }
+
+        .widget-cards {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 20px;
+        }
+
+        .widget-card {
+          background-color: var(--surface);
+          border: 1px solid var(--border);
+          border-radius: 12px;
+          padding: 20px;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          cursor: pointer;
+          transition: transform 0.2s ease, background-color 0.2s ease;
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+          opacity: 0;
+          animation: fadeIn 0.5s ease-out forwards;
+        }
+        
+        .widget-card:nth-child(1) { animation-delay: 0.2s; }
+        .widget-card:nth-child(2) { animation-delay: 0.3s; }
+        .widget-card:nth-child(3) { animation-delay: 0.4s; }
+
+        .widget-card:hover {
+          transform: translateY(-4px);
+          background-color: rgba(37, 32, 21, 0.9);
+        }
+
+        .widget-header {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          font-size: 1.1rem;
+          font-weight: 500;
+        }
+
+        .widget-header .icon {
+          font-size: 1.5rem;
+        }
+
+        .widget-count {
+          margin-left: auto;
+          font-size: 1.1rem;
+          font-weight: 600;
+          color: var(--accent);
+        }
+
+        .widget-description {
+          font-size: 0.9rem;
+          color: var(--muted);
+        }
+
+        .suggestions {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 12px;
+          opacity: 0;
+          animation: fadeIn 0.5s 0.5s ease-out forwards;
+        }
+
+        .suggestion-chip {
+          background-color: transparent;
+          border: 1px solid var(--border);
+          color: var(--muted);
+          padding: 6px 14px;
+          border-radius: 20px;
+          font-size: 0.9rem;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .suggestion-chip:hover {
+          background-color: var(--surface);
+          color: var(--text);
+          border-color: var(--accent);
+        }
+
+        .conversations {
+          margin-top: 20px;
+          opacity: 0;
+          animation: fadeIn 0.5s 0.6s ease-out forwards;
+        }
+        
+        .conversations h2 {
+          font-size: 1.25rem;
+          margin-bottom: 16px;
+          color: var(--muted);
+          font-weight: 500;
+        }
+
+        .conversation-item {
+          background-color: var(--surface);
+          border: 1px solid var(--border);
+          border-radius: 8px;
+          padding: 12px 16px;
+          margin-bottom: 10px;
+          font-size: 0.95rem;
+          cursor: pointer;
+          transition: background-color 0.2s ease;
+        }
+
+        .conversation-item:hover {
+          background-color: rgba(37, 32, 21, 0.9);
+        }
+        
+        .conversation-item .truncate {
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: var(--muted);
         }
 
         @keyframes fadeIn {
@@ -168,218 +199,143 @@ class ScDashboard extends HTMLElement {
           to { opacity: 1; transform: translateY(0); }
         }
 
-        .dashboard-container {
-          max-width: 900px;
-          margin: 0 auto;
-          animation: fadeIn 0.5s ease-out;
-        }
-
-        .greeting-bar {
-          padding-bottom: 2rem;
-          font-size: 1.75rem;
-          font-weight: 500;
-          color: var(--text);
-        }
-
-        .widgets-grid {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 1.5rem;
-          margin-bottom: 2rem;
-        }
-
-        .widget-card {
-          background-color: var(--surface);
-          border: 1px solid var(--border);
-          border-radius: 8px;
-          padding: 1.5rem;
-          display: flex;
-          flex-direction: column;
-          justify-content: space-between;
-          min-height: 120px;
-          cursor: pointer;
-          transition: background-color 0.2s, border-color 0.2s;
-          backdrop-filter: blur(12px);
-          animation: fadeIn 0.5s ease-out forwards;
-          opacity: 0;
-        }
-        
-        .widget-card:nth-child(1) { animation-delay: 0.1s; }
-        .widget-card:nth-child(2) { animation-delay: 0.2s; }
-        .widget-card:nth-child(3) { animation-delay: 0.3s; }
-
-        .widget-card:hover {
-          background-color: rgba(37, 32, 21, 0.9);
-          border-color: rgba(249, 166, 2, 0.15);
-        }
-
-        .widget-header {
-          display: flex;
-          align-items: center;
-          font-size: 1rem;
-          font-weight: 500;
-        }
-
-        .widget-icon {
-          margin-right: 0.75rem;
-          font-size: 1.25rem;
-        }
-
-        .widget-count {
-          margin-left: auto;
-          font-size: 1.75rem;
-          font-weight: 600;
-          color: var(--text);
-        }
-
-        .suggestions-container {
-          margin-bottom: 2.5rem;
-          display: flex;
-          flex-wrap: wrap;
-          gap: 0.75rem;
-        }
-
-        .suggestion-chip {
-          background-color: var(--surface);
-          border: 1px solid var(--border);
-          border-radius: 16px;
-          padding: 0.5rem 1rem;
-          font-size: 0.875rem;
-          color: var(--muted);
-          cursor: pointer;
-          transition: all 0.2s;
-        }
-
-        .suggestion-chip:hover {
-          color: var(--text);
-          border-color: rgba(249, 166, 2, 0.2);
-          background-color: rgba(37, 32, 21, 0.9);
-        }
-        
-        .section-header {
-            font-size: 1rem;
-            font-weight: 500;
-            color: var(--muted);
-            margin-bottom: 1rem;
-            padding-bottom: 0.5rem;
-            border-bottom: 1px solid var(--border);
-        }
-        
-        .conversations-list {
-            display: grid;
-            gap: 0.5rem;
-        }
-
-        .conversation-item {
-            display: flex;
-            align-items: center;
-            padding: 0.75rem;
-            border-radius: 6px;
-            background-color: transparent;
-            cursor: pointer;
-            transition: background-color 0.2s;
-        }
-        
-        .conversation-item:hover {
-            background-color: var(--surface);
-        }
-        
-        .conversation-item.empty {
-            color: var(--muted);
-            cursor: default;
-        }
-        
-        .conversation-item.empty:hover {
-             background-color: transparent;
-        }
-
-        .convo-icon {
-            margin-right: 1rem;
-            color: var(--muted);
-        }
-        
-        .convo-title {
-            color: var(--text);
-            font-size: 0.9rem;
-        }
-
         @media (max-width: 768px) {
           :host {
-            padding: 1.5rem 1rem;
+            padding: 1rem;
           }
-          
           .greeting-bar {
             font-size: 1.5rem;
-            padding-bottom: 1.5rem;
           }
-
-          .widgets-grid {
+          .widget-cards {
             grid-template-columns: 1fr;
             overflow-x: auto;
             scroll-snap-type: x mandatory;
+            padding-bottom: 15px; /* for scrollbar */
+            /* A bit of a hack for horizontal scrolling on mobile */
             display: flex;
-            padding-bottom: 1rem; /* for scrollbar */
-            gap: 1rem;
+            width: 100%;
           }
-          
           .widget-card {
-            flex-shrink: 0;
-            width: 70vw;
-            min-height: 110px;
+            min-width: 280px;
             scroll-snap-align: start;
-          }
-
-          .suggestions-container {
-            margin-bottom: 2rem;
           }
         }
       </style>
-      <div class="dashboard-container">
+      
+      <div class="dashboard-grid">
         <div class="greeting-bar">
-          <span class="greeting-text"></span>
+          <span class="greeting-text"></span> <span class="greeting-name"></span>
         </div>
 
-        <div class="widgets-grid">
+        <div class="widget-cards">
           <div class="widget-card" data-widget="notes">
-            <div class="widget-header">
-              <span class="widget-icon">📝</span>
-              <span>Notes</span>
-            </div>
-            <div class="widget-count">—</div>
+            <div class="widget-header"><span class="icon">📝</span><span>Notes</span><span class="widget-count" id="notes-count">—</span></div>
+            <div class="widget-description">Quick thoughts and long-form ideas.</div>
           </div>
           <div class="widget-card" data-widget="calendar">
-            <div class="widget-header">
-              <span class="widget-icon">📅</span>
-              <span>Calendar</span>
-            </div>
-            <div class="widget-count">—</div>
+            <div class="widget-header"><span class="icon">📅</span><span>Calendar</span><span class="widget-count" id="calendar-count">—</span></div>
+            <div class="widget-description">What's on your agenda for today.</div>
           </div>
           <div class="widget-card" data-widget="email">
-            <div class="widget-header">
-              <span class="widget-icon">📧</span>
-              <span>Email</span>
-            </div>
-            <div class="widget-count">—</div>
+            <div class="widget-header"><span class="icon">📧</span><span>Email</span><span class="widget-count" id="email-count">—</span></div>
+            <div class="widget-description">Unread messages in your inbox.</div>
           </div>
         </div>
 
-        <div class="suggestions-container">
-          <div class="suggestion-chip" data-text="What's on my mind?">What's on my mind?</div>
-          <div class="suggestion-chip" data-text="Summarize my morning emails">Summarize my morning emails</div>
-          <div class="suggestion-chip" data-text="Draft a new note">Draft a new note</div>
-          <div class="suggestion-chip" data-text="What are my top priorities?">What are my top priorities?</div>
-          <div class="suggestion-chip" data-text="Show me the latest news">Show me the latest news</div>
+        <div class="suggestions">
+          <button class="suggestion-chip" data-suggestion="Summarize my morning emails">Summarize my morning emails</button>
+          <button class="suggestion-chip" data-suggestion="What's on my calendar today?">What's on my calendar today?</button>
+          <button class="suggestion-chip" data-suggestion="Draft a thank-you note">Draft a thank-you note</button>
+          <button class="suggestion-chip" data-suggestion="Review my open tasks">Review my open tasks</button>
         </div>
         
-        <div class="recent-conversations">
-            <div class="section-header">Recent</div>
-            <div class="conversations-list">
-                <!-- Populated by JS -->
-            </div>
+        <div class="conversations">
+          <h2>Recent Chats</h2>
+          <div id="conversation-list">
+            <div class="empty-state">No recent conversations.</div>
+          </div>
         </div>
       </div>
     `;
+
+    this.shadowRoot.appendChild(template.content.cloneNode(true));
     this._updateGreeting();
+    this.refresh();
+    this._attachEventListeners();
+  }
+
+  _updateGreeting() {
+    const hour = new Date().getHours();
+    let greeting = 'Hello';
+    if (hour < 12) {
+      greeting = 'Good morning';
+    } else if (hour < 18) {
+      greeting = 'Good afternoon';
+    } else {
+      greeting = 'Good evening';
+    }
+    this.shadowRoot.querySelector('.greeting-text').textContent = greeting + ',';
+    this.shadowRoot.querySelector('.greeting-name').textContent = this.userName;
+  }
+  
+  _attachEventListeners() {
+    this.shadowRoot.querySelectorAll('.widget-card').forEach(card => {
+      card.addEventListener('click', () => {
+        this.dispatchEvent(new CustomEvent('dashboard-open-widget', {
+          detail: { widget: card.dataset.widget },
+          bubbles: true,
+          composed: true
+        }));
+      });
+    });
+
+    this.shadowRoot.querySelectorAll('.suggestion-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        this.dispatchEvent(new CustomEvent('dashboard-suggestion', {
+          detail: { text: chip.dataset.suggestion },
+          bubbles: true,
+          composed: true
+        }));
+      });
+    });
+  }
+
+  async refresh() {
+    this._updateGreeting();
+    const fetchOptions = {
+      credentials: 'same-origin',
+      headers: { 'Accept': 'application/json' }
+    };
+    
+    // Fetch counts
+    const countsPromise = Promise.all([
+      fetch('/api/notes', fetchOptions).then(res => res.ok ? res.json() : { count: '—' }).catch(() => ({ count: '—' })),
+      fetch(`/api/calendar?from=today&to=tomorrow`, fetchOptions).then(res => res.ok ? res.json() : { count: '—' }).catch(() => ({ count: '—' })),
+      fetch('/api/emails?status=unread', fetchOptions).then(res => res.ok ? res.json() : { count: '—' }).catch(() => ({ count: '—' }))
+    ]);
+
+    // Fetch conversations
+    const historyPromise = fetch('/api/chat/history?limit=5', fetchOptions)
+      .then(res => res.ok ? res.json() : [])
+      .catch(() => []);
+
+    const [counts, history] = await Promise.all([countsPromise, historyPromise]);
+
+    this.shadowRoot.getElementById('notes-count').textContent = counts[0].count ?? '—';
+    this.shadowRoot.getElementById('calendar-count').textContent = counts[1].count ?? '—';
+    this.shadowRoot.getElementById('email-count').textContent = counts[2].count ?? '—';
+
+    // Render conversations
+    const conversationList = this.shadowRoot.getElementById('conversation-list');
+    if (history && history.length > 0) {
+      conversationList.innerHTML = history.map(chat => `
+        <div class="conversation-item" data-chat-id="${chat.id}">
+          <div class="truncate">${chat.title || 'Untitled Chat'}</div>
+        </div>
+      `).join('');
+    } else {
+      conversationList.innerHTML = '<div class="empty-state">No recent conversations.</div>';
+    }
   }
 }
 
