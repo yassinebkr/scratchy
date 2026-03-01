@@ -8,6 +8,29 @@
  * Events:     message-send, message-retry, scroll-state
  */
 
+
+const AVATAR_PALETTE = [
+  { bg: '#F9A602', fg: '#0d0b07' },
+  { bg: '#22c55e', fg: '#0d0b07' },
+  { bg: '#3b82f6', fg: '#ffffff' },
+  { bg: '#a855f7', fg: '#ffffff' },
+  { bg: '#ef4444', fg: '#ffffff' },
+  { bg: '#06b6d4', fg: '#0d0b07' },
+  { bg: '#f97316', fg: '#0d0b07' },
+  { bg: '#ec4899', fg: '#ffffff' },
+  { bg: '#84cc16', fg: '#0d0b07' },
+  { bg: '#6366f1', fg: '#ffffff' },
+];
+
+function getAvatarColor(name) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = ((hash << 5) - hash) + name.charCodeAt(i);
+    hash |= 0;
+  }
+  return AVATAR_PALETTE[Math.abs(hash) % AVATAR_PALETTE.length];
+}
+
 const STYLES = `
   :host {
     display: flex;
@@ -55,6 +78,85 @@ const STYLES = `
   }
   .chat-messages::-webkit-scrollbar-thumb:hover {
     background: rgba(249,166,2,0.25);
+  }
+
+  _updateTeamBanner() {
+    if (!this._teamBanner) return;
+    if (this._teamId) {
+      this._teamBannerName.textContent = this._teamName || 'DevOps Team';
+      this._teamBannerCount.textContent = (this._teamAgentCount || 3) + ' agents';
+      this._teamBanner.classList.remove('hidden');
+    } else {
+      this._teamBanner.classList.add('hidden');
+    }
+  }
+
+  handleTeamEvent(event) {
+    const type = event.type;
+    if (type === 'team-message-start') {
+      this._addTeamStatusMsg('[Team: ' + (event.teamName || 'DevOps Team') + '] ' + (event.agentName || 'Agent') + ' is orchestrating...');
+    } else if (type === 'team-delegation') {
+      if (event.status === 'start') {
+        this._addTeamStatusMsg('\u21B3 Delegating to ' + event.agentName + ': ' + (event.task || 'task'));
+      } else if (event.status === 'complete') {
+        this._addTeamStatusMsg('\u21B3 ' + event.agentName + ' completed');
+      } else if (event.status === 'error') {
+        this._addTeamStatusMsg('\u21B3 ' + event.agentName + ' failed: ' + (event.error || 'timeout'));
+      }
+    } else if (type === 'team-worker-stream') {
+      this._updateWorkerStream(event);
+    } else if (type === 'team-message-end') {
+      this._workerStreamEl = null;
+    }
+  }
+
+  _addTeamStatusMsg(text) {
+    const wrap = document.createElement('div');
+    wrap.style.display = 'flex';
+    wrap.style.justifyContent = 'center';
+    wrap.style.width = '100%';
+    const el = document.createElement('div');
+    el.className = 'team-status-msg';
+    el.textContent = text;
+    wrap.appendChild(el);
+    this._listEl.appendChild(wrap);
+    if (!this._userScrolled) this._doScrollToBottom();
+  }
+
+  _updateWorkerStream(event) {
+    if (!this._workerStreamEl || this._workerStreamEl.dataset.agent !== event.agentName) {
+      const wrap = document.createElement('div');
+      wrap.className = 'msg msg--assistant';
+      wrap.style.maxWidth = '100%';
+      wrap.style.width = '100%';
+      
+      const details = document.createElement('details');
+      details.className = 'team-worker-stream';
+      details.open = true;
+      
+      const summary = document.createElement('summary');
+      summary.className = 'team-worker-summary';
+      
+      const headerWrap = document.createElement('div');
+      headerWrap.className = 'team-worker-header';
+      const color = getAvatarColor(event.agentName || '');
+      headerWrap.innerHTML = '<span class="team-avatar-dot" style="background:' + color.bg + '"></span> ' + this._escapeHtml(event.agentName || 'Worker');
+      
+      summary.appendChild(headerWrap);
+      
+      const content = document.createElement('div');
+      content.className = 'team-worker-content';
+      
+      details.appendChild(summary);
+      details.appendChild(content);
+      wrap.appendChild(details);
+      
+      this._listEl.appendChild(wrap);
+      this._workerStreamEl = content;
+      this._workerStreamEl.dataset.agent = event.agentName;
+    }
+    this._workerStreamEl.textContent += (event.text || event.chunk || '');
+    if (!this._userScrolled) this._doScrollToBottom();
   }
 
   /* ─── Empty State ─── */
@@ -677,6 +779,86 @@ const STYLES = `
     .chat-messages { padding: 14px 14px 8px; }
     .msg { max-width: 90%; }
   }
+  
+  /* ─── Team CSS ─── */
+  .team-banner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: var(--sc-surface-active);
+    border-bottom: 1px solid var(--sc-border);
+    font-size: var(--sc-font-size-sm);
+    color: var(--sc-text-muted);
+    flex-shrink: 0;
+  }
+  .team-banner.hidden { display: none; }
+  .switch-single-btn {
+    background: transparent;
+    border: none;
+    color: var(--sc-text-dim);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: inherit;
+    padding: 0;
+    transition: color var(--sc-transition);
+  }
+  .switch-single-btn:hover { color: var(--sc-text); }
+  .team-msg-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+    font-size: var(--sc-font-size-sm);
+    font-weight: 500;
+    color: var(--sc-text);
+  }
+  .team-avatar-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+  }
+  .team-status-msg {
+    font-size: var(--sc-font-size-sm);
+    color: var(--sc-text-muted);
+    padding: 4px 12px;
+    margin: 4px auto 12px auto;
+    background: var(--sc-surface-active);
+    border-radius: var(--sc-radius-full);
+    text-align: center;
+  }
+  .team-worker-stream {
+    margin-top: 8px;
+    padding: 8px 12px;
+    background: var(--sc-surface);
+    border-radius: var(--sc-radius);
+    border: 1px solid var(--sc-border);
+    width: 100%;
+  }
+  .team-worker-summary {
+    cursor: pointer;
+    user-select: none;
+    color: var(--sc-text);
+    font-size: var(--sc-font-size-sm);
+    font-weight: 500;
+  }
+  .team-worker-header {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    vertical-align: middle;
+  }
+  .team-worker-content {
+    margin-top: 8px;
+    font-family: var(--sc-mono);
+    font-size: var(--sc-font-size-xs);
+    color: var(--sc-text-muted);
+    max-height: 200px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+  }
+
   @media (max-width: 480px) {
     .chat-messages { padding: 12px 12px 8px; }
     .msg { max-width: 94%; }
@@ -697,6 +879,10 @@ const SVG_PAPERCLIP = '<svg viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19
 const SVG_CLOSE = '<svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
 
 const TEMPLATE = `
+  
+  <div class="team-banner hidden" id="team-banner">
+    👥 <span id="team-banner-name">DevOps Team</span> &nbsp;&middot;&nbsp; <span id="team-banner-count">3 agents</span> &nbsp;&middot;&nbsp; <button class="switch-single-btn" id="switch-single-btn">[Switch to single agent]</button>
+  </div>
   <div class="drop-overlay">Drop files here</div>
   <div class="chat-messages"></div>
   <div class="empty-state">
@@ -742,6 +928,10 @@ class ScChat extends HTMLElement {
     this._dragCounter = 0;
     this._messageIdCounter = 0;
 
+    this._teamId = null;
+    this._teamName = 'DevOps Team';
+    this._teamAgentCount = 3;
+
     // Streaming state
     this._streaming = false;
     this._streamEl = null;
@@ -761,6 +951,22 @@ class ScChat extends HTMLElement {
   }
 
   /* ─── Properties ─── */
+  get teamId() { return this._teamId; }
+  set teamId(val) {
+    this._teamId = val;
+    this._updateTeamBanner();
+  }
+  get teamName() { return this._teamName; }
+  set teamName(val) {
+    this._teamName = val;
+    this._updateTeamBanner();
+  }
+  get teamAgentCount() { return this._teamAgentCount; }
+  set teamAgentCount(val) {
+    this._teamAgentCount = val;
+    this._updateTeamBanner();
+  }
+
   get messages() { return [...this._messages]; }
   set messages(arr) {
     this._messages = [];
@@ -802,6 +1008,10 @@ class ScChat extends HTMLElement {
     this._inputWrap = container.querySelector('.chat-input-wrap');
     this._dropOverlay = container.querySelector('.drop-overlay');
     this._fileChipsEl = container.querySelector('.file-chips');
+    this._teamBanner = container.querySelector('#team-banner');
+    this._teamBannerName = container.querySelector('#team-banner-name');
+    this._teamBannerCount = container.querySelector('#team-banner-count');
+    this._switchSingleBtn = container.querySelector('#switch-single-btn');
 
     this._textareaEl.placeholder = this._placeholder;
 
@@ -851,6 +1061,12 @@ class ScChat extends HTMLElement {
         this._handleSend();
       }
     });
+
+    if (this._switchSingleBtn) {
+      this._switchSingleBtn.addEventListener('click', () => {
+        this.dispatchEvent(new CustomEvent('switch-single-agent', { bubbles: true, composed: true }));
+      });
+    }
 
     // Send button
     this._sendBtn.addEventListener('click', () => this._handleSend());
@@ -983,9 +1199,11 @@ class ScChat extends HTMLElement {
     this._pendingFiles = [];
     this._renderFileChips();
 
+    const detail = { text, files };
+    if (this._teamId) detail.teamId = this._teamId;
     this.dispatchEvent(new CustomEvent('message-send', {
       bubbles: true, composed: true,
-      detail: { text, files }
+      detail
     }));
   }
 
@@ -1009,7 +1227,9 @@ class ScChat extends HTMLElement {
       id: msg.id || `msg-${++this._messageIdCounter}`,
       role: msg.role,
       content: msg.content || '',
-      timestamp: msg.timestamp || Date.now()
+      timestamp: msg.timestamp || Date.now(),
+      agentName: msg.agentName,
+      agentId: msg.agentId
     };
     this._messages.push(message);
     this._renderMessage(message);
@@ -1197,6 +1417,15 @@ class ScChat extends HTMLElement {
     // Actions
     const actions = this._createActions(msg.role, msg.id);
     wrap.appendChild(actions);
+
+    // Team Header
+    if (this._teamId && msg.role === 'assistant' && msg.agentName) {
+      const header = document.createElement('div');
+      header.className = 'team-msg-header';
+      const color = getAvatarColor(msg.agentName);
+      header.innerHTML = '<span class="team-avatar-dot" style="background:' + color.bg + '"></span> ' + this._escapeHtml(msg.agentName);
+      wrap.appendChild(header);
+    }
 
     // Bubble
     const bubble = document.createElement('div');
