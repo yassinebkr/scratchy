@@ -439,37 +439,7 @@ template.innerHTML = /* html */ `
     </button>
   </div>
 
-  <!-- Widget pills -->
-  <div class="surfaces widgets" role="group" aria-label="Widgets">
-    <button class="pill widget-pill" data-widget="notes" title="Notes">
-      <svg viewBox="0 0 16 16" aria-hidden="true">
-        <path d="M4 2h8a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z"/>
-        <line x1="5.5" y1="5.5" x2="10.5" y2="5.5"/>
-        <line x1="5.5" y1="8" x2="10.5" y2="8"/>
-        <line x1="5.5" y1="10.5" x2="8.5" y2="10.5"/>
-      </svg>
-      <span class="pill-label">Notes</span>
-    </button>
-    <button class="pill widget-pill" data-widget="calendar" title="Calendar">
-      <svg viewBox="0 0 16 16" aria-hidden="true">
-        <rect x="2" y="3" width="12" height="11" rx="1.5"/>
-        <line x1="2" y1="7" x2="14" y2="7"/>
-        <line x1="5.5" y1="1.5" x2="5.5" y2="4.5"/>
-        <line x1="10.5" y1="1.5" x2="10.5" y2="4.5"/>
-      </svg>
-      <span class="pill-label">Calendar</span>
-    </button>
-    <button class="pill widget-pill" data-widget="email" title="Email">
-      <svg viewBox="0 0 16 16" aria-hidden="true">
-        <rect x="1.5" y="3.5" width="13" height="9" rx="1.5"/>
-        <polyline points="1.5 3.5 8 9 14.5 3.5"/>
-      </svg>
-      <span class="pill-label">Email</span>
-    </button>
-  </div>
-
-  <!-- Divider -->
-  <div class="divider" aria-hidden="true"></div>
+  <!-- Widgets accessible via command palette (⌘K) only -->
 
   <!-- Activity indicator -->
   <div class="activity" data-state="idle" aria-live="polite" aria-label="Agent activity">
@@ -618,7 +588,8 @@ class ScWorkspaceBar extends HTMLElement {
       });
     });
 
-    // Widget pills
+    // Widget pills removed — accessible via command palette (⌘K) only
+    // Kept query for forward compat if pills are re-added later
     const widgetPills = this.#shadow.querySelectorAll('.widget-pill');
     widgetPills.forEach((pill) => {
       pill.addEventListener('click', () => {
