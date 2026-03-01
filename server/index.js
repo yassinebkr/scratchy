@@ -18,6 +18,7 @@ import { createSurfaceEventHandler } from './surface-events.js';
 import { seedAgents } from './seed-agents.js';
 import * as canvasState from '../state/canvas.js';
 import * as teamsState from '../state/teams.js';
+import * as workspacesState from '../state/workspaces.js';
 
 /** Default port — v2 runs on 3002 (v1 is on 3001) */
 const PORT = parseInt(process.env.PORT ?? '3002', 10);
@@ -140,7 +141,8 @@ async function main() {
   /* -- Canvas state -- */
   if (db) {
     canvasState.init(db);
-    console.log('[server] Canvas state persistence initialized');
+    workspacesState.init(db);
+    console.log('[server] Canvas + workspace state persistence initialized');
   }
 
   /* -- WebSocket handler -- */
@@ -162,10 +164,18 @@ async function main() {
     // Restore canvas state when a client connects
     onConnect: async (userId, ws) => {
       if (!db) return;
+      const { sendJson } = await import('./ws.js');
+
+      // Restore canvas state
       const ops = canvasState.getCanvasState(userId);
       if (ops && ops.length > 0) {
-        const { sendJson } = await import('./ws.js');
         sendJson(ws, { type: 'canvas-ops', ops, restored: true, ts: Date.now() });
+      }
+
+      // Send active workspace info (if any)
+      const activeWs = workspacesState.getActiveWorkspace(userId);
+      if (activeWs) {
+        sendJson(ws, { type: 'workspace-active', workspace: activeWs, ts: Date.now() });
       }
     },
   });

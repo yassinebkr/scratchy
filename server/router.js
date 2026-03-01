@@ -17,6 +17,7 @@ import * as agents from '../state/agents.js';
 import * as adminConfig from '../state/admin-config.js';
 import * as preferences from '../state/preferences.js';
 import * as teamsState from '../state/teams.js';
+import * as workspacesState from '../state/workspaces.js';
 import { adminRoutes } from './routes/admin.js';
 import { createChatRoutes } from './routes/chat.js';
 import { createWidgetRoutes } from './routes/widgets.js';
@@ -25,6 +26,7 @@ import { createWidgetRoutes } from './routes/widgets.js';
 import { handleBYOK } from './routes/byok.js';
 import { handleBilling } from './routes/billing.js';
 import { createTeamRoutes } from './routes/teams.js';
+import { createWorkspaceRoutes } from './routes/workspaces.js';
 
 /** @type {import('../lib/mcp-registry.js').McpRegistry|null} */
 let _mcpRegistry = null;
@@ -311,6 +313,9 @@ export function createRouter(opts = {}) {
     /** Lazily initialized team route handler */
     let _teamHandler = null;
 
+    /** Lazily initialized workspace route handler */
+    let _workspaceHandler = null;
+
   /**
    * Lazily initialize state modules when we have a db.
    */
@@ -324,6 +329,7 @@ export function createRouter(opts = {}) {
     adminConfig.init(db);
     preferences.init(db);
     teamsState.init(db);
+    workspacesState.init(db);
     stateInitialized = true;
   }
 
@@ -736,6 +742,15 @@ export function createRouter(opts = {}) {
           _teamHandler = createTeamRoutes({ authenticate, matchRoute });
         }
         const handled = await _teamHandler.handle(req, res, pathname);
+        if (handled) return;
+      }
+
+      /* ---------- Workspaces API ---------- */
+      if (pathname.startsWith('/api/workspaces')) {
+        if (!_workspaceHandler) {
+          _workspaceHandler = createWorkspaceRoutes({ authenticate, matchRoute });
+        }
+        const handled = await _workspaceHandler.handle(req, res, pathname);
         if (handled) return;
       }
 

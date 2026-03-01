@@ -254,6 +254,39 @@ export function initSchema(db) {
 
     CREATE INDEX IF NOT EXISTS idx_emails_userId ON emails(userId);
     CREATE INDEX IF NOT EXISTS idx_emails_sentAt ON emails(sentAt);
+
+    -- Workspaces (named canvas layouts)
+    CREATE TABLE IF NOT EXISTS workspaces (
+      id          TEXT PRIMARY KEY,
+      userId      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      name        TEXT NOT NULL,
+      description TEXT NOT NULL DEFAULT '',
+      icon        TEXT NOT NULL DEFAULT '📐',
+      ops         TEXT NOT NULL DEFAULT '[]',
+      surfaces    TEXT NOT NULL DEFAULT '[]',
+      layoutMode  TEXT NOT NULL DEFAULT 'auto',
+      isDefault   INTEGER NOT NULL DEFAULT 0,
+      templateKey TEXT,
+      createdAt   TEXT NOT NULL DEFAULT (datetime('now')),
+      updatedAt   TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_workspaces_userId ON workspaces(userId);
+
+    -- Workspace templates (pre-built layouts)
+    CREATE TABLE IF NOT EXISTS workspace_templates (
+      key         TEXT PRIMARY KEY,
+      name        TEXT NOT NULL,
+      description TEXT NOT NULL DEFAULT '',
+      icon        TEXT NOT NULL DEFAULT '📋',
+      category    TEXT NOT NULL DEFAULT 'general',
+      ops         TEXT NOT NULL DEFAULT '[]',
+      surfaces    TEXT NOT NULL DEFAULT '[]',
+      layoutMode  TEXT NOT NULL DEFAULT 'auto',
+      tier        TEXT NOT NULL DEFAULT 'free' CHECK (tier IN ('free','pro','max')),
+      sortOrder   INTEGER NOT NULL DEFAULT 0,
+      createdAt   TEXT NOT NULL DEFAULT (datetime('now'))
+    );
   `);
 
   // Migrate existing memory_chunks tables to v2 schema (consolidation support)
