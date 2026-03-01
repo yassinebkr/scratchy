@@ -788,6 +788,38 @@ function wireNewUIModules() {
 
   // --- Workspace Bar events ---
   // Surface pill toggle — mobile uses exclusive stack, desktop uses grid
+  // Plan selection → Stripe checkout
+  document.addEventListener('plan-selected', async (e) => {
+    const { planId } = e.detail || {};
+    if (!planId || planId === 'free') return; // free doesn't need checkout
+    if (planId === 'byok') {
+      // Open settings to BYOK section
+      let settings = document.querySelector('sc-settings');
+      if (!settings) { settings = document.createElement('sc-settings'); document.body.appendChild(settings); }
+      settings.setAttribute('open', '');
+      return;
+    }
+    // Paid plans → Stripe checkout
+    try {
+      const resp = await fetch('/api/billing/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ plan: planId }),
+      });
+      const data = await resp.json();
+      if (data.url) {
+        window.location.href = data.url; // redirect to Stripe
+      } else {
+        console.error('[billing] No checkout URL:', data);
+        alert(data.error || 'Failed to create checkout session');
+      }
+    } catch (err) {
+      console.error('[billing] Checkout error:', err);
+      alert('Failed to connect to billing service');
+    }
+  });
+
   // Dashboard events
   document.addEventListener('dashboard-open-widget', (e) => {
     const widget = e.detail?.widget;
@@ -930,6 +962,25 @@ async function init() {
   resolveDOM();
   wireWsEvents();
   wireNewUIModules();
+
+  // Handle Stripe return URL params
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.has('upgraded')) {
+    const plan = urlParams.get('upgraded');
+    // Clean URL
+    window.history.replaceState({}, '', window.location.pathname);
+    // Show success toast after app loads
+    setTimeout(() => {
+      const msg = document.createElement('div');
+      msg.textContent = `🎉 Welcome to Scratchy ${plan === 'pro' ? 'Pro' : 'Max'}! Your plan is now active.`;
+      msg.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#1a1610;border:1px solid rgba(249,166,2,0.3);color:#f0ead6;padding:12px 24px;border-radius:8px;z-index:9999;font-family:Geist,sans-serif;font-size:14px;animation:fadeIn 0.3s ease';
+      document.body.appendChild(msg);
+      setTimeout(() => msg.remove(), 5000);
+    }, 1000);
+  }
+  if (urlParams.has('cancelled')) {
+    window.history.replaceState({}, '', window.location.pathname);
+  }
 
   // Listen for auth events from <sc-auth>
   document.addEventListener('auth-login', async (e) => {

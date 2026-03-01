@@ -41,7 +41,7 @@ export function initSchema(db) {
       passwordHash  TEXT NOT NULL,
       displayName   TEXT,
       role          TEXT NOT NULL DEFAULT 'user'    CHECK (role IN ('admin', 'user')),
-      plan          TEXT NOT NULL DEFAULT 'free'    CHECK (plan IN ('free', 'pro', 'team', 'byok', 'enterprise')),
+      plan          TEXT NOT NULL DEFAULT 'free'    CHECK (plan IN ('free', 'pro', 'max', 'team', 'byok', 'enterprise')),
       apiKey        TEXT,
       capabilities  TEXT NOT NULL DEFAULT '[]',
       createdAt     TEXT NOT NULL DEFAULT (datetime('now')),

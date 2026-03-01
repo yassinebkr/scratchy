@@ -62,8 +62,8 @@ export async function handleBilling(method, pathname, user, body, json, res, req
   // POST /api/billing/checkout — create upgrade session
   if (method === 'POST' && pathname === '/api/billing/checkout') {
     const { plan } = body || {};
-    if (!plan || !['pro', 'team'].includes(plan)) {
-      return json(res, 400, { error: 'Plan must be "pro" or "team"' });
+    if (!plan || !['pro', 'max'].includes(plan)) {
+      return json(res, 400, { error: 'Plan must be "pro" or "max"' });
     }
     try {
       const result = await createCheckoutSession({
