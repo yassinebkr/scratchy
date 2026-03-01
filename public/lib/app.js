@@ -960,6 +960,15 @@ function wireNewUIModules() {
         widgetStore.setAttribute('open', '');
         break;
       }
+      case 'open-teams': {
+        let teams = document.querySelector('sc-teams');
+        if (!teams) {
+          teams = document.createElement('sc-teams');
+          document.body.appendChild(teams);
+        }
+        teams.setAttribute('open', '');
+        break;
+      }
     }
   });
 
@@ -1217,6 +1226,25 @@ async function init() {
     const ws = document.querySelector('sc-widget-store');
     if (ws) ws.removeAttribute('open');
   });
+
+  // Teams panel events
+  document.addEventListener('teams-close', () => {
+    const t = document.querySelector('sc-teams');
+    if (t) t.removeAttribute('open');
+  });
+  document.addEventListener('team-chat', (e) => {
+    const { teamId, teamName } = e.detail || {};
+    if (!teamId) return;
+    const t = document.querySelector('sc-teams');
+    if (t) t.removeAttribute('open');
+    // Set team mode on chat component
+    const chat = document.querySelector('sc-chat');
+    if (chat) {
+      chat.teamId = teamId;
+      chat.teamName = teamName;
+    }
+  });
+
   document.addEventListener('widget-open', (e) => {
     const { widget } = e.detail || {};
     if (!widget) return;
