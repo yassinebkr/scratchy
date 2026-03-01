@@ -942,6 +942,24 @@ function wireNewUIModules() {
         _openWidget('sc-email', 'email');
         break;
       }
+      case 'open-billing': {
+        let billing = document.querySelector('sc-billing');
+        if (!billing) {
+          billing = document.createElement('sc-billing');
+          document.body.appendChild(billing);
+        }
+        billing.setAttribute('open', '');
+        break;
+      }
+      case 'open-widget-store': {
+        let widgetStore = document.querySelector('sc-widget-store');
+        if (!widgetStore) {
+          widgetStore = document.createElement('sc-widget-store');
+          document.body.appendChild(widgetStore);
+        }
+        widgetStore.setAttribute('open', '');
+        break;
+      }
     }
   });
 
@@ -1187,6 +1205,32 @@ async function init() {
     if (s) s.removeAttribute('open');
   });
   document.addEventListener('settings-logout', logout);
+
+  // Billing panel events
+  document.addEventListener('billing-close', () => {
+    const b = document.querySelector('sc-billing');
+    if (b) b.removeAttribute('open');
+  });
+
+  // Widget Store panel events
+  document.addEventListener('widget-store-close', () => {
+    const ws = document.querySelector('sc-widget-store');
+    if (ws) ws.removeAttribute('open');
+  });
+  document.addEventListener('widget-open', (e) => {
+    const { widget } = e.detail || {};
+    if (!widget) return;
+    // Close widget store
+    const ws = document.querySelector('sc-widget-store');
+    if (ws) ws.removeAttribute('open');
+    // If it's a builtin component, dispatch to workspace bar
+    if (widget.component) {
+      window.dispatchEvent(new CustomEvent('open-widget', { detail: { widgetId: widget.id, component: widget.component } }));
+    } else if (widget.url) {
+      // Embed as web app surface
+      window.dispatchEvent(new CustomEvent('surface-activate', { detail: { surface: 'webapp', url: widget.url, title: widget.name } }));
+    }
+  });
   if ($logoutBtn) {
     $logoutBtn.addEventListener('click', () => { $userMenu.classList.add('hidden'); logout(); });
   }

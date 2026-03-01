@@ -686,6 +686,12 @@ export function createRouter(opts = {}) {
         }
       }
 
+      // GET /api/plans — public plan/pricing metadata
+      if (method === 'GET' && pathname === '/api/plans') {
+        const { PLAN_META } = await import('../lib/usage-tracker.js');
+        return json(res, 200, { plans: PLAN_META });
+      }
+
       /* ---------- Billing API ---------- */
       if (pathname.startsWith('/api/billing')) {
         // Webhook endpoint doesn't require auth (Stripe signs it)
@@ -723,12 +729,13 @@ export function createRouter(opts = {}) {
         const user = await requireAuth(req, res);
         if (!user) return;
         try {
-          const { getUsageTracker } = await import('../lib/usage-tracker.js');
+          const { getUsageTracker, PLAN_META } = await import('../lib/usage-tracker.js');
           const tracker = getUsageTracker();
           if (pathname === '/api/usage' && method === 'GET') {
             const today = tracker.getToday(user.id);
             const limits = tracker.getLimits(user.id);
-            return json(res, 200, { today, limits, resetAt: new Date(new Date().setUTCHours(24, 0, 0, 0)).toISOString() });
+            const planInfo = PLAN_META[limits.tier] || PLAN_META.free;
+            return json(res, 200, { today, limits, plan: planInfo, resetAt: new Date(new Date().setUTCHours(24, 0, 0, 0)).toISOString() });
           }
           if (pathname === '/api/usage/history' && method === 'GET') {
             const url = new URL(req.url, `http://${req.headers.host}`);
