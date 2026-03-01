@@ -161,6 +161,56 @@ export function initSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_agent_conversations_agentId ON agent_conversations(agentId);
     CREATE INDEX IF NOT EXISTS idx_agent_conversations_userId ON agent_conversations(userId);
 
+    -- Teams (multi-agent collaboration)
+    CREATE TABLE IF NOT EXISTS teams (
+      id          TEXT PRIMARY KEY,
+      name        TEXT NOT NULL,
+      description TEXT NOT NULL DEFAULT '',
+      ownerId     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      icon        TEXT DEFAULT '👥',
+      color       TEXT DEFAULT 'blue',
+      createdAt   TEXT NOT NULL DEFAULT (datetime('now')),
+      updatedAt   TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS team_members (
+      id       TEXT PRIMARY KEY,
+      teamId   TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+      userId   TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      role     TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('owner','admin','member')),
+      joinedAt TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(teamId, userId)
+    );
+
+    CREATE TABLE IF NOT EXISTS team_agents (
+      id       TEXT PRIMARY KEY,
+      teamId   TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+      agentId  TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+      role     TEXT NOT NULL DEFAULT 'worker' CHECK (role IN ('orchestrator','worker','reviewer')),
+      addedBy  TEXT REFERENCES users(id) ON DELETE SET NULL,
+      addedAt  TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(teamId, agentId)
+    );
+
+    CREATE TABLE IF NOT EXISTS team_memory (
+      id        TEXT PRIMARY KEY,
+      teamId    TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+      key       TEXT NOT NULL,
+      content   TEXT NOT NULL,
+      embedding BLOB,
+      createdBy TEXT REFERENCES users(id) ON DELETE SET NULL,
+      agentId   TEXT REFERENCES agents(id) ON DELETE SET NULL,
+      createdAt TEXT NOT NULL DEFAULT (datetime('now')),
+      updatedAt TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_teams_ownerId ON teams(ownerId);
+    CREATE INDEX IF NOT EXISTS idx_team_members_teamId ON team_members(teamId);
+    CREATE INDEX IF NOT EXISTS idx_team_members_userId ON team_members(userId);
+    CREATE INDEX IF NOT EXISTS idx_team_agents_teamId ON team_agents(teamId);
+    CREATE INDEX IF NOT EXISTS idx_team_agents_agentId ON team_agents(agentId);
+    CREATE INDEX IF NOT EXISTS idx_team_memory_teamId ON team_memory(teamId);
+
     -- Notes (widget: notes)
     CREATE TABLE IF NOT EXISTS notes (
       id        TEXT PRIMARY KEY,
