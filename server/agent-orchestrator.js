@@ -34,6 +34,7 @@ import { createToolCallDetector } from '../lib/tool-call-detector.js';
 import * as agents from '../state/agents.js';
 import * as memory from '../state/memory.js';
 import * as contextIndex from '../state/context-index.js';
+import { getUsageTracker } from '../lib/usage-tracker.js';
 
 /* ------------------------------------------------------------------ */
 /*  Constants                                                         */
@@ -794,6 +795,36 @@ export async function routeMessage(userId, agentId, message, ws) {
 
   console.log(`[orchestrator] ${userId} → agent:${agentId || 'default'}: ${text.slice(0, 100)}`);
 
+  // ── Step 0: Rate limiting ──
+  try {
+    const tracker = getUsageTracker();
+
+    // Burst rate limit (per-minute)
+    const burst = tracker.checkBurst(userId);
+    if (!burst.allowed) {
+      sendJson(ws, {
+        type: 'chat', from: 'system',
+        text: `⏳ Rate limit reached. Try again in ${Math.ceil(burst.retryAfterMs / 1000)}s.`,
+        ts: Date.now(),
+      });
+      return;
+    }
+
+    // Daily quota check
+    const quota = tracker.check(userId, 'message');
+    if (!quota.allowed) {
+      sendJson(ws, {
+        type: 'chat', from: 'system',
+        text: `📊 Daily message limit reached (${quota.limit} messages). Resets at midnight UTC. Upgrade your plan for more.`,
+        ts: Date.now(),
+      });
+      return;
+    }
+  } catch (rateLimitErr) {
+    // Usage tracker not initialized yet — allow the message through
+    console.warn('[orchestrator] Rate limit check skipped:', rateLimitErr.message);
+  }
+
   // ── Step 1: Resolve agent config ──
   const agent = resolveAgent(agentId);
   const effectiveAgentId = agent.id;
@@ -989,12 +1020,25 @@ export async function routeMessage(userId, agentId, message, ws) {
       handleA2UIResponse(response, ws, userId);
     }
 
-    // ── Step 9: Persist assistant response ──
+    // ── Step 9: Persist assistant response + usage tracking ──
     if (response) {
       const modelLabel = usedAdapter
         ? `nullclaw-gateway:${agent.model || 'default'}`
         : 'nullclaw';
       appendHistory(userId, effectiveAgentId, 'assistant', response, modelLabel);
+
+      // Log usage (best-effort, don't block)
+      try {
+        const tracker = getUsageTracker();
+        tracker.log(userId, 'message', 1, { agentId: effectiveAgentId, model: modelLabel });
+        // Estimate tokens: ~4 chars per token for both input and output
+        const inputTokens = Math.ceil(augmentedPrompt.length / 4);
+        const outputTokens = Math.ceil(response.length / 4);
+        tracker.log(userId, 'tokens', inputTokens + outputTokens, { input: inputTokens, output: outputTokens });
+      } catch (usageErr) {
+        // Usage tracking is non-critical — don't break chat flow
+        console.warn('[orchestrator] Usage tracking error:', usageErr.message);
+      }
     }
 
     // ── Async post-response pipeline (memory extraction) ──

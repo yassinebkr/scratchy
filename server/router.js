@@ -19,6 +19,7 @@ import * as preferences from '../state/preferences.js';
 import { adminRoutes } from './routes/admin.js';
 import { createChatRoutes } from './routes/chat.js';
 import { createWidgetRoutes } from './routes/widgets.js';
+import { registerUsageRoutes } from './routes/usage.js';
 
 /** @type {import('../lib/mcp-registry.js').McpRegistry|null} */
 let _mcpRegistry = null;
@@ -679,6 +680,33 @@ export function createRouter(opts = {}) {
           return json(res, 200, catalog);
         } catch (err) {
           return json(res, 500, { error: 'Failed to load widget catalog' });
+        }
+      }
+
+      /* ---------- Usage API ---------- */
+      if (pathname.startsWith('/api/usage')) {
+        const user = await requireAuth(req, res);
+        if (!user) return;
+        try {
+          const { getUsageTracker } = await import('../lib/usage-tracker.js');
+          const tracker = getUsageTracker();
+          if (pathname === '/api/usage' && method === 'GET') {
+            const today = tracker.getToday(user.id);
+            const limits = tracker.getLimits(user.id);
+            return json(res, 200, { today, limits, resetAt: new Date(new Date().setUTCHours(24, 0, 0, 0)).toISOString() });
+          }
+          if (pathname === '/api/usage/history' && method === 'GET') {
+            const url = new URL(req.url, `http://${req.headers.host}`);
+            const from = url.searchParams.get('from') || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+            const to = url.searchParams.get('to') || new Date().toISOString().slice(0, 10);
+            return json(res, 200, { from, to, data: tracker.getRange(user.id, from, to) });
+          }
+          if (pathname === '/api/usage/limits' && method === 'GET') {
+            return json(res, 200, tracker.getLimits(user.id));
+          }
+          return json(res, 404, { error: 'Not found' });
+        } catch (err) {
+          return json(res, 500, { error: 'Usage tracker not available' });
         }
       }
 

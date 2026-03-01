@@ -44,6 +44,15 @@ async function main() {
     }
     console.log('[server] Database initialized');
 
+    /* -- Usage tracker -- */
+    try {
+      const { initUsageTracker } = await import('../lib/usage-tracker.js');
+      initUsageTracker(db);
+      console.log('[server] Usage tracker initialized');
+    } catch (err) {
+      console.warn('[server] Usage tracker init failed:', err.message);
+    }
+
     /* -- Seed default agents -- */
     seedAgents(db);
   } catch (err) {
