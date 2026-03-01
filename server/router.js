@@ -19,7 +19,8 @@ import * as preferences from '../state/preferences.js';
 import { adminRoutes } from './routes/admin.js';
 import { createChatRoutes } from './routes/chat.js';
 import { createWidgetRoutes } from './routes/widgets.js';
-import { registerUsageRoutes } from './routes/usage.js';
+// Usage routes are handled inline below (custom router, not Express)
+// import { registerUsageRoutes } from './routes/usage.js';
 import { handleBYOK } from './routes/byok.js';
 import { handleBilling } from './routes/billing.js';
 
