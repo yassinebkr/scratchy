@@ -449,6 +449,7 @@ class ScWorkerBubble extends HTMLElement {
           border: 2px solid transparent;
           border-top-color: rgba(249,166,2,0.6);
           border-right-color: rgba(249,166,2,0.2);
+          box-sizing: border-box;
           opacity: 0;
           transition: opacity 0.3s ease;
           pointer-events: none;

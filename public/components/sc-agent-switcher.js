@@ -1461,35 +1461,58 @@ const STYLES = /* css */ `
   }
 }
 
-/* ── Team groups ─────────────────────────────────────────── */
-.team-group { margin-bottom: 4px; }
+/* ── Team groups (icon rail mode) ─────────────────────────── */
+.team-group { margin-bottom: 2px; }
 .team-header {
-  display: flex; align-items: center; gap: 10px;
-  padding: 10px 12px; border-radius: 8px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  width: 44px; height: 44px; min-height: 44px;
+  padding: 0; border-radius: var(--radius); cursor: pointer;
   transition: background 150ms; border: 1px solid transparent;
+  position: relative;
 }
-.team-header:hover { background: rgba(255,255,255,0.03); border-color: rgba(249,166,2,0.12); }
+.team-header:hover { background: rgba(249,166,2,0.06); border-color: rgba(249,166,2,0.12); }
 .team-header.active { background: rgba(249,166,2,0.08); border-color: rgba(249,166,2,0.25); }
 .team-icon {
-  width: 36px; height: 36px; border-radius: 50%;
+  width: 36px; height: 36px; border-radius: var(--radius);
   background: rgba(249,166,2,0.12);
   display: flex; align-items: center; justify-content: center;
   color: #F9A602; flex-shrink: 0;
 }
-.team-info { flex: 1; min-width: 0; }
+/* Hide text labels in icon rail — use tooltip instead */
+.team-info { display: none; }
 .team-name { display: block; font-weight: 600; font-size: 13px; color: #f0ead6; }
 .team-count { font-size: 11px; color: #8a7e6a; }
-.team-chevron {
-  font-size: 12px; color: #8a7e6a; transition: transform 200ms;
-  cursor: pointer; padding: 4px;
-}
+.team-chevron { display: none; }
 .team-group.expanded .team-chevron { transform: rotate(90deg); }
+/* Team members hidden in icon rail */
 .team-members {
-  padding-left: 20px; overflow: hidden; max-height: 0;
+  padding-left: 0; overflow: hidden; max-height: 0;
   transition: max-height 300ms ease;
 }
 .team-group.expanded .team-members { max-height: 500px; }
 .team-members .agent-card { transform: scale(0.95); margin-bottom: 2px; }
+/* CSS tooltip for team names — same pattern as agent cards */
+.team-header[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%);
+  background: #1a1610;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-hover);
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease-out;
+  z-index: 200;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+.team-header[data-tooltip]:hover::after { opacity: 1; }
 `;
 
 /* ─── HTML Template ──────────────────────────────────────── */
@@ -1991,13 +2014,13 @@ export class ScAgentSwitcher extends HTMLElement {
     header.setAttribute('role', 'button');
     header.setAttribute('aria-expanded', 'false');
     header.setAttribute('aria-label', `${team.name || 'Team'} \u2014 ${members.length} agents`);
+    header.dataset.tooltip = `${team.name || 'Team'} \u2014 ${members.length} agent${members.length !== 1 ? 's' : ''}`;
     header.innerHTML = `
       <div class="team-icon">${SVG.group}</div>
       <div class="team-info">
         <span class="team-name">${this._esc(team.name || 'Team')}</span>
         <span class="team-count">${members.length} agent${members.length !== 1 ? 's' : ''}</span>
       </div>
-      <span class="team-chevron">\u25B8</span>
     `;
 
     const membersContainer = document.createElement('div');
@@ -2008,9 +2031,8 @@ export class ScAgentSwitcher extends HTMLElement {
       membersContainer.appendChild(card);
     }
 
-    /* Clicking the header area (not chevron) dispatches team-chat */
-    header.addEventListener('click', (e) => {
-      if (e.target.closest('.team-chevron')) return;
+    /* Clicking the header dispatches team-chat */
+    header.addEventListener('click', () => {
       this.dispatchEvent(new CustomEvent('team-chat', {
         bubbles: true,
         composed: true,
@@ -2020,14 +2042,6 @@ export class ScAgentSwitcher extends HTMLElement {
           agentCount: members.length,
         },
       }));
-    });
-
-    /* Clicking the chevron toggles expand/collapse */
-    const chevron = header.querySelector('.team-chevron');
-    chevron.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const expanded = group.classList.toggle('expanded');
-      header.setAttribute('aria-expanded', String(expanded));
     });
 
     group.appendChild(header);
