@@ -211,7 +211,9 @@ function sendMessage() {
 
   // Send with active agent ID for per-agent conversation isolation
   const activeAgentId = $agentSwitcher?._activeAgentId || null;
-  sendChat(text, activeAgentId, _activeTeamId || undefined);
+  const teamId = _activeTeamId || sessionStorage.getItem('scratchy_teamId') || undefined;
+  if (teamId) console.log('[app] Sending team message:', teamId);
+  sendChat(text, activeAgentId, teamId);
   $msgInput.value = '';
   autoResize($msgInput);
   $msgInput.focus();

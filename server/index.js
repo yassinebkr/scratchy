@@ -156,6 +156,7 @@ async function main() {
     mcpRegistry,
     onChat: async (userId, msg, ws) => {
       // Team routing: if msg has teamId, route through team pipeline
+      console.log(`[chat] userId=${userId} teamId=${msg.teamId || 'none'} agentId=${msg.agentId || 'default'} text=${(msg.text || '').slice(0, 60)}`);
       if (msg.teamId) {
         await routeTeamChat(userId, msg.teamId, msg, ws);
       } else {
