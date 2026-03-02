@@ -1462,35 +1462,46 @@ const STYLES = /* css */ `
 }
 
 /* ── Team groups (icon rail mode) ─────────────────────────── */
-.team-group { margin-bottom: 2px; }
+.team-group {
+  margin-bottom: 2px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
 .team-header {
   display: flex; align-items: center; justify-content: center;
   width: 44px; height: 44px; min-height: 44px;
-  padding: 0; border-radius: var(--radius); cursor: pointer;
-  transition: background 150ms; border: 1px solid transparent;
+  padding: 0; cursor: pointer;
+  transition: background 150ms, border-color 150ms;
+  border: 1.5px dashed rgba(249,166,2,0.25);
+  border-radius: 50%;
   position: relative;
+  flex-shrink: 0;
 }
-.team-header:hover { background: rgba(249,166,2,0.06); border-color: rgba(249,166,2,0.12); }
-.team-header.active { background: rgba(249,166,2,0.08); border-color: rgba(249,166,2,0.25); }
+.team-header:hover {
+  background: rgba(249,166,2,0.08);
+  border-color: rgba(249,166,2,0.45);
+}
+.team-header.active {
+  background: rgba(249,166,2,0.10);
+  border-color: var(--accent);
+  border-style: solid;
+}
 .team-icon {
-  width: 36px; height: 36px; border-radius: var(--radius);
-  background: rgba(249,166,2,0.12);
+  width: 36px; height: 36px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  color: #F9A602; flex-shrink: 0;
+  font-size: 12px; font-weight: 700; letter-spacing: 0.3px;
+  flex-shrink: 0;
+  user-select: none;
 }
 /* Hide text labels in icon rail — use tooltip instead */
 .team-info { display: none; }
-.team-name { display: block; font-weight: 600; font-size: 13px; color: #f0ead6; }
-.team-count { font-size: 11px; color: #8a7e6a; }
 .team-chevron { display: none; }
-.team-group.expanded .team-chevron { transform: rotate(90deg); }
 /* Team members hidden in icon rail */
 .team-members {
   padding-left: 0; overflow: hidden; max-height: 0;
   transition: max-height 300ms ease;
 }
-.team-group.expanded .team-members { max-height: 500px; }
-.team-members .agent-card { transform: scale(0.95); margin-bottom: 2px; }
 /* CSS tooltip for team names — same pattern as agent cards */
 .team-header[data-tooltip]::after {
   content: attr(data-tooltip);
