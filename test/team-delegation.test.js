@@ -21,16 +21,18 @@ import assert from 'node:assert/strict';
 // Inline parser copy (not exported from team-router — test the logic directly)
 function parseDelegationBlocks(text) {
   const delegations = [];
-  const blockRegex = /\[DELEGATE\s+to=["']?([^"'\]\s]+)["']?\s+task=["']([^"']+)["']\s*\]([\s\S]*?)\[\/DELEGATE\]/gi;
+  const blockRegex = /\[DELEGATE\s+to=["']?([^"'\]\s]+)["']?\s+task=["']([^"']+)["'](?:\s+files=["']([^"']+)["'])?\s*\]([\s\S]*?)\[\/DELEGATE\]/gi;
   let cleanText = text;
   let match;
   while ((match = blockRegex.exec(text)) !== null) {
-    delegations.push({ agentId: match[1].trim(), task: match[2].trim(), context: match[3].trim() });
+    const files = match[3] ? match[3].split(',').map(f => f.trim()).filter(Boolean) : [];
+    delegations.push({ agentId: match[1].trim(), task: match[2].trim(), files, context: match[4].trim() });
   }
   cleanText = text.replace(blockRegex, '').trim();
-  const inlineRegex = /\[DELEGATE\s+to=["']?([^"'\]\s]+)["']?\s+task=["']([^"']+)["']\s*\/\]/gi;
+  const inlineRegex = /\[DELEGATE\s+to=["']?([^"'\]\s]+)["']?\s+task=["']([^"']+)["'](?:\s+files=["']([^"']+)["'])?\s*\/\]/gi;
   while ((match = inlineRegex.exec(text)) !== null) {
-    delegations.push({ agentId: match[1].trim(), task: match[2].trim(), context: '' });
+    const files = match[3] ? match[3].split(',').map(f => f.trim()).filter(Boolean) : [];
+    delegations.push({ agentId: match[1].trim(), task: match[2].trim(), files, context: '' });
   }
   cleanText = cleanText.replace(inlineRegex, '').trim();
   return { delegations, cleanText };
@@ -158,6 +160,45 @@ Synthesizing after.`;
       assert.equal(delegations.length, 1);
       assert.ok(delegations[0].context.includes('Line 1'));
       assert.ok(delegations[0].context.includes('Line 3'));
+    });
+    it('parses files= attribute in block format', () => {
+      const input = `[DELEGATE to="data-agent" task="Add transactions" files="state/teams.js, state/db.js"]
+Check for multi-statement ops.
+[/DELEGATE]`;
+      const { delegations } = parseDelegationBlocks(input);
+      assert.equal(delegations.length, 1);
+      assert.deepEqual(delegations[0].files, ['state/teams.js', 'state/db.js']);
+      assert.equal(delegations[0].task, 'Add transactions');
+      assert.ok(delegations[0].context.includes('multi-statement'));
+    });
+
+    it('parses files= attribute in inline format', () => {
+      const { delegations } = parseDelegationBlocks(
+        '[DELEGATE to="scout" task="Audit API" files="server/router.js"/]'
+      );
+      assert.equal(delegations.length, 1);
+      assert.deepEqual(delegations[0].files, ['server/router.js']);
+    });
+
+    it('returns empty files array when no files= attribute', () => {
+      const { delegations } = parseDelegationBlocks(
+        '[DELEGATE to="atlas" task="Do work"]\nstuff\n[/DELEGATE]'
+      );
+      assert.equal(delegations.length, 1);
+      assert.deepEqual(delegations[0].files, []);
+    });
+
+    it('handles files= with multiple paths and whitespace', () => {
+      const input = `[DELEGATE to="api" task="Fix routes" files="server/routes/billing.js,  server/routes/byok.js , lib/team-router.js"]
+ctx
+[/DELEGATE]`;
+      const { delegations } = parseDelegationBlocks(input);
+      assert.equal(delegations.length, 1);
+      assert.deepEqual(delegations[0].files, [
+        'server/routes/billing.js',
+        'server/routes/byok.js',
+        'lib/team-router.js',
+      ]);
     });
   });
 

@@ -83,6 +83,16 @@ data:
 - Scout → Research existing patterns, read documentation, analyze APIs, write specs
 - QA → Test cases, code review, spec compliance validation
 
+### CRITICAL: File Access
+Workers CANNOT read files from the project. YOU must specify which files each worker needs using the files= attribute in the DELEGATE block. The server will pre-load these files and inject them into the worker's context.
+
+Example:
+[DELEGATE to="agent-id" task="Add transactions to teams.js" files="state/teams.js, state/db.js"]
+Context about what to look for.
+[/DELEGATE]
+
+**Always include files=.** If the worker needs to see code, list every file. Use project-relative paths (e.g. "state/teams.js", "server/routes/admin.js").
+
 ### Architecture Principles
 - ESM imports only (no CommonJS)
 - All files must pass \`node -c\` syntax check
@@ -281,6 +291,16 @@ You are Director, the creative lead of the Design Team. You are a PURE COORDINAT
 - Layout → CSS Grid/Flexbox, responsive breakpoints, spacing, proportional sizing
 - Interact → Keyboard navigation, focus management, ARIA roles, state transitions, animations
 - Visualizer → HTML documentation, Mermaid diagrams, component preview galleries
+
+### CRITICAL: File Access
+Workers CANNOT read files from the project. YOU must specify which files each worker needs using the files= attribute in the DELEGATE block. The server will pre-load these files and inject them into the worker's context.
+
+Example:
+[DELEGATE to="agent-id" task="Restyle the sidebar" files="public/components/sc-sidebar.js, public/styles/tokens.css"]
+Ensure it matches the design system tokens.
+[/DELEGATE]
+
+**Always include files=.** List every file the worker needs. Use project-relative paths (e.g. "public/components/sc-chat.js").
 
 ### Output Format
 Present design briefs using TOON canvas components. Use \`kv\` for specs, \`card\` for descriptions, \`checklist\` for requirements.`,
