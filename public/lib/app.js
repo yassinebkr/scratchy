@@ -32,8 +32,8 @@ let $agentSwitcher;
 let $mobileAgentBtn;
 let $workspaceBar;
 let $teamBanner, $teamBannerName, $teamBannerAgents, $teamExitBtn;
-let _activeTeamId = null;
-let _activeTeamName = null;
+let _activeTeamId = sessionStorage.getItem('scratchy_teamId') || null;
+let _activeTeamName = sessionStorage.getItem('scratchy_teamName') || null;
 
 function resolveDOM() {
   $loadingScreen = document.getElementById('loading-screen');
@@ -108,6 +108,16 @@ function showApp() {
     dashboard.refresh?.();
   }
   if ($workspaceBar && state.user?.displayName) $workspaceBar.setUser(state.user.displayName);
+
+  // Restore team mode from sessionStorage
+  if (_activeTeamId) {
+    const agentCount = sessionStorage.getItem('scratchy_teamAgents') || '?';
+    if ($teamBanner) $teamBanner.classList.remove('hidden');
+    if ($teamBannerName) $teamBannerName.textContent = _activeTeamName || 'Team';
+    if ($teamBannerAgents) $teamBannerAgents.textContent = agentCount + ' agents';
+    if ($msgInput) $msgInput.placeholder = 'Message ' + (_activeTeamName || 'Team') + '...';
+  }
+
   $msgInput?.focus();
 }
 
@@ -1290,6 +1300,9 @@ async function init() {
     // Activate team mode
     _activeTeamId = teamId;
     _activeTeamName = teamName || 'Team';
+    sessionStorage.setItem('scratchy_teamId', _activeTeamId);
+    sessionStorage.setItem('scratchy_teamName', _activeTeamName);
+    if (agentCount) sessionStorage.setItem('scratchy_teamAgents', String(agentCount));
     if ($teamBanner) $teamBanner.classList.remove('hidden');
     if ($teamBannerName) $teamBannerName.textContent = _activeTeamName;
     if ($teamBannerAgents) $teamBannerAgents.textContent = (agentCount || '?') + ' agents';
@@ -1303,6 +1316,9 @@ async function init() {
     $teamExitBtn.addEventListener('click', () => {
       _activeTeamId = null;
       _activeTeamName = null;
+      sessionStorage.removeItem('scratchy_teamId');
+      sessionStorage.removeItem('scratchy_teamName');
+      sessionStorage.removeItem('scratchy_teamAgents');
       if ($teamBanner) $teamBanner.classList.add('hidden');
       if ($msgInput) $msgInput.placeholder = 'Message Scratchy\u2026 (Shift+Enter for new line)';
     });

@@ -672,8 +672,8 @@ export class ScTeams extends HTMLElement {
         </div>
         <div class="card-desc">${this.esc(team.description || 'No description')}</div>
         <div class="card-meta">
-          <span>${ICONS.user} ${team.members?.length || 0}</span>
-          <span>${ICONS.bot} ${team.agents?.length || 0}</span>
+          <span>${ICONS.user} ${team.memberCount ?? team.members?.length ?? 0}</span>
+          <span>${ICONS.bot} ${team.agentCount ?? team.agents?.length ?? 0}</span>
         </div>
       `;
       card.addEventListener('click', () => this.openDetail(team.id));
@@ -793,7 +793,7 @@ export class ScTeams extends HTMLElement {
     this.$.detailContent.querySelector('#btn-team-chat').addEventListener('click', () => {
       this.dispatchEvent(new CustomEvent('team-chat', {
         bubbles: true, composed: true,
-        detail: { teamId: t.id, teamName: t.name, agentCount: (t.agents || []).length }
+        detail: { teamId: t.id, teamName: t.name, agentCount: t.agentCount ?? (t.agents || []).length }
       }));
     });
 
