@@ -36,7 +36,7 @@ import * as agents from '../state/agents.js';
 import * as memory from '../state/memory.js';
 import * as contextIndex from '../state/context-index.js';
 import { getUsageTracker } from '../lib/usage-tracker.js';
-import { routeTeamMessage, handleDelegation } from '../lib/team-router.js';
+import { routeTeamMessage } from '../lib/team-router.js';
 import * as teamsState from '../state/teams.js';
 
 /* ------------------------------------------------------------------ */
@@ -1212,22 +1212,8 @@ export async function routeTeamChat(userId, teamId, message, ws) {
   }
 }
 
-/**
- * Handle a delegation request from NullClaw (via /api/internal/team-delegate).
- * Exposed for the router to call.
- *
- * @param {Object} params — { userId, teamId, agentId, task, context }
- * @param {import('ws').WebSocket|null} ws
- * @returns {Promise<{ content: string, isError?: boolean }>}
- */
-export async function handleTeamDelegation(params, ws) {
-  return handleDelegation({
-    ...params,
-    adapter: _adapter,
-    ws,
-    sendJson,
-  });
-}
+// handleTeamDelegation removed — delegation is fully server-managed via [DELEGATE] blocks.
+// No http_request delegation path exists.
 
 /* ------------------------------------------------------------------ */
 /*  Shutdown                                                          */
