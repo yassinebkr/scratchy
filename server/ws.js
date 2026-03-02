@@ -15,7 +15,8 @@ import { URL } from 'node:url';
 /*  Rate limiter — per-client message counter, resets every second    */
 /* ------------------------------------------------------------------ */
 
-const MAX_MESSAGES_PER_SECOND = 10;
+const RATE_WARN_THRESHOLD = 20;
+const RATE_DISCONNECT_THRESHOLD = 50;
 
 /** @type {Map<import('ws').WebSocket, number>} */
 const messageCounters = new Map();
@@ -368,7 +369,7 @@ async function handleMessage(ws, state, msg, opts) {
     }
 
     default: {
-      sendJson(ws, { type: 'error', message: `Unknown message type: ${type}` });
+      console.warn(`[ws] Unknown message type ignored: ${type}`);
     }
   }
 }
@@ -411,7 +412,7 @@ export function createWsHandler(server, opts = {}) {
 
   /* -- Connection handler -- */
   wss.on('connection', (ws, _req) => {
-    // Track as pending auth — must authenticate within 5 seconds
+    // Track as pending auth — must authenticate within 10 seconds
     pendingAuth.add(ws);
     const authTimeout = setTimeout(() => {
       if (pendingAuth.has(ws)) {
@@ -419,15 +420,26 @@ export function createWsHandler(server, opts = {}) {
         pendingAuth.delete(ws);
         ws.close(4001, 'Auth timeout');
       }
-    }, 5000);
+    }, 10_000);
 
     /* -- Incoming messages -- */
     ws.on('message', async (raw) => {
-      /* Rate limiting */
+      /* Rate limiting — tiered: warn at 20/sec, disconnect at 50/sec */
       const count = (messageCounters.get(ws) ?? 0) + 1;
       messageCounters.set(ws, count);
-      if (count > MAX_MESSAGES_PER_SECOND) {
-        sendJson(ws, { type: 'error', message: 'Rate limit exceeded — max 10 messages per second' });
+      if (count > RATE_DISCONNECT_THRESHOLD) {
+        console.warn('[ws] Rate limit exceeded (>50/sec) — disconnecting client');
+        ws.close(4008, 'Rate limit exceeded');
+        return;
+      }
+      if (count > RATE_WARN_THRESHOLD) {
+        sendJson(ws, { type: 'error', message: 'Slow down — too many messages per second' });
+        return;
+      }
+
+      /* Message size limit — 64KB */
+      if (raw.length > 65536) {
+        sendJson(ws, { type: 'error', message: 'Message too large (max 64KB)' });
         return;
       }
 
@@ -542,14 +554,19 @@ export function createWsHandler(server, opts = {}) {
     });
   });
 
-  /* -- Keepalive interval (ping every 30s, terminate dead connections) -- */
+  /* -- Keepalive interval (ping every 30s, terminate after 2 missed pongs = 60s) -- */
   const keepaliveInterval = setInterval(() => {
     for (const [ws, state] of clients) {
       if (!state.alive) {
-        console.log(`[ws] Terminating inactive connection: ${state.userId}`);
-        ws.terminate();
-        unregisterClient(ws);
-        continue;
+        state.missedPings = (state.missedPings || 0) + 1;
+        if (state.missedPings >= 2) {
+          console.log(`[ws] Terminating inactive connection (${state.missedPings} missed pings): ${state.userId}`);
+          ws.terminate();
+          unregisterClient(ws);
+          continue;
+        }
+      } else {
+        state.missedPings = 0;
       }
       state.alive = false;
       ws.ping();

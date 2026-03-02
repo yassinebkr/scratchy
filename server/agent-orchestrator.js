@@ -44,7 +44,7 @@ import * as teamsState from '../state/teams.js';
 /* ------------------------------------------------------------------ */
 
 const NULLCLAW_BIN = '/home/nonbios/nullclaw-gateway-streaming/zig-out/bin/nullclaw';
-const NULLCLAW_TIMEOUT = 60_000;
+const NULLCLAW_TIMEOUT = 120_000;
 
 /** Number of history turns to retrieve for prompt building */
 const HISTORY_TURNS = 20;
@@ -54,6 +54,18 @@ const CONTEXT_TOP_K = 5;
 
 /** Top-K results for memory recall */
 const MEMORY_TOP_K = 5;
+
+/** Max user message size before truncation (bytes) */
+const MAX_MESSAGE_SIZE = 100 * 1024;
+
+/** Abort SSE stream if no data received for this duration */
+const STREAM_INACTIVITY_TIMEOUT = 60_000;
+
+/** Max concurrent requests per user */
+const MAX_CONCURRENT_PER_USER = 3;
+
+/** @type {Map<string, number>} active request count per userId */
+const _activeRequests = new Map();
 
 /** Adapter port range — offset from chat-handler's 29000-29999 */
 const ADAPTER_PORT_MIN = 28_000;
@@ -797,8 +809,26 @@ async function cheapLlmCall(systemPrompt, userPrompt) {
  * @param {import('ws').WebSocket} ws — client WebSocket connection
  */
 export async function routeMessage(userId, agentId, message, ws) {
-  const text = message.text ?? message.content ?? '';
+  let text = message.text ?? message.content ?? '';
   if (!text.trim()) return;
+
+  // Truncate oversized messages (100KB limit)
+  if (text.length > MAX_MESSAGE_SIZE) {
+    text = text.slice(0, MAX_MESSAGE_SIZE);
+    console.warn(`[orchestrator] Truncated oversized message from ${userId}`);
+  }
+
+  // Concurrent request guard — max 3 per user
+  const activeCount = _activeRequests.get(userId) || 0;
+  if (activeCount >= MAX_CONCURRENT_PER_USER) {
+    sendJson(ws, {
+      type: 'chat', from: 'system',
+      text: '⏳ Too many concurrent requests. Please wait for a previous request to complete.',
+      ts: Date.now(),
+    });
+    return;
+  }
+  _activeRequests.set(userId, activeCount + 1);
 
   console.log(`[orchestrator] ${userId} → agent:${agentId || 'default'}: ${text.slice(0, 100)}`);
 
@@ -900,11 +930,23 @@ export async function routeMessage(userId, agentId, message, ws) {
     });
 
     if (_adapter) {
+      // NullClaw call timeout (120s) + stream inactivity guard (60s no data)
+      let _inactTimer, _rejectTimeout;
+      const _timeoutPromise = new Promise((_, reject) => {
+        _rejectTimeout = reject;
+        _inactTimer = setTimeout(() => reject(new Error('__stream_inactive__')), STREAM_INACTIVITY_TIMEOUT);
+      });
+      const _hardTimer = setTimeout(() => _rejectTimeout(new Error('__nc_timeout__')), NULLCLAW_TIMEOUT);
+      const _resetInact = () => {
+        clearTimeout(_inactTimer);
+        _inactTimer = setTimeout(() => _rejectTimeout(new Error('__stream_inactive__')), STREAM_INACTIVITY_TIMEOUT);
+      };
       try {
-        response = await sendViaAdapter(
+        response = await Promise.race([sendViaAdapter(
           userId, effectiveAgentId, augmentedPrompt, agent,
           // onChunk — text deltas (still feed to detector as fallback + filter)
           (chunk) => {
+            _resetInact();
             toolDetector.feed(chunk);
             streamFilter.feed(chunk);
           },
@@ -913,6 +955,7 @@ export async function routeMessage(userId, agentId, message, ws) {
           // them immediately to the client. The XML-based toolDetector is kept
           // as fallback for NullClaw instances without the event callback patch.
           (evt) => {
+            _resetInact();
             if (evt.type === 'tool_call_start') {
               sendJson(ws, {
                 type: 'tool_call',
@@ -960,13 +1003,19 @@ export async function routeMessage(userId, agentId, message, ws) {
               });
             }
           }
-        );
+        ), _timeoutPromise]);
         usedAdapter = true;
       } catch (adapterErr) {
+        clearTimeout(_hardTimer); clearTimeout(_inactTimer);
+        if (adapterErr.message === '__nc_timeout__' || adapterErr.message === '__stream_inactive__') {
+          throw new Error('Request timed out — the AI took too long to respond.');
+        }
         console.warn(
           `[orchestrator] Adapter failed for ${userId}:${effectiveAgentId}, ` +
           `falling back to direct spawn:`, adapterErr.message
         );
+      } finally {
+        clearTimeout(_hardTimer); clearTimeout(_inactTimer);
       }
     }
 
@@ -1058,13 +1107,22 @@ export async function routeMessage(userId, agentId, message, ws) {
   } catch (err) {
     console.error(`[orchestrator] Error for ${userId}:${effectiveAgentId}:`, err.message);
     sendJson(ws, { type: 'typing', status: 'stop', agentId: effectiveAgentId, ts: Date.now() });
+    // Sanitize: only show safe messages to client, never internal errors
+    const safeMsg = err.message?.startsWith('Request timed out')
+      ? `❌ ${err.message}`
+      : '❌ Something went wrong. Please try again.';
     sendJson(ws, {
       type: 'chat',
       from: 'system',
       agentId: effectiveAgentId,
-      text: `❌ Agent error: ${err.message}`,
+      text: safeMsg,
       ts: Date.now(),
     });
+  } finally {
+    // Release concurrent request slot
+    const newCount = (_activeRequests.get(userId) || 1) - 1;
+    if (newCount <= 0) _activeRequests.delete(userId);
+    else _activeRequests.set(userId, newCount);
   }
 }
 
@@ -1140,7 +1198,7 @@ export async function routeTeamChat(userId, teamId, message, ws) {
     console.error(`[orchestrator] Team routing error for ${userId}:${teamId}:`, err.message);
     sendJson(ws, {
       type: 'chat', from: 'system',
-      text: `❌ Team error: ${err.message}`,
+      text: '❌ Something went wrong with team routing. Please try again.',
       ts: Date.now(),
     });
   }
