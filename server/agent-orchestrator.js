@@ -28,6 +28,7 @@ import { searchContext, searchMemory, formatResultsAsToon } from '../lib/context
 import { createBestGeminiProvider, createOpenAIProvider, createMockProvider } from '../lib/embeddings.js';
 import { extractMemories } from '../lib/memory-extraction.js';
 import { BUILTIN_TOOLS, createToolExecutor } from '../lib/builtin-tools.js';
+import { getToolsForAgent } from '../lib/skills/index.js';
 import { isA2UIMessage, parseA2UIMessage, a2uiToGenUI } from '../protocol/a2ui.js';
 import { parseGenUIResponse } from '../lib/genui-response-parser.js';
 import { createToolCallDetector } from '../lib/tool-call-detector.js';
@@ -565,8 +566,12 @@ function buildAugmentedPrompt(userMessage, agentConfig, history, contextBlock, t
  * @returns {Promise<Array<{name: string, description: string, inputSchema: Object}>>}
  */
 async function ensureMcpServers(agentConfig) {
-  // Always include built-in tools
-  const builtinTools = _toolExecutor ? _toolExecutor.getTools() : [];
+  // Get built-in tools, filtered by agent's skill-based tool whitelist
+  const allBuiltinTools = _toolExecutor ? _toolExecutor.getTools() : [];
+  const allowedTools = getToolsForAgent(agentConfig.name);
+  const builtinTools = allowedTools
+    ? allBuiltinTools.filter(t => allowedTools.includes(t.name))
+    : allBuiltinTools; // null = unrestricted (original 4 agents)
 
   // If no MCP registry or no MCP servers configured, return just built-in tools
   if (!_mcpRegistry || !agentConfig.mcpServers || agentConfig.mcpServers.length === 0) {
