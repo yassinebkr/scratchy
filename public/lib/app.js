@@ -200,9 +200,14 @@ function _openWidget(tagName, name) {
 /*  Send logic                                                        */
 /* ------------------------------------------------------------------ */
 
+let _sendGuard = false;
 function sendMessage() {
   const text = $msgInput.value.trim();
-  if (!text) return;
+  if (!text || _sendGuard) return;
+
+  // Debounce: block re-sends for 500ms (prevents double-click/tap)
+  _sendGuard = true;
+  setTimeout(() => { _sendGuard = false; }, 500);
 
   // Remove empty state if present
   removeEmptyState();
@@ -499,8 +504,7 @@ function wireWsEvents() {
     if (!$messages) return;
     // Remove empty state and typing dots once real content arrives
     removeEmptyState();
-    const typingEl = $messages.querySelector('.typing-indicator');
-    if (typingEl) typingEl.remove();
+    $messages.querySelectorAll('.typing-indicator').forEach(el => el.remove());
     if (!_streamDiv) {
       _streamDiv = document.createElement('div');
       _streamDiv.className = 'msg msg-assistant streaming';
@@ -549,6 +553,13 @@ function wireWsEvents() {
     }
   });
 
+  // Helper: remove ALL typing indicators from chat area
+  function clearAllTypingIndicators() {
+    if (!$messages) return;
+    $messages.querySelectorAll('.typing-indicator').forEach(el => el.remove());
+  }
+
+  let _typingSafetyTimer = null;
   on('typing', (msg) => {
     if ($statusText) {
       if (msg.status === 'start') {
@@ -559,17 +570,34 @@ function wireWsEvents() {
     }
     // Show/hide typing indicator dots in chat area
     if ($messages) {
-      const existing = $messages.querySelector('.typing-indicator');
-      if (msg.status === 'start' && !existing) {
+      if (msg.status === 'start') {
+        // Always deduplicate — remove any existing before adding
+        clearAllTypingIndicators();
         const el = document.createElement('div');
         el.className = 'typing-indicator';
         el.innerHTML = '<span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>';
         $messages.appendChild(el);
         $messages.scrollTop = $messages.scrollHeight;
-      } else if (msg.status !== 'start' && existing) {
-        existing.remove();
+        // Safety: auto-remove after 120s (prevents infinite stuck dots)
+        clearTimeout(_typingSafetyTimer);
+        _typingSafetyTimer = setTimeout(clearAllTypingIndicators, 120000);
+      } else {
+        clearAllTypingIndicators();
+        clearTimeout(_typingSafetyTimer);
       }
     }
+  });
+
+  // Clean up typing indicators when team routing completes or errors
+  on('team-message-end', () => {
+    clearAllTypingIndicators();
+    clearTimeout(_typingSafetyTimer);
+    if ($statusText) $statusText.textContent = state.connected ? 'Connected' : 'Disconnected';
+  });
+  on('team-error', () => {
+    clearAllTypingIndicators();
+    clearTimeout(_typingSafetyTimer);
+    if ($statusText) $statusText.textContent = state.connected ? 'Connected' : 'Disconnected';
   });
 
   on('canvas-update', (msg) => {

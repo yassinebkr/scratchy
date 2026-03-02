@@ -231,11 +231,13 @@ function _updateThinkingIndicator(state) {
 /* ------------------------------------------------------------------ */
 
 function _wireEvents() {
-  // 1. typing { status: 'start' } → thinking
+  // 1. typing { status: 'start' } → thinking, { status: 'stop' } → idle
   on('typing', (msg) => {
     if (msg.status === 'start') {
       _streamStarted = false; // reset for new response cycle
       _setState('thinking', 'Processing…');
+    } else if (msg.status === 'stop') {
+      _setState('idle', '');
     }
   });
 
@@ -269,6 +271,19 @@ function _wireEvents() {
   // 6. error → error state, auto-reset after 3s
   on('error', (msg) => {
     _setState('error', msg.text || 'Something went wrong');
+    _errorResetTimer = setTimeout(() => {
+      _errorResetTimer = null;
+      _setState('idle', '');
+    }, ERROR_RESET_MS);
+  });
+
+  // 7. team-message-end / team-error → idle (team routing complete)
+  on('team-message-end', () => {
+    _streamStarted = false;
+    _setState('idle', '');
+  });
+  on('team-error', () => {
+    _setState('error', 'Team routing failed');
     _errorResetTimer = setTimeout(() => {
       _errorResetTimer = null;
       _setState('idle', '');
