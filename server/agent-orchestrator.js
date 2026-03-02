@@ -23,7 +23,16 @@
  */
 
 import { spawn } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { join as pathJoin } from 'node:path';
+import { tmpdir, homedir } from 'node:os';
 import { NullClawAdapter } from '../lib/nullclaw-adapter.js';
+import {
+  generateConfig,
+  auditToolEvent,
+  cleanupStaleConfigs,
+  instanceKey as policyInstanceKey,
+} from '../lib/tool-policy.js';
 import { searchContext, searchMemory, formatResultsAsToon } from '../lib/context-search.js';
 import { createBestGeminiProvider, createOpenAIProvider, createMockProvider, createFallbackProvider } from '../lib/embeddings.js';
 import { extractMemories } from '../lib/memory-extraction.js';
@@ -45,6 +54,12 @@ import * as teamsState from '../state/teams.js';
 
 const NULLCLAW_BIN = '/home/nonbios/nullclaw-gateway-streaming/zig-out/bin/nullclaw';
 const NULLCLAW_TIMEOUT = 120_000;
+
+/**
+ * Deployment mode: 'hosted' (sandbox all users) or 'selfhosted' (no restrictions).
+ * Default: hosted (secure by default). Override via SCRATCHY_DEPLOYMENT env var.
+ */
+const DEPLOYMENT_MODE = process.env.SCRATCHY_DEPLOYMENT || 'hosted';
 
 /** Number of history turns to retrieve for prompt building */
 const HISTORY_TURNS = 20;
@@ -322,7 +337,10 @@ export function init(db, mcpRegistry) {
       }
     });
 
-    console.log('[orchestrator] NullClaw adapter pool initialized (ports 28000-28999)');
+    // Clean up any stale sandbox configs from previous runs
+    cleanupStaleConfigs();
+
+    console.log(`[orchestrator] NullClaw adapter pool initialized (ports 28000-28999, mode=${DEPLOYMENT_MODE})`);
   } catch (err) {
     console.error('[orchestrator] Failed to initialize adapter pool:', err.message);
     _adapter = null;
@@ -649,8 +667,57 @@ function adapterKey(userId, _agentId) {
 }
 
 /**
+ * Track which users already have a sandboxed config generated.
+ * Avoids re-generating on every message (configs persist until instance destroyed).
+ * @type {Set<string>}
+ */
+const _sandboxedUsers = new Set();
+
+/**
+ * Ensure a user has a sandboxed NullClaw config.
+ * In hosted mode: generates a restrictive config on first use.
+ * In selfhosted mode: no-op (uses default ~/.nullclaw/config.json).
+ *
+ * @param {string} userId
+ * @returns {{ role: string, homeDir: string|null }}
+ */
+function ensureUserSandbox(userId) {
+  if (DEPLOYMENT_MODE === 'selfhosted') {
+    return { role: 'user-selfhosted', homeDir: null };
+  }
+
+  if (_sandboxedUsers.has(userId)) {
+    // Config already generated — return the path
+    const homeDir = pathJoin(tmpdir(), `nullclaw-${userId}-user`);
+    return { role: 'user', homeDir };
+  }
+
+  // Read API key from default NullClaw config
+  let apiKey = '';
+  try {
+    const config = JSON.parse(readFileSync(pathJoin(homedir(), '.nullclaw', 'config.json'), 'utf8'));
+    apiKey = config?.models?.providers?.anthropic?.api_key || '';
+  } catch { /* no config — key will be empty */ }
+
+  // Check if user has BYOK (their own API key) — they get a different workspace
+  // but still sandboxed. BYOK users bypass quotas, not security.
+
+  const homeDir = generateConfig(userId, 'user', {
+    apiKey,
+    workspaceDir: pathJoin(process.cwd(), '.scratchy-data', 'user-workspace', userId),
+  });
+
+  _sandboxedUsers.add(userId);
+  console.log(`[orchestrator] Sandboxed NullClaw config generated for ${userId} (hosted mode)`);
+  return { role: 'user', homeDir };
+}
+
+/**
  * Send a message through the NullClaw adapter via /api/message with SSE streaming.
  * Calls onChunk for each incremental delta, returns full accumulated text.
+ *
+ * In hosted mode, ensures the user's NullClaw instance uses a sandboxed config
+ * (no network, workspace-only, command whitelist, high-risk commands blocked).
  *
  * @param {string} userId
  * @param {string} agentId
@@ -661,9 +728,29 @@ function adapterKey(userId, _agentId) {
  */
 async function sendViaAdapter(userId, agentId, augmentedPrompt, agentConfig, onChunk, onToolEvent) {
   if (!_adapter) throw new Error('Adapter not initialized');
+
+  // Ensure sandbox config exists
+  const { role, homeDir } = ensureUserSandbox(userId);
   const key = adapterKey(userId, agentId);
+
+  // If instance doesn't exist yet and we have a homeDir, spawn with sandbox
+  const status = _adapter.getInstanceStatus(key);
+  if (!status && homeDir) {
+    await _adapter.spawnInstance(key, { role, homeDir });
+  }
+
   const sessionKey = `agent:${agentId}`;
-  return _adapter.routeMessageStreaming(key, augmentedPrompt, onChunk, sessionKey, onToolEvent);
+
+  // Wrap onToolEvent with audit
+  const auditedToolEvent = onToolEvent ? (evt) => {
+    const audit = auditToolEvent(evt, role, agentId);
+    if (audit.violated) {
+      console.error(`[orchestrator] Tool violation: ${JSON.stringify(audit)}`);
+    }
+    onToolEvent(evt);
+  } : null;
+
+  return _adapter.routeMessageStreaming(key, augmentedPrompt, onChunk, sessionKey, auditedToolEvent);
 }
 
 /**
