@@ -640,8 +640,12 @@ async function ensureMcpServers(agentConfig) {
  * @param {string} agentId
  * @returns {string}
  */
-function adapterKey(userId, agentId) {
-  return `${userId}:${agentId}`;
+/**
+ * Instance key — one NullClaw per user (shared across agents).
+ * Agent isolation uses session_key, not separate processes.
+ */
+function adapterKey(userId, _agentId) {
+  return userId;
 }
 
 /**
@@ -658,8 +662,8 @@ function adapterKey(userId, agentId) {
 async function sendViaAdapter(userId, agentId, augmentedPrompt, agentConfig, onChunk, onToolEvent) {
   if (!_adapter) throw new Error('Adapter not initialized');
   const key = adapterKey(userId, agentId);
-  // routeMessageStreaming(userId, message, onChunk, sessionKey?, onToolEvent?)
-  return _adapter.routeMessageStreaming(key, augmentedPrompt, onChunk, undefined, onToolEvent);
+  const sessionKey = `agent:${agentId}`;
+  return _adapter.routeMessageStreaming(key, augmentedPrompt, onChunk, sessionKey, onToolEvent);
 }
 
 /**
