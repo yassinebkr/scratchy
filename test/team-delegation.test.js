@@ -335,4 +335,41 @@ ctx
       assert.equal(vecs.length, 0);
     });
   });
+
+  // ── countUserTasks ──
+  // Local copy for testing (mirrors lib/team-router.js)
+  function countUserTasks(message) {
+    const taskPattern = /\btask\s*\d+/gi;
+    const taskMatches = message.match(taskPattern);
+    if (taskMatches && taskMatches.length >= 2) return taskMatches.length;
+    const numberedPattern = /^\s*\d+[\.\)]\s/gm;
+    const numberedMatches = message.match(numberedPattern);
+    if (numberedMatches && numberedMatches.length >= 2) return numberedMatches.length;
+    return 0;
+  }
+
+  describe('countUserTasks', () => {
+    it('detects Task N patterns', () => {
+      const msg = 'Task 1 — Build toast. Task 2 — Build API client. Task 3 — Build skeleton.';
+      assert.equal(countUserTasks(msg), 3);
+    });
+
+    it('detects numbered list items', () => {
+      const msg = '1. Build toast\n2. Build API client\n3. Build skeleton';
+      assert.equal(countUserTasks(msg), 3);
+    });
+
+    it('returns 0 for no clear task markers', () => {
+      assert.equal(countUserTasks('Build a toast component for the app'), 0);
+    });
+
+    it('returns 0 for single task', () => {
+      assert.equal(countUserTasks('Task 1 — only one task'), 0);
+    });
+
+    it('handles mixed case', () => {
+      const msg = 'TASK 1 do this. task 2 do that. Task 3 final thing.';
+      assert.equal(countUserTasks(msg), 3);
+    });
+  });
 });
