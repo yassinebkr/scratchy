@@ -116,6 +116,8 @@ function showApp() {
     if ($teamBannerName) $teamBannerName.textContent = _activeTeamName || 'Team';
     if ($teamBannerAgents) $teamBannerAgents.textContent = agentCount + ' agents';
     if ($msgInput) $msgInput.placeholder = 'Message ' + (_activeTeamName || 'Team') + '...';
+    // Force team history load (not single-agent)
+    _historyLoadedForAgent = null;
   }
 
   $msgInput?.focus();
@@ -399,8 +401,11 @@ function formatMarkdown(text) {
 let _historyLoadedForAgent = null;
 
 async function loadChatHistory(agentId) {
-  const effectiveAgentId = agentId || $agentSwitcher?._activeAgentId || null;
-  // Skip if already loaded for this agent (unless switching)
+  // In team mode, load team conversation history
+  const effectiveAgentId = _activeTeamId
+    ? 'team:' + _activeTeamId
+    : (agentId || $agentSwitcher?._activeAgentId || null);
+  // Skip if already loaded for this agent/team (unless switching)
   if (_historyLoadedForAgent === effectiveAgentId) return;
   const token = localStorage.getItem('scratchy_token') || '';
   if (!token) return;
@@ -1307,6 +1312,10 @@ async function init() {
     if ($teamBannerName) $teamBannerName.textContent = _activeTeamName;
     if ($teamBannerAgents) $teamBannerAgents.textContent = (agentCount || '?') + ' agents';
     if ($msgInput) $msgInput.placeholder = 'Message ' + _activeTeamName + '...';
+    // Reload chat history for this team
+    _historyLoadedForAgent = null;
+    if ($messages) $messages.innerHTML = '';
+    loadChatHistory();
     // Focus chat
     $msgInput?.focus();
   });
@@ -1321,6 +1330,10 @@ async function init() {
       sessionStorage.removeItem('scratchy_teamAgents');
       if ($teamBanner) $teamBanner.classList.add('hidden');
       if ($msgInput) $msgInput.placeholder = 'Message Scratchy\u2026 (Shift+Enter for new line)';
+      // Reload single-agent history
+      _historyLoadedForAgent = null;
+      if ($messages) $messages.innerHTML = '';
+      loadChatHistory();
     });
   }
 

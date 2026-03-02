@@ -54,8 +54,9 @@ export function createChatRoutes({ authenticate, getDb }) {
 
       // Validate agentId if provided
       const rawAgentId = url.searchParams.get('agentId') || null;
-      if (rawAgentId != null && !isUUID(rawAgentId)) {
-        jsonRes(res, 400, { ok: false, error: 'agentId must be a valid UUID' });
+      // Accept UUIDs or team-prefixed IDs (team:<uuid>)
+      if (rawAgentId != null && !isUUID(rawAgentId) && !/^team:[0-9a-f-]{36}$/i.test(rawAgentId)) {
+        jsonRes(res, 400, { ok: false, error: 'agentId must be a valid UUID or team:<uuid>' });
         return true;
       }
       const agentId = rawAgentId;
