@@ -472,10 +472,189 @@ async function loadChatHistory(agentId) {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Team UI utilities                                                 */
+/* ------------------------------------------------------------------ */
+
+function getAgentColor(name) {
+  const colors = ['#f59e0b','#3b82f6','#8b5cf6','#ec4899','#10b981','#f43f5e','#06b6d4','#84cc16'];
+  let h = 0;
+  for (let i = 0; i < (name||'').length; i++) h = ((h << 5) - h + name.charCodeAt(i)) | 0;
+  return colors[Math.abs(h) % colors.length];
+}
+
+function injectTeamUIStyles() {
+  const existingStyle = document.head.querySelector('#team-ui-styles');
+  if (existingStyle) return; // Already injected
+
+  const style = document.createElement('style');
+  style.id = 'team-ui-styles';
+  style.textContent = `
+    /* Team UI Components */
+    .team-status-msg {
+      background: rgba(249,166,2,0.06);
+      border: 1px solid rgba(249,166,2,0.15);
+      border-radius: 12px;
+      padding: 12px 16px;
+      margin: 8px 0;
+      font-family: inherit;
+      color: #f0ead6;
+      font-size: 14px;
+    }
+    
+    .team-plan-card {
+      background: rgba(249,166,2,0.06);
+      border: 1px solid rgba(249,166,2,0.15);
+      border-radius: 12px;
+      padding: 16px;
+      margin: 8px 0;
+      font-family: inherit;
+    }
+    
+    .team-plan-header {
+      color: #f0ead6;
+      font-weight: 600;
+      margin-bottom: 12px;
+      font-size: 15px;
+    }
+    
+    .team-plan-task {
+      display: flex;
+      align-items: center;
+      margin: 8px 0;
+      color: #f0ead6;
+      font-size: 14px;
+    }
+    
+    .team-plan-agent-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 8px;
+      flex-shrink: 0;
+    }
+    
+    .team-plan-summary {
+      margin-top: 12px;
+      color: #8a7e6a;
+      font-size: 13px;
+    }
+    
+    .team-worker-card {
+      background: rgba(249,166,2,0.06);
+      border: 1px solid rgba(249,166,2,0.15);
+      border-radius: 12px;
+      padding: 14px;
+      margin: 6px 0;
+      font-family: inherit;
+    }
+    
+    .team-worker-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    
+    .team-worker-info {
+      display: flex;
+      align-items: center;
+      color: #f0ead6;
+      font-size: 14px;
+    }
+    
+    .team-worker-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 8px;
+      flex-shrink: 0;
+    }
+    
+    .team-worker-status {
+      font-size: 12px;
+      font-weight: 600;
+    }
+    
+    .team-worker-status.working {
+      color: #f59e0b;
+    }
+    
+    .team-worker-status.complete {
+      color: #22c55e;
+    }
+    
+    .team-worker-status.error {
+      color: #ef4444;
+    }
+    
+    .team-worker-task {
+      color: #8a7e6a;
+      font-size: 13px;
+      margin-top: 4px;
+    }
+    
+    .team-worker-spinner {
+      width: 12px;
+      height: 12px;
+      border: 2px solid rgba(249,166,2,0.2);
+      border-top: 2px solid #f59e0b;
+      border-radius: 50%;
+      animation: team-spin 1s linear infinite;
+    }
+    
+    .team-worker-details {
+      margin-top: 8px;
+      border-top: 1px solid rgba(249,166,2,0.1);
+      padding-top: 8px;
+    }
+    
+    .team-worker-toggle {
+      background: none;
+      border: none;
+      color: #8a7e6a;
+      font-size: 12px;
+      cursor: pointer;
+      padding: 4px 0;
+      font-family: inherit;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    
+    .team-worker-toggle:hover {
+      color: #f0ead6;
+    }
+    
+    .team-worker-output {
+      background: rgba(0,0,0,0.2);
+      border-radius: 6px;
+      padding: 8px;
+      margin-top: 6px;
+      color: #f0ead6;
+      font-family: 'SF Mono', Monaco, Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.4;
+      white-space: pre-wrap;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    
+    @keyframes team-spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+/* ------------------------------------------------------------------ */
 /*  WS event handlers                                                 */
 /* ------------------------------------------------------------------ */
 
 function wireWsEvents() {
+  // Inject CSS styles for team UI components
+  injectTeamUIStyles();
+
   on('connected', () => {
     setConnectionStatus('connected');
     // Load chat history from server on (re)connect
@@ -593,11 +772,197 @@ function wireWsEvents() {
     clearAllTypingIndicators();
     clearTimeout(_typingSafetyTimer);
     if ($statusText) $statusText.textContent = state.connected ? 'Connected' : 'Disconnected';
+    // Reset worker card states on completion
+    if ($messages) {
+      const workerCards = $messages.querySelectorAll('.team-worker-card');
+      workerCards.forEach(card => {
+        const spinner = card.querySelector('.team-worker-spinner');
+        if (spinner) spinner.remove();
+      });
+    }
   });
-  on('team-error', () => {
+  on('team-error', (msg) => {
     clearAllTypingIndicators();
     clearTimeout(_typingSafetyTimer);
     if ($statusText) $statusText.textContent = state.connected ? 'Connected' : 'Disconnected';
+    // Show error message in chat
+    if (msg.error && $messages) {
+      appendMessage('system', `<span class="msg-error">Team error: ${escapeHtml(msg.error)}</span>`);
+    }
+  });
+
+  // --- New Team Event Handlers ---
+
+  // 1. Team routing begins
+  on('team-message-start', (msg) => {
+    if (!$messages) return;
+    removeEmptyState();
+    const { teamName, agents } = msg;
+    const agentCount = agents ? agents.length : '?';
+    appendMessage('system', `<div class="team-status-msg">🤝 Orchestrating with ${escapeHtml(teamName)} (${agentCount} agents)...</div>`);
+  });
+
+  // 2. Planning phase updates
+  on('team-planning', (msg) => {
+    if (!$messages) return;
+    const { status } = msg;
+
+    if (status === 'start') {
+      appendMessage('system', '<div class="team-status-msg">🧠 Planning tasks...</div>');
+    } else if (status === 'accepted' && msg.tasks) {
+      // Show plan card with tasks
+      const { tasks, parallelCount, taskCount } = msg;
+      let planHTML = '<div class="team-plan-card">';
+      planHTML += '<div class="team-plan-header">📋 Plan</div>';
+      
+      tasks.forEach(task => {
+        const agentColor = getAgentColor(task.agent);
+        planHTML += `<div class="team-plan-task">
+          <div class="team-plan-agent-dot" style="background-color: ${agentColor}"></div>
+          <strong>${escapeHtml(task.agent)}</strong>: ${escapeHtml(task.task)}
+        </div>`;
+      });
+      
+      planHTML += `<div class="team-plan-summary">${taskCount} task${taskCount === 1 ? '' : 's'} (${parallelCount} parallel${parallelCount !== taskCount ? ', ' + (taskCount - parallelCount) + ' sequential' : ''})</div>`;
+      planHTML += '</div>';
+      
+      appendMessage('system', planHTML);
+    } else if (status === 'simple') {
+      appendMessage('system', '<div class="team-status-msg">⚡ Handling directly...</div>');
+    } else if (status === 'fallback') {
+      // Hide plan, continue silently
+      return;
+    } else if (status === 'error' && msg.error) {
+      appendMessage('system', `<span class="msg-error">Planning error: ${escapeHtml(msg.error)}</span>`);
+    }
+  });
+
+  // 3. Batch of workers starting
+  on('team-delegations-start', (msg) => {
+    if (!$messages) return;
+    const { count } = msg;
+    appendMessage('system', `<div class="team-status-msg">🚀 Dispatching ${count} worker${count === 1 ? '' : 's'}...</div>`);
+  });
+
+  // 4. Individual worker lifecycle
+  on('team-delegation', (msg) => {
+    if (!$messages) return;
+    const { status, toAgentName } = msg;
+
+    if (status === 'start') {
+      const { task } = msg;
+      const agentColor = getAgentColor(toAgentName);
+      
+      const workerHTML = `<div class="team-worker-card" data-agent="${escapeHtml(toAgentName)}">
+        <div class="team-worker-header">
+          <div class="team-worker-info">
+            <div class="team-worker-dot" style="background-color: ${agentColor}"></div>
+            <div>
+              <div class="team-worker-status working">${escapeHtml(toAgentName)} — <span class="worker-task-text">${escapeHtml(task)}</span></div>
+            </div>
+          </div>
+          <div class="team-worker-spinner"></div>
+        </div>
+        <div class="team-worker-details" style="display: none;">
+          <button class="team-worker-toggle">
+            <span>▸</span> Show output
+          </button>
+          <div class="team-worker-output" style="display: none;"></div>
+        </div>
+      </div>`;
+      
+      appendMessage('system', workerHTML);
+      
+      // Add toggle functionality
+      const workerCard = $messages.querySelector(`[data-agent="${toAgentName}"]`);
+      if (workerCard) {
+        const toggle = workerCard.querySelector('.team-worker-toggle');
+        const output = workerCard.querySelector('.team-worker-output');
+        if (toggle && output) {
+          toggle.addEventListener('click', () => {
+            const isOpen = output.style.display !== 'none';
+            output.style.display = isOpen ? 'none' : 'block';
+            toggle.querySelector('span').textContent = isOpen ? '▸' : '▾';
+            toggle.innerHTML = toggle.innerHTML.replace(/Show output|Hide output/, isOpen ? 'Show output' : 'Hide output');
+          });
+        }
+      }
+    } else if (status === 'complete') {
+      // Mark worker as done
+      const workerCard = $messages.querySelector(`[data-agent="${toAgentName}"]`);
+      if (workerCard) {
+        const statusEl = workerCard.querySelector('.team-worker-status');
+        const spinner = workerCard.querySelector('.team-worker-spinner');
+        if (statusEl) {
+          statusEl.className = 'team-worker-status complete';
+          statusEl.innerHTML = statusEl.innerHTML.replace(/ — /, ' ✓ — ');
+        }
+        if (spinner) spinner.remove();
+        
+        // Show details section if there's output
+        const details = workerCard.querySelector('.team-worker-details');
+        const output = workerCard.querySelector('.team-worker-output');
+        if (details && output && output.textContent.trim()) {
+          details.style.display = 'block';
+        }
+      }
+    } else if (status === 'error') {
+      // Mark worker as failed
+      const workerCard = $messages.querySelector(`[data-agent="${toAgentName}"]`);
+      if (workerCard) {
+        const statusEl = workerCard.querySelector('.team-worker-status');
+        const spinner = workerCard.querySelector('.team-worker-spinner');
+        if (statusEl) {
+          statusEl.className = 'team-worker-status error';
+          statusEl.innerHTML = statusEl.innerHTML.replace(/ — /, ' ✗ — ');
+        }
+        if (spinner) spinner.remove();
+        
+        // Show error in output
+        const output = workerCard.querySelector('.team-worker-output');
+        const details = workerCard.querySelector('.team-worker-details');
+        if (output && msg.error) {
+          output.textContent = `Error: ${msg.error}`;
+          if (details) details.style.display = 'block';
+        }
+      }
+    }
+  });
+
+  // 5. Worker output streaming
+  on('team-worker-stream', (msg) => {
+    if (!$messages) return;
+    const { delta, agentName } = msg;
+    if (!delta || !agentName) return;
+    
+    const workerCard = $messages.querySelector(`[data-agent="${agentName}"]`);
+    if (workerCard) {
+      const output = workerCard.querySelector('.team-worker-output');
+      if (output) {
+        output.textContent += delta;
+        // Auto-scroll output area if at bottom
+        if (output.scrollTop >= output.scrollHeight - output.clientHeight - 10) {
+          output.scrollTop = output.scrollHeight;
+        }
+      }
+    }
+    
+    // Auto-scroll main chat
+    $messages.scrollTop = $messages.scrollHeight;
+  });
+
+  // 6. Batch complete
+  on('team-delegations-end', (msg) => {
+    if (!$messages) return;
+    const { count, errors } = msg;
+    const errorCount = errors && Array.isArray(errors) ? errors.length : 0;
+    
+    let statusText = `✅ ${count} worker${count === 1 ? '' : 's'} done`;
+    if (errorCount > 0) {
+      statusText += ` (${errorCount} error${errorCount === 1 ? '' : 's'})`;
+    }
+    
+    appendMessage('system', `<div class="team-status-msg">${statusText}</div>`);
   });
 
   on('canvas-update', (msg) => {

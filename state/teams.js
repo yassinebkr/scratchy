@@ -102,7 +102,7 @@ export function getTeam(id) {
  * @returns {Object[]} Teams with member count and agent count
  */
 export function listUserTeams(userId) {
-  return d().prepare(`
+  const rows = d().prepare(`
     SELECT t.*,
       (SELECT COUNT(*) FROM team_members WHERE teamId = t.id) as memberCount,
       (SELECT COUNT(*) FROM team_agents WHERE teamId = t.id) as agentCount
@@ -111,6 +111,7 @@ export function listUserTeams(userId) {
     WHERE tm.userId = ?
     ORDER BY t.updatedAt DESC
   `).all(userId);
+  return rows.map(t => ({ ...t, agents: _getTeamAgents(t.id) }));
 }
 
 /**
@@ -118,13 +119,29 @@ export function listUserTeams(userId) {
  * @returns {Object[]}
  */
 export function listAllTeams() {
-  return d().prepare(`
+  const rows = d().prepare(`
     SELECT t.*,
       (SELECT COUNT(*) FROM team_members WHERE teamId = t.id) as memberCount,
       (SELECT COUNT(*) FROM team_agents WHERE teamId = t.id) as agentCount
     FROM teams t
     ORDER BY t.updatedAt DESC
   `).all();
+  return rows.map(t => ({ ...t, agents: _getTeamAgents(t.id) }));
+}
+
+/**
+ * Get agent assignments for a team (id, name, role).
+ * @param {string} teamId
+ * @returns {Array<{id: string, name: string, role: string}>}
+ */
+function _getTeamAgents(teamId) {
+  return d().prepare(`
+    SELECT a.id, a.name, ta.role
+    FROM team_agents ta
+    JOIN agents a ON a.id = ta.agentId
+    WHERE ta.teamId = ?
+    ORDER BY ta.role ASC, a.name ASC
+  `).all(teamId);
 }
 
 /**

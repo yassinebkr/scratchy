@@ -1872,7 +1872,7 @@ export class ScAgentSwitcher extends HTMLElement {
       const teamMatchedIds = new Set();
       (this._teams || []).forEach(t => {
         if ((t.name || '').toLowerCase().includes(q)) {
-          (t.members || []).forEach(m => teamMatchedIds.add(m.id || m));
+          (t.agents || []).forEach(a => teamMatchedIds.add(a.id || a));
         }
       });
       this._filtered = this._agents.filter(a => {
@@ -1886,9 +1886,9 @@ export class ScAgentSwitcher extends HTMLElement {
       });
       this._filteredTeams = (this._teams || []).filter(t => {
         if ((t.name || '').toLowerCase().includes(q)) return true;
-        return (t.members || []).some(m => {
-          const mid = m.id || m;
-          return this._filtered.some(a => a.id === mid);
+        return (t.agents || []).some(a => {
+          const aid = a.id || a;
+          return this._filtered.some(ag => ag.id === aid);
         });
       });
     }
@@ -1937,9 +1937,9 @@ export class ScAgentSwitcher extends HTMLElement {
     }
 
     /* Classify agents: main (template-*) vs team members vs stray workers */
-    const teamMemberIds = new Set();
+    const teamAgentIds = new Set();
     const teams = this._filteredTeams || [];
-    teams.forEach(t => (t.members || []).forEach(m => teamMemberIds.add(m.id || m)));
+    teams.forEach(t => (t.agents || []).forEach(a => teamAgentIds.add(a.id || a)));
 
     const mainAgents = this._filtered.filter(a => a.id && a.id.startsWith('template-'));
     /* Stray workers (not main, not in any team) are hidden */
@@ -1954,9 +1954,9 @@ export class ScAgentSwitcher extends HTMLElement {
 
     /* 2) Render team groups (expandable) */
     for (const team of teams) {
-      const memberIds = (team.members || []).map(m => m.id || m);
-      const memberAgents = memberIds
-        .map(mid => this._filtered.find(a => a.id === mid))
+      const agentIds = (team.agents || []).map(a => a.id || a);
+      const memberAgents = agentIds
+        .map(aid => this._filtered.find(a => a.id === aid))
         .filter(Boolean);
       const group = this._createTeamGroupEl(team, memberAgents, cardIndex);
       this._gridEl.appendChild(group);
