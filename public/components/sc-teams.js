@@ -615,7 +615,7 @@ export class ScTeams extends HTMLElement {
   }
 
   get authHeaders() {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('scratchy_token');
     return {
       'Authorization': 'Bearer ' + token,
       'Content-Type': 'application/json'
