@@ -1116,8 +1116,10 @@ export function createRouter(opts = {}) {
 
       /* ---------- Internal Team Delegation (for NullClaw → orchestrator) ---------- */
 
-      // POST /api/internal/team-delegate — Orchestrator delegates to worker
+      // POST /api/internal/team-delegate — DEPRECATED: delegation is now server-managed
+      // Kept for backward compat (NullClaw instances may still try to call it)
       if (method === 'POST' && pathname === '/api/internal/team-delegate') {
+        console.warn('[router] DEPRECATED: /api/internal/team-delegate called — delegation should use [DELEGATE] blocks');
         const remoteAddr = req.socket?.remoteAddress || '';
         const isLocalhost = remoteAddr === '127.0.0.1' || remoteAddr === '::1' || remoteAddr === '::ffff:127.0.0.1';
         if (!isLocalhost) {
