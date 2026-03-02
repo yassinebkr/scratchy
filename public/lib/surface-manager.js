@@ -58,6 +58,14 @@ let _toolbar = null;
 
 const IDLE_TIMEOUT = 300_000; // 5 min after last activity before auto-hide (canvas/surfaces persist)
 
+/**
+ * Highlight-only mode: tabs show activity indicators but surfaces
+ * don't actually open. Set to false when surface components are ready.
+ */
+let _highlightOnly = true;
+const HIGHLIGHT_RESET_MS = 8000; // auto-clear highlight after 8s of no activity
+const _highlightTimers = new Map();
+
 /* ------------------------------------------------------------------ */
 /*  Initialization                                                    */
 /* ------------------------------------------------------------------ */
@@ -130,8 +138,29 @@ const SURFACE_GROUPS = {
 /** Set of surfaces that were manually toggled (not auto-activated) */
 const _manualSurfaces = new Set();
 
+/**
+ * Highlight a surface tab without opening the surface panel.
+ * Used in highlight-only mode. Auto-clears after HIGHLIGHT_RESET_MS.
+ */
+function _highlightSurface(type) {
+  const $bar = document.querySelector('sc-workspace-bar');
+  if ($bar?.setSurfaceActive) $bar.setSurfaceActive(type, true);
+  // Auto-clear highlight after timeout
+  clearTimeout(_highlightTimers.get(type));
+  _highlightTimers.set(type, setTimeout(() => {
+    if ($bar?.setSurfaceActive) $bar.setSurfaceActive(type, false);
+    _highlightTimers.delete(type);
+  }, HIGHLIGHT_RESET_MS));
+}
+
 /** Activate a surface by type */
 export function activateSurface(type, { manual = false } = {}) {
+  // In highlight-only mode, just pulse the tab indicator
+  if (_highlightOnly) {
+    _highlightSurface(type);
+    return;
+  }
+
   const s = _surfaces.get(type);
   if (!s || s.active) return;
 
@@ -204,10 +233,29 @@ export function deactivateSurface(type) {
 
 /** Toggle a surface (always treated as manual) */
 export function toggleSurface(type) {
+  // In highlight-only mode, just toggle the tab highlight
+  if (_highlightOnly) {
+    const $bar = document.querySelector('sc-workspace-bar');
+    const timer = _highlightTimers.get(type);
+    if (timer) {
+      clearTimeout(timer);
+      _highlightTimers.delete(type);
+      if ($bar?.setSurfaceActive) $bar.setSurfaceActive(type, false);
+    } else {
+      _highlightSurface(type);
+    }
+    return;
+  }
+
   const s = _surfaces.get(type);
   if (!s) return;
   if (s.active) deactivateSurface(type);
   else activateSurface(type, { manual: true });
+}
+
+/** Enable or disable highlight-only mode */
+export function setHighlightOnly(enabled) {
+  _highlightOnly = !!enabled;
 }
 
 /** Get active surface types */

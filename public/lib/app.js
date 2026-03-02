@@ -174,6 +174,17 @@ function appendMessage(role, html) {
   $messages.scrollTop = $messages.scrollHeight;
 }
 
+/**
+ * Scroll to bottom only if user is already near the bottom.
+ * Prevents jarring auto-scroll during team status updates.
+ */
+function softScrollToBottom() {
+  if (!$messages) return;
+  const threshold = 150; // px from bottom to consider "near bottom"
+  const nearBottom = ($messages.scrollHeight - $messages.scrollTop - $messages.clientHeight) < threshold;
+  if (nearBottom) $messages.scrollTop = $messages.scrollHeight;
+}
+
 /* ------------------------------------------------------------------ */
 /*  Textarea auto-resize                                              */
 /* ------------------------------------------------------------------ */
@@ -494,19 +505,22 @@ function injectTeamUIStyles() {
       background: rgba(249,166,2,0.06);
       border: 1px solid rgba(249,166,2,0.15);
       border-radius: 12px;
-      padding: 12px 16px;
-      margin: 8px 0;
+      padding: 8px 14px;
+      margin: 6px auto;
+      max-width: 480px;
       font-family: inherit;
       color: #f0ead6;
-      font-size: 14px;
+      font-size: 13px;
+      text-align: center;
     }
     
     .team-plan-card {
       background: rgba(249,166,2,0.06);
       border: 1px solid rgba(249,166,2,0.15);
       border-radius: 12px;
-      padding: 16px;
-      margin: 8px 0;
+      padding: 14px;
+      margin: 6px auto;
+      max-width: 520px;
       font-family: inherit;
     }
     
@@ -543,8 +557,9 @@ function injectTeamUIStyles() {
       background: rgba(249,166,2,0.06);
       border: 1px solid rgba(249,166,2,0.15);
       border-radius: 12px;
-      padding: 14px;
-      margin: 6px 0;
+      padding: 12px;
+      margin: 4px auto;
+      max-width: 520px;
       font-family: inherit;
     }
     
@@ -947,8 +962,8 @@ function wireWsEvents() {
       }
     }
     
-    // Auto-scroll main chat
-    $messages.scrollTop = $messages.scrollHeight;
+    // Soft scroll — don't force if user scrolled up to read
+    softScrollToBottom();
   });
 
   // 6. Batch complete
