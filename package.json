@@ -7,8 +7,8 @@
   "scripts": {
     "start": "node server/index.js",
     "dev": "node --watch server/index.js",
-    "test": "node --test test/*.test.js",
-    "test:verbose": "node --test --test-reporter spec test/*.test.js"
+    "test": "node --test --test-force-exit test/*.test.js",
+    "test:verbose": "node --test --test-force-exit --test-reporter spec test/*.test.js"
   },
   "engines": {
     "node": ">=22.0.0"
@@ -23,5 +23,8 @@
     "robots-parser": "^3.0.1",
     "tough-cookie": "^6.0.0",
     "ws": "^8.19.0"
+  },
+  "devDependencies": {
+    "jsdom": "^28.1.0"
   }
 }
