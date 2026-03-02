@@ -950,235 +950,207 @@ describe('Phase 4: Billing + Memory Consolidation', () => {
   });
 
   // ─── Billing Routes ────────────────────────────────────────────────────────
+  // Tests for handleBilling(method, pathname, user, body, json, res, req, getDb, baseUrl)
   describe('Billing Routes', () => {
-    let billingRoutes;
+    let handleBilling;
     let originalFetch;
+    let savedEnv;
 
     beforeEach(async () => {
       originalFetch = globalThis.fetch;
+      savedEnv = { ...process.env };
       const mod = await import('../server/routes/billing.js');
-      billingRoutes = mod.billingRoutes;
+      handleBilling = mod.handleBilling;
     });
 
     afterEach(() => {
       globalThis.fetch = originalFetch;
+      // Restore env vars
+      for (const key of Object.keys(process.env)) {
+        if (!(key in savedEnv)) delete process.env[key];
+      }
+      Object.assign(process.env, savedEnv);
     });
 
-    /**
-     * Create mock IncomingMessage (with URL and method).
-     */
-    function mockReq(method, url, body = null, headers = {}) {
-      const emitter = new EventEmitter();
-      emitter.method = method;
-      emitter.url = url;
-      emitter.headers = { host: 'localhost', ...headers };
-
-      process.nextTick(() => {
-        if (body) {
-          emitter.emit('data', Buffer.from(JSON.stringify(body), 'utf-8'));
-        }
-        emitter.emit('end');
-      });
-      return emitter;
-    }
-
-    function mockRes() {
-      const res = {
-        statusCode: null,
-        headers: {},
-        body: null,
-        writeHead(status, headers) {
-          res.statusCode = status;
-          res.headers = headers || {};
-        },
-        end(data) {
-          res.body = data ? JSON.parse(data) : null;
-        },
+    /** json() response helper — captures status and data on res */
+    function makeJson() {
+      return (res, status, data) => {
+        res.statusCode = status;
+        res.body = data;
+        return true;
       };
-      return res;
     }
 
-    function makeDeps(overrides = {}) {
-      const db = new Database(':memory:');
+    /** Mock async-iterable request (for webhook raw body reading) */
+    function makeReq(bodyStr = '', headers = {}) {
+      const buf = Buffer.from(bodyStr, 'utf-8');
       return {
-        stripeClient: {
-          createCustomer: mock.fn(async () => ({ id: 'cus_new' })),
-          createCheckoutSession: mock.fn(async () => ({ url: 'https://checkout.stripe.com/test' })),
-          createPortalSession: mock.fn(async () => ({ url: 'https://portal.stripe.com/test' })),
-          verifyWebhookSignature: mock.fn(() => ({ type: 'test', data: {} })),
-        },
-        usageTracker: {
-          getUsage: mock.fn(async () => ({ messages: 10, tokens: 5000, modelBreakdown: {} })),
-          checkQuota: mock.fn(async () => ({ allowed: true, remaining: { messages: 40, tokens: 95000 }, resetAt: '2025-01-02T00:00:00.000Z' })),
-          getMonthlyUsage: mock.fn(async () => ({ month: '2025-01', totalMessages: 100, totalTokens: 50000, days: 5, modelBreakdown: {} })),
-        },
-        webhookHandler: mock.fn(async (req, res) => {
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ received: true }));
-        }),
-        authenticate: mock.fn(async () => ({
-          id: 'user_1',
-          username: 'testuser',
-          plan: 'free',
-        })),
-        getUserBilling: mock.fn(() => ({ stripeCustomerId: 'cus_existing', plan: 'free' })),
-        updateUserBilling: mock.fn(() => {}),
-        ...overrides,
+        headers,
+        async *[Symbol.asyncIterator]() { yield buf; },
       };
     }
 
-    it('GET /usage returns current usage + quota', async () => {
-      const deps = makeDeps();
-      const handlers = billingRoutes(null, deps);
+    /** Create in-memory DB with billing tables */
+    function makeDb() {
+      const db = new Database(':memory:');
+      db.exec(`CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY, username TEXT, plan TEXT DEFAULT 'free', updatedAt TEXT
+      )`);
+      db.exec(`CREATE TABLE IF NOT EXISTS stripe_customers (
+        userId TEXT PRIMARY KEY, customerId TEXT UNIQUE, createdAt TEXT DEFAULT (datetime('now'))
+      )`);
+      db.exec(`CREATE TABLE IF NOT EXISTS user_api_keys (
+        userId TEXT, isActive INTEGER DEFAULT 1
+      )`);
+      return db;
+    }
 
-      const req = mockReq('GET', '/api/billing/usage');
-      const res = mockRes();
-      await handlers.usage(req, res);
+    it('GET /api/billing/status returns current plan for authenticated user', async () => {
+      const db = makeDb();
+      db.prepare(`INSERT INTO users (id, username, plan) VALUES (?, ?, ?)`).run('user_1', 'test@test.com', 'pro');
+      const json = makeJson();
+      const res = {};
+      const user = { id: 'user_1', username: 'test@test.com' };
 
-      assert.equal(res.statusCode, 200);
-      assert.ok(res.body.today);
-      assert.ok(res.body.quota);
-      assert.ok(res.body.monthly);
-      assert.equal(res.body.planId, 'free');
-    });
-
-    it('GET /usage returns 401 when unauthenticated', async () => {
-      const deps = makeDeps({ authenticate: mock.fn(async () => null) });
-      const handlers = billingRoutes(null, deps);
-
-      const req = mockReq('GET', '/api/billing/usage');
-      const res = mockRes();
-      await handlers.usage(req, res);
-
-      assert.equal(res.statusCode, 401);
-    });
-
-    it('GET /plan returns current plan', async () => {
-      const deps = makeDeps();
-      const handlers = billingRoutes(null, deps);
-
-      const req = mockReq('GET', '/api/billing/plan');
-      const res = mockRes();
-      await handlers.plan(req, res);
+      await handleBilling('GET', '/api/billing/status', user, null, json, res, { headers: {} }, () => db, 'https://test.local');
 
       assert.equal(res.statusCode, 200);
-      assert.ok(res.body.plan);
-      assert.equal(res.body.plan.id, 'free');
-      assert.ok(Array.isArray(res.body.allPlans));
-      assert.equal(res.body.allPlans.length, 4);
+      assert.equal(res.body.plan, 'pro');
+      assert.equal(res.body.hasStripeSubscription, false);
     });
 
-    it('GET /plan returns 401 when unauthenticated', async () => {
-      const deps = makeDeps({ authenticate: mock.fn(async () => null) });
-      const handlers = billingRoutes(null, deps);
+    it('GET /api/billing/status returns 401 when unauthenticated', async () => {
+      const json = makeJson();
+      const res = {};
 
-      const req = mockReq('GET', '/api/billing/plan');
-      const res = mockRes();
-      await handlers.plan(req, res);
+      await handleBilling('GET', '/api/billing/status', null, null, json, res, { headers: {} }, () => null, 'https://test.local');
 
       assert.equal(res.statusCode, 401);
+      assert.ok(res.body.error);
     });
 
-    it('POST /checkout creates session', async () => {
-      const deps = makeDeps();
-      const handlers = billingRoutes(null, deps);
+    it('GET /api/billing/status shows hasStripeSubscription when customer exists', async () => {
+      const db = makeDb();
+      db.prepare(`INSERT INTO users (id, username, plan) VALUES (?, ?, ?)`).run('user_1', 'test@test.com', 'pro');
+      db.prepare(`INSERT INTO stripe_customers (userId, customerId) VALUES (?, ?)`).run('user_1', 'cus_abc');
+      // Mock fetch for getSubscription call
+      globalThis.fetch = mock.fn(async () => ({
+        ok: true,
+        json: async () => ({ data: [] }),
+      }));
+      process.env.STRIPE_SECRET_KEY = 'sk_test_dummy';
 
-      const req = mockReq('POST', '/api/billing/checkout', { planId: 'pro' });
-      const res = mockRes();
-      await handlers.checkout(req, res);
+      const json = makeJson();
+      const res = {};
+      const user = { id: 'user_1', username: 'test@test.com' };
+
+      await handleBilling('GET', '/api/billing/status', user, null, json, res, { headers: {} }, () => db, 'https://test.local');
+
+      assert.equal(res.statusCode, 200);
+      assert.equal(res.body.hasStripeSubscription, true);
+      assert.equal(res.body.customerId, 'cus_abc');
+    });
+
+    it('POST /api/billing/checkout returns 401 when unauthenticated', async () => {
+      const json = makeJson();
+      const res = {};
+
+      await handleBilling('POST', '/api/billing/checkout', null, { plan: 'pro' }, json, res, { headers: {} }, () => null, 'https://test.local');
+
+      assert.equal(res.statusCode, 401);
+      assert.ok(res.body.error);
+    });
+
+    it('POST /api/billing/checkout returns 400 without plan', async () => {
+      const json = makeJson();
+      const res = {};
+      const user = { id: 'user_1', username: 'test@test.com' };
+
+      await handleBilling('POST', '/api/billing/checkout', user, {}, json, res, { headers: {} }, () => null, 'https://test.local');
+
+      assert.equal(res.statusCode, 400);
+      assert.ok(res.body.error.includes('Plan'));
+    });
+
+    it('POST /api/billing/checkout returns 400 for invalid plan (free)', async () => {
+      const json = makeJson();
+      const res = {};
+      const user = { id: 'user_1', username: 'test@test.com' };
+
+      await handleBilling('POST', '/api/billing/checkout', user, { plan: 'free' }, json, res, { headers: {} }, () => null, 'https://test.local');
+
+      assert.equal(res.statusCode, 400);
+      assert.ok(res.body.error);
+    });
+
+    it('POST /api/billing/checkout creates session with valid plan (mock Stripe)', async () => {
+      process.env.STRIPE_SECRET_KEY = 'sk_test_dummy';
+      process.env.STRIPE_PRICE_PRO = 'price_pro_test';
+
+      globalThis.fetch = mock.fn(async () => ({
+        ok: true,
+        json: async () => ({ id: 'cs_test_123', url: 'https://checkout.stripe.com/test' }),
+      }));
+
+      const json = makeJson();
+      const res = {};
+      const user = { id: 'user_1', username: 'test@test.com' };
+
+      await handleBilling('POST', '/api/billing/checkout', user, { plan: 'pro' }, json, res, { headers: {} }, () => null, 'https://test.local');
 
       assert.equal(res.statusCode, 200);
       assert.equal(res.body.url, 'https://checkout.stripe.com/test');
+      assert.equal(res.body.sessionId, 'cs_test_123');
     });
 
-    it('POST /checkout returns 400 without planId', async () => {
-      const deps = makeDeps();
-      const handlers = billingRoutes(null, deps);
+    it('POST /api/billing/portal returns 401 when unauthenticated', async () => {
+      const json = makeJson();
+      const res = {};
 
-      const req = mockReq('POST', '/api/billing/checkout', {});
-      const res = mockRes();
-      await handlers.checkout(req, res);
-
-      assert.equal(res.statusCode, 400);
-      assert.ok(res.body.error.includes('planId'));
-    });
-
-    it('POST /checkout returns 400 for invalid plan', async () => {
-      const deps = makeDeps();
-      const handlers = billingRoutes(null, deps);
-
-      const req = mockReq('POST', '/api/billing/checkout', { planId: 'free' }); // free has no stripePriceId
-      const res = mockRes();
-      await handlers.checkout(req, res);
-
-      assert.equal(res.statusCode, 400);
-      assert.ok(res.body.error.includes('Invalid plan'));
-    });
-
-    it('POST /checkout returns 401 when unauthenticated', async () => {
-      const deps = makeDeps({ authenticate: mock.fn(async () => null) });
-      const handlers = billingRoutes(null, deps);
-
-      const req = mockReq('POST', '/api/billing/checkout', { planId: 'pro' });
-      const res = mockRes();
-      await handlers.checkout(req, res);
+      await handleBilling('POST', '/api/billing/portal', null, {}, json, res, { headers: {} }, () => null, 'https://test.local');
 
       assert.equal(res.statusCode, 401);
     });
 
-    it('POST /checkout creates customer if none exists', async () => {
-      const deps = makeDeps({
-        getUserBilling: mock.fn(() => ({ stripeCustomerId: null, plan: 'free' })),
-      });
-      const handlers = billingRoutes(null, deps);
+    it('POST /api/billing/portal returns 404 when no customer', async () => {
+      const db = makeDb();
+      const json = makeJson();
+      const res = {};
+      const user = { id: 'user_1', username: 'test@test.com' };
 
-      const req = mockReq('POST', '/api/billing/checkout', { planId: 'pro' });
-      const res = mockRes();
-      await handlers.checkout(req, res);
+      await handleBilling('POST', '/api/billing/portal', user, {}, json, res, { headers: {} }, () => db, 'https://test.local');
 
-      assert.equal(res.statusCode, 200);
-      assert.equal(deps.stripeClient.createCustomer.mock.callCount(), 1);
-      assert.equal(deps.updateUserBilling.mock.callCount(), 1);
+      assert.equal(res.statusCode, 404);
+      assert.ok(res.body.error.includes('subscription'));
     });
 
-    it('POST /webhook validates signature (delegates to handler)', async () => {
-      const deps = makeDeps();
-      const handlers = billingRoutes(null, deps);
+    it('POST /api/billing/webhook returns 400 without stripe-signature', async () => {
+      const json = makeJson();
+      const res = {};
+      const req = makeReq('{}', {}); // no stripe-signature header
 
-      const req = mockReq('POST', '/api/billing/webhook', null, { 'stripe-signature': 'sig' });
-      const res = mockRes();
-      await handlers.webhook(req, res);
+      await handleBilling('POST', '/api/billing/webhook', null, null, json, res, req, () => null, 'https://test.local');
 
-      assert.equal(res.statusCode, 200);
-      assert.equal(deps.webhookHandler.mock.callCount(), 1);
+      assert.equal(res.statusCode, 400);
+      assert.ok(res.body.error.includes('Missing'));
     });
 
-    it('registers routes on a Map-based router', () => {
-      const deps = makeDeps();
-      const routerMap = new Map();
-      billingRoutes(routerMap, deps);
+    it('handleBilling returns false for unmatched routes', async () => {
+      const json = makeJson();
+      const res = {};
 
-      assert.ok(routerMap.has('POST /api/billing/checkout'));
-      assert.ok(routerMap.has('GET /api/billing/portal'));
-      assert.ok(routerMap.has('GET /api/billing/usage'));
-      assert.ok(routerMap.has('GET /api/billing/plan'));
-      assert.ok(routerMap.has('POST /api/billing/webhook'));
-      assert.equal(routerMap.size, 5);
+      const result = await handleBilling('GET', '/api/unknown', { id: 'u1' }, null, json, res, { headers: {} }, () => null, 'https://test.local');
+
+      assert.equal(result, false);
     });
 
-    it('registers routes on a handle()-based router', () => {
-      const deps = makeDeps();
-      const routes = [];
-      const router = {
-        handle(method, path, handler) {
-          routes.push({ method, path });
-        },
-      };
-      billingRoutes(router, deps);
+    it('handleBilling returns false for non-billing paths', async () => {
+      const json = makeJson();
+      const res = {};
 
-      assert.equal(routes.length, 5);
-      assert.ok(routes.some(r => r.method === 'POST' && r.path === '/api/billing/checkout'));
-      assert.ok(routes.some(r => r.method === 'GET' && r.path === '/api/billing/usage'));
+      const result = await handleBilling('POST', '/api/users/login', { id: 'u1' }, null, json, res, { headers: {} }, () => null, 'https://test.local');
+
+      assert.equal(result, false);
     });
   });
 
