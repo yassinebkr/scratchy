@@ -108,6 +108,70 @@ function splitCSV(line) {
 }
 
 /**
+ * Split a CSV line into exactly N fields for tabular arrays.
+ *
+ * Uses an "anchor both ends" strategy to handle unquoted commas in
+ * middle fields (the most common case in TOON — short labels at edges,
+ * prose with commas in the middle):
+ *
+ *   n=1  → entire line
+ *   n=2  → first value + everything remaining
+ *   n≥3  → first from left, last from right, middle absorbs excess
+ *
+ * If the line has N or fewer comma-separated values, returns them as-is.
+ * Quoting is always respected — quoted values with commas are never split.
+ *
+ * @param {string} line — CSV row content
+ * @param {number} n — number of fields expected
+ * @returns {string[]} — exactly n (or fewer) values
+ */
+function splitCSVN(line, n) {
+  if (n <= 0) return [];
+  if (n === 1) return [line];
+
+  // Split into all values using the full quote-aware parser
+  const allValues = splitCSV(line);
+
+  // Exact or fewer values: no redistribution needed
+  if (allValues.length <= n) return allValues;
+
+  // n=2: first value from left, rest joined as second value
+  if (n === 2) {
+    return [allValues[0], allValues.slice(1).join(',')];
+  }
+
+  // n≥3: anchor first and last from edges, middle fields absorb excess
+  const result = [];
+
+  // First field (anchored from left)
+  result.push(allValues[0]);
+
+  // Middle values (everything between first and last)
+  const middleValues = allValues.slice(1, allValues.length - 1);
+  const middleFieldCount = n - 2;
+
+  if (middleFieldCount === 1) {
+    // Single middle field absorbs all middle values
+    result.push(middleValues.join(','));
+  } else {
+    // Multiple middle fields: first (middleFieldCount-1) get one value each,
+    // the last middle field absorbs any remaining
+    for (let m = 0; m < middleFieldCount - 1 && m < middleValues.length; m++) {
+      result.push(middleValues[m]);
+    }
+    const leftover = middleValues.slice(Math.min(middleFieldCount - 1, middleValues.length));
+    if (leftover.length > 0) {
+      result.push(leftover.join(','));
+    }
+  }
+
+  // Last field (anchored from right)
+  result.push(allValues[allValues.length - 1]);
+
+  return result;
+}
+
+/**
  * Measure the leading indentation (number of spaces) of a line.
  * @param {string} line
  * @returns {number}
@@ -218,7 +282,7 @@ function parseBlock(lines, baseIndent) {
         if (rowLine.trim() === '' || rowLine.trim() === '---') break;
         const rowIndent = indent(rowLine);
         if (rowIndent <= lineIndent) break;
-        const values = splitCSV(rowLine.trim());
+        const values = splitCSVN(rowLine.trim(), fields.length);
         const rowObj = {};
         for (let f = 0; f < fields.length; f++) {
           const raw = f < values.length ? values[f].trim() : '';

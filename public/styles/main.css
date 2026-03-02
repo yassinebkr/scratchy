@@ -108,8 +108,18 @@ select:focus-visible,
   display: flex;
   flex-direction: column;
   height: 100%;
-  /* Account for workspace bar height (52px) + padding (12px) + safe area */
-  padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+  position: relative; /* anchor for user-menu absolute positioning */
+  /* Account for workspace bar at top on desktop */
+  padding-top: var(--sc-bar-h, 52px);
+  padding-bottom: 0;
+}
+
+@media (max-width: 767px) {
+  #app-screen {
+    /* Bar is at bottom on mobile */
+    padding-top: 0;
+    padding-bottom: calc(var(--sc-bar-h, 52px) + env(safe-area-inset-bottom, 0px));
+  }
 }
 
 /* Prevent chat surface from extending behind the workspace bar */
@@ -140,6 +150,10 @@ sc-workspace-bar {
   border-bottom: var(--glass-border);
   z-index: var(--sc-z-topbar, 50);
   position: relative;
+}
+
+@media (min-width: 768px) {
+  .topbar { display: none; }
 }
 
 .topbar-left,

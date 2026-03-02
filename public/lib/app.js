@@ -100,6 +100,7 @@ function showApp() {
     if (state.user?.displayName) dashboard.userName = state.user.displayName;
     dashboard.refresh?.();
   }
+  if ($workspaceBar && state.user?.displayName) $workspaceBar.setUser(state.user.displayName);
   $msgInput?.focus();
 }
 
@@ -140,6 +141,8 @@ function setConnectionStatus(status) {
       $statusBadge.onclick = null;
     }
   }
+
+  if ($workspaceBar) $workspaceBar.setConnectionStatus(status);
 }
 
 function appendMessage(role, html) {
@@ -357,6 +360,15 @@ function formatMarkdown(text) {
   html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
   // Italic: *...*
   html = html.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em>$1</em>');
+  // Images: [IMAGE:path] → inline <img>
+  html = html.replace(/\[IMAGE:([^\]]+)\]/g, (_, path) => {
+    const safePath = path.trim();
+    return '<img src="/api/workspace-file?path=' + encodeURIComponent(safePath) + '" alt="Agent image" style="max-width:100%;max-height:400px;border-radius:8px;margin:8px 0" loading="lazy">';
+  });
+  // Markdown images: ![alt](url)
+  html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" style="max-width:100%;max-height:400px;border-radius:8px;margin:8px 0" loading="lazy">');
+  // Markdown links: [text](url)
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
   // Line breaks
   html = html.replace(/\n/g, '<br>');
   return html;
@@ -656,6 +668,7 @@ async function enterApp() {
   if ($topbarUser) {
     $topbarUser.textContent = state.user?.displayName || state.user?.username || '';
   }
+  if ($workspaceBar) $workspaceBar.setUser(state.user?.displayName || state.user?.email || 'User');
 
   // Show admin button + divider for admin users
   if ($adminBtn && state.user?.role === 'admin') {
@@ -884,6 +897,19 @@ function wireNewUIModules() {
       // Desktop: toggle sidebar visibility
       const sidebar = document.getElementById('sidebar');
       if (sidebar) sidebar.classList.toggle('collapsed');
+    }
+  });
+
+  // User menu click from workspace bar → toggle the existing user menu
+  // Uses _skipMenuClose flag to prevent the document-level click handler
+  // from immediately re-hiding the menu (click bubbles from shadow DOM).
+  let _skipMenuClose = false;
+  document.addEventListener('user-menu-click', () => {
+    if ($userMenu) {
+      _skipMenuClose = true;
+      const isOpen = !$userMenu.classList.contains('hidden');
+      $userMenu.classList.toggle('hidden');
+      if ($userMenuBtn) $userMenuBtn.setAttribute('aria-expanded', String(!isOpen));
     }
   });
 
@@ -1187,7 +1213,12 @@ async function init() {
       e.stopPropagation();
       $userMenu.classList.toggle('hidden');
     });
-    document.addEventListener('click', () => $userMenu.classList.add('hidden'));
+    document.addEventListener('click', (e) => {
+      if (_skipMenuClose) { _skipMenuClose = false; return; }
+      // Don't close if click is inside the menu itself
+      if ($userMenu.contains(e.target)) return;
+      $userMenu.classList.add('hidden');
+    });
   }
   // Settings
   if ($settingsBtn) {

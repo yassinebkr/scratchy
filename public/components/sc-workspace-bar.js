@@ -8,11 +8,11 @@ template.innerHTML = /* html */ `
   :host {
     display: block;
     position: fixed;
-    bottom: 0;
+    top: 0;
     left: 0;
     right: 0;
-    padding: 0 16px 12px;
-    z-index: 9000;
+    padding: 0;
+    z-index: var(--sc-z-bar, 40);
     pointer-events: none;
     font-family: var(--sc-font, system-ui, -apple-system, sans-serif);
   }
@@ -25,16 +25,16 @@ template.innerHTML = /* html */ `
     align-items: center;
     gap: 6px;
     height: 48px;
-    max-width: 840px;
-    margin: 0 auto;
+    max-width: none;
+    margin: 0;
     padding: 0 10px;
     background: var(--sc-glass-bg-heavy, rgba(26, 22, 16, 0.95));
     backdrop-filter: var(--sc-glass-blur, blur(20px));
     -webkit-backdrop-filter: var(--sc-glass-blur, blur(20px));
     border: 1px solid rgba(249, 166, 2, 0.08);
-    border-radius: 12px;
+    border-radius: 0;
     pointer-events: auto;
-    box-shadow: 0 -4px 32px rgba(0, 0, 0, 0.4),
+    box-shadow: 0 4px 32px rgba(0, 0, 0, 0.4),
                 0 0 0 0.5px rgba(249, 166, 2, 0.04) inset;
     transition: box-shadow 0.2s ease;
   }
@@ -350,9 +350,71 @@ template.innerHTML = /* html */ `
     opacity: 0.7;
   }
 
+  /* ───────── Connection Status ───────── */
+  .conn-status {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    padding: 0 4px;
+  }
+  .conn-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--sc-danger, #ef4444);
+    transition: background 0.3s ease;
+  }
+  .conn-status[data-status="connected"] .conn-dot {
+    background: var(--sc-success, #22c55e);
+  }
+  .conn-status[data-status="connecting"] .conn-dot {
+    background: var(--sc-warning, #fbbf24);
+    animation: dotPulse 1.4s ease-in-out infinite;
+  }
+
+  /* ───────── User Button ───────── */
+  .user-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 34px;
+    padding: 0 10px;
+    border: 1px solid var(--sc-border, rgba(249, 166, 2, 0.12));
+    border-radius: 8px;
+    background: transparent;
+    color: var(--sc-text-muted, #8a7e6e);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 12.5px;
+    font-weight: 500;
+    white-space: nowrap;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+    flex-shrink: 0;
+  }
+  .user-btn:hover {
+    background: rgba(249, 166, 2, 0.08);
+    color: var(--sc-text, #e8e0d2);
+    border-color: rgba(249, 166, 2, 0.2);
+  }
+  .user-btn:active {
+    background: rgba(249, 166, 2, 0.14);
+  }
+  .user-btn svg {
+    opacity: 0.5;
+    flex-shrink: 0;
+  }
+  .user-btn:hover svg { opacity: 1; }
+  .user-name {
+    max-width: 100px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
   /* ───────── Mobile ───────── */
   @media (max-width: 767px) {
     :host {
+      top: auto;
+      bottom: 0;
       padding: 0;
     }
     .bar {
@@ -381,6 +443,10 @@ template.innerHTML = /* html */ `
     .cmd-palette {
       padding: 0 8px;
       border: none;
+    }
+    .conn-status,
+    .user-btn {
+      display: none;
     }
   }
 </style>
@@ -450,6 +516,11 @@ template.innerHTML = /* html */ `
   <!-- Spacer -->
   <div class="spacer"></div>
 
+  <!-- Connection status -->
+  <span class="conn-status" data-status="disconnected" title="Disconnected">
+    <span class="conn-dot"></span>
+  </span>
+
   <!-- Command palette trigger -->
   <button class="cmd-palette" aria-label="Open command palette (⌘K)" title="Command palette">
     <svg viewBox="0 0 16 16" aria-hidden="true">
@@ -457,6 +528,13 @@ template.innerHTML = /* html */ `
       <line x1="10" y1="10" x2="14" y2="14"/>
     </svg>
     <span class="cmd-badge">⌘K</span>
+  </button>
+
+  <!-- User menu -->
+  <div class="divider" aria-hidden="true"></div>
+  <button class="user-btn" aria-label="User menu" title="User menu">
+    <span class="user-name">User</span>
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
   </button>
 </div>
 `;
@@ -558,6 +636,20 @@ class ScWorkspaceBar extends HTMLElement {
     pill.setAttribute('aria-pressed', String(!!active));
   }
 
+  setConnectionStatus(status) {
+    const el = this.#shadow.querySelector('.conn-status');
+    if (!el) return;
+    const valid = ['connected', 'disconnected', 'connecting'];
+    if (!valid.includes(status)) return;
+    el.setAttribute('data-status', status);
+    el.setAttribute('title', status.charAt(0).toUpperCase() + status.slice(1));
+  }
+
+  setUser(name) {
+    const el = this.#shadow.querySelector('.user-name');
+    if (el) el.textContent = name || 'User';
+  }
+
   /* ─────────── Internal ─────────── */
 
   #bindEvents() {
@@ -611,6 +703,14 @@ class ScWorkspaceBar extends HTMLElement {
     cmdBtn.addEventListener('click', () => {
       this.dispatchEvent(new CustomEvent('command-palette', { bubbles: true, composed: true }));
     });
+
+    // User menu
+    const userBtn = this.#shadow.querySelector('.user-btn');
+    if (userBtn) {
+      userBtn.addEventListener('click', () => {
+        this.dispatchEvent(new CustomEvent('user-menu-click', { bubbles: true, composed: true }));
+      });
+    }
 
     // Keyboard shortcut: ⌘K / Ctrl+K
     this.#shadow.addEventListener('keydown', (e) => {

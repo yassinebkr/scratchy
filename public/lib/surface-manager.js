@@ -27,10 +27,10 @@ import { on, emit } from './ws-client.js';
 
 /** @type {Record<string, SurfaceDef>} */
 const SURFACE_DEFS = {
-  terminal: { triggers: ['shell', 'exec'], component: 'sc-terminal', priority: 2, label: 'Terminal' },
-  explorer: { triggers: ['file_read', 'read', 'read_dir', 'list_files', 'list_dir'], component: 'sc-filetree', priority: 1, label: 'Files' },
-  editor:   { triggers: ['file_write', 'file_edit', 'file_append', 'write', 'edit'], component: 'sc-editor', priority: 2, label: 'Editor' },
-  search:   { triggers: ['web_search', 'web_fetch'], component: 'sc-search', priority: 1, label: 'Search' },
+  terminal: { triggers: ['shell', 'exec', 'Exec', 'bash', 'Bash'], component: 'sc-terminal', priority: 2, label: 'Terminal' },
+  explorer: { triggers: ['file_read', 'read', 'Read', 'read_dir', 'list_files', 'list_dir', 'ListDir', 'ReadDir'], component: 'sc-filetree', priority: 1, label: 'Files' },
+  editor:   { triggers: ['file_write', 'file_edit', 'file_append', 'write', 'Write', 'edit', 'Edit'], component: 'sc-editor', priority: 2, label: 'Editor' },
+  search:   { triggers: ['web_search', 'web_fetch', 'WebSearch', 'WebFetch', 'http_request', 'HttpRequest'], component: 'sc-search', priority: 1, label: 'Search' },
   canvas:   { triggers: ['canvas_op'], component: 'sc-canvas', priority: 3, label: 'Canvas' },
 };
 
