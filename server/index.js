@@ -16,6 +16,7 @@ import { init as initChat, handleChat, shutdown as shutdownChat } from './chat-h
 import { init as initOrchestrator, routeMessage, routeTeamChat, shutdown as shutdownOrchestrator } from './agent-orchestrator.js';
 import { createSurfaceEventHandler } from './surface-events.js';
 import { seedAgents } from './seed-agents.js';
+import { seedTeams } from './seed-teams.js';
 import * as canvasState from '../state/canvas.js';
 import * as teamsState from '../state/teams.js';
 import * as workspacesState from '../state/workspaces.js';
@@ -79,6 +80,9 @@ async function main() {
 
     /* -- Seed default agents -- */
     seedAgents(db);
+
+    /* -- Seed default teams (Backend Dev + Frontend) -- */
+    seedTeams(db);
   } catch (err) {
     console.warn('[server] Database module not available, running without DB:', err.message);
   }

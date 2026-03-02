@@ -27,6 +27,8 @@ import { handleBYOK } from './routes/byok.js';
 import { handleBilling } from './routes/billing.js';
 import { createTeamRoutes } from './routes/teams.js';
 import { createWorkspaceRoutes } from './routes/workspaces.js';
+import { listSkills, getSkill, getSkillsForAgent, getToolsForAgent } from '../lib/skills/index.js';
+import { scanSkill, formatReport } from '../lib/skill-scanner.js';
 
 /** @type {import('../lib/mcp-registry.js').McpRegistry|null} */
 let _mcpRegistry = null;
@@ -685,6 +687,29 @@ export function createRouter(opts = {}) {
         if (handled) return;
       }
 
+      /* ---------- Workspace file serving (agent images, screenshots) ---------- */
+      if (method === 'GET' && pathname === '/api/workspace-file') {
+        const filePath = url.searchParams?.get('path') || new URL(req.url, 'http://x').searchParams.get('path');
+        if (!filePath) return json(res, 400, { error: 'Missing path parameter' });
+        // Security: only allow files from nullclaw workspace or /tmp
+        const allowedPrefixes = ['/home/nonbios/.nullclaw/', '/tmp/'];
+        const normalizedPath = resolve(filePath);
+        if (!allowedPrefixes.some(p => normalizedPath.startsWith(p))) {
+          return json(res, 403, { error: 'Access denied' });
+        }
+        try {
+          const data = await readFile(normalizedPath);
+          const ext = normalizedPath.split('.').pop().toLowerCase();
+          const mimeMap = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml', pdf: 'application/pdf' };
+          const mime = mimeMap[ext] || 'application/octet-stream';
+          res.writeHead(200, { 'Content-Type': mime, 'Cache-Control': 'public, max-age=3600' });
+          res.end(data);
+        } catch {
+          return json(res, 404, { error: 'File not found' });
+        }
+        return;
+      }
+
       /* ---------- Widget APIs (Notes, Calendar, Email) ---------- */
       // GET /api/widget-catalog — curated list of available widgets
       if (method === 'GET' && pathname === '/api/widget-catalog') {
@@ -752,6 +777,40 @@ export function createRouter(opts = {}) {
         }
         const handled = await _workspaceHandler.handle(req, res, pathname);
         if (handled) return;
+      }
+
+      /* ---------- Skills API ---------- */
+      if (pathname.startsWith('/api/skills')) {
+        if (method === 'GET' && pathname === '/api/skills') {
+          return json(res, 200, { ok: true, data: listSkills() });
+        }
+        if (method === 'GET') {
+          const agentMatch = matchRoute('/api/skills/agent/:name', pathname);
+          if (agentMatch) {
+            const skills = getSkillsForAgent(agentMatch.name).map(s => ({
+              id: s.id, name: s.name, description: s.description, category: s.category,
+            }));
+            const tools = getToolsForAgent(agentMatch.name);
+            return json(res, 200, { ok: true, data: { agent: agentMatch.name, skills, tools: tools || 'unrestricted', skillCount: skills.length } });
+          }
+          const idMatch = matchRoute('/api/skills/:id', pathname);
+          if (idMatch) {
+            const skill = getSkill(idMatch.id);
+            if (!skill) return json(res, 404, { ok: false, error: 'Skill not found' });
+            const { id, name, description, category, source, version } = skill;
+            return json(res, 200, { ok: true, data: { id, name, description, category, source, version } });
+          }
+        }
+        if (method === 'POST' && pathname === '/api/skills/scan') {
+          const user = await requireAuth(req, res);
+          if (!user) return;
+          const manifest = req.body;
+          if (!manifest || !manifest.id || !manifest.prompt) {
+            return json(res, 400, { ok: false, error: 'Manifest must include at least: id, prompt' });
+          }
+          const report = scanSkill(manifest);
+          return json(res, 200, { ok: true, data: { ...report, formattedReport: formatReport(report) } });
+        }
       }
 
       /* ---------- Usage API ---------- */
