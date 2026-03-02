@@ -25,7 +25,7 @@
 import { spawn } from 'node:child_process';
 import { NullClawAdapter } from '../lib/nullclaw-adapter.js';
 import { searchContext, searchMemory, formatResultsAsToon } from '../lib/context-search.js';
-import { createBestGeminiProvider, createOpenAIProvider, createMockProvider } from '../lib/embeddings.js';
+import { createBestGeminiProvider, createOpenAIProvider, createMockProvider, createFallbackProvider } from '../lib/embeddings.js';
 import { extractMemories } from '../lib/memory-extraction.js';
 import { BUILTIN_TOOLS, createToolExecutor } from '../lib/builtin-tools.js';
 import { getToolsForAgent } from '../lib/skills/index.js';
@@ -276,18 +276,22 @@ export function init(db, mcpRegistry) {
   _db = db;
   _mcpRegistry = mcpRegistry;
 
-  // ── Embedding provider (priority: Gemini OAuth → Gemini API key → OpenAI → Mock) ──
-  const geminiProvider = createBestGeminiProvider();
-  const openaiKey = process.env.OPENAI_API_KEY;
-  if (geminiProvider) {
-    _embedder = geminiProvider;
-    console.log('[orchestrator] Embedding provider: Gemini text-embedding-004');
-  } else if (openaiKey) {
-    _embedder = createOpenAIProvider(openaiKey);
-    console.log('[orchestrator] Embedding provider: OpenAI text-embedding-3-small');
-  } else {
-    _embedder = createMockProvider();
-    console.warn('[orchestrator] No Gemini OAuth/API key or OpenAI key — using mock embeddings (semantic search disabled)');
+  // ── Embedding provider (fallback chain: Gemini → OpenAI → Mock) ──
+  {
+    const chain = [];
+    const geminiProvider = createBestGeminiProvider();
+    const openaiKey = process.env.OPENAI_API_KEY;
+    if (geminiProvider) chain.push({ name: 'Gemini', provider: geminiProvider });
+    if (openaiKey) chain.push({ name: 'OpenAI', provider: createOpenAIProvider(openaiKey) });
+    chain.push({ name: 'Mock', provider: createMockProvider(chain[0]?.provider.dimensions || 768) });
+
+    if (chain.length > 1) {
+      _embedder = createFallbackProvider(chain);
+      console.log(`[orchestrator] Embedding provider: fallback chain [${chain.map(c => c.name).join(' → ')}]`);
+    } else {
+      _embedder = chain[0].provider;
+      console.warn('[orchestrator] Embedding provider: Mock only (semantic search degraded)');
+    }
   }
 
   // ── NullClaw adapter pool (separate port range from chat-handler) ──

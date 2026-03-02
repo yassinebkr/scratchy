@@ -15,7 +15,7 @@ import crypto from 'node:crypto';
 
 import { NullClawAdapter } from '../lib/nullclaw-adapter.js';
 import { searchContext, searchMemory, formatResultsAsToon } from '../lib/context-search.js';
-import { createBestGeminiProvider, createOpenAIProvider, createMockProvider } from '../lib/embeddings.js';
+import { createBestGeminiProvider, createOpenAIProvider, createMockProvider, createFallbackProvider } from '../lib/embeddings.js';
 import { extractMemories } from '../lib/memory-extraction.js';
 import { maskObservations } from '../lib/observation-masking.js';
 import { MemoryConsolidator } from '../lib/memory-consolidation.js';
@@ -106,18 +106,22 @@ export function init(db) {
   memory.init(db);
   contextIndex.init(db);
 
-  // ── Embedding provider (priority: Gemini OAuth → Gemini API key → OpenAI → Mock) ──
-  const geminiProvider = createBestGeminiProvider();
-  const openaiKey = process.env.OPENAI_API_KEY;
-  if (geminiProvider) {
-    _embedder = geminiProvider;
-    console.log('[chat] Embedding provider: Gemini text-embedding-004 (OAuth)');
-  } else if (openaiKey) {
-    _embedder = createOpenAIProvider(openaiKey);
-    console.log('[chat] Embedding provider: OpenAI text-embedding-3-small');
-  } else {
-    _embedder = createMockProvider();
-    console.warn('[chat] No Gemini OAuth/API key or OpenAI key — using mock embeddings (semantic search disabled)');
+  // ── Embedding provider (fallback chain: Gemini → OpenAI → Mock) ──
+  {
+    const chain = [];
+    const geminiProvider = createBestGeminiProvider();
+    const openaiKey = process.env.OPENAI_API_KEY;
+    if (geminiProvider) chain.push({ name: 'Gemini', provider: geminiProvider });
+    if (openaiKey) chain.push({ name: 'OpenAI', provider: createOpenAIProvider(openaiKey) });
+    chain.push({ name: 'Mock', provider: createMockProvider(chain[0]?.provider.dimensions || 768) });
+
+    if (chain.length > 1) {
+      _embedder = createFallbackProvider(chain);
+      console.log(`[chat] Embedding provider: fallback chain [${chain.map(c => c.name).join(' → ')}]`);
+    } else {
+      _embedder = chain[0].provider;
+      console.warn('[chat] Embedding provider: Mock only (semantic search degraded)');
+    }
   }
 
   // ── NullClaw adapter pool ──
