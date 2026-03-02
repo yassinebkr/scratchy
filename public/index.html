@@ -8,12 +8,12 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Scratchy v2</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/geist@1.3.1/dist/fonts/geist-sans/style.css">
-  <link rel="stylesheet" href="styles/tokens.css?v=2.1.25">
-  <link rel="stylesheet" href="styles/main.css?v=2.1.25">
-  <link rel="stylesheet" href="styles/chat.css?v=2.1.25">
-  <link rel="stylesheet" href="styles/tiles.css?v=2.1.25">
-  <link rel="stylesheet" href="app.css?v=2.1.25">
-  <link rel="stylesheet" href="css/mobile.css?v=2.1.25">
+  <link rel="stylesheet" href="styles/tokens.css?v=2.1.26">
+  <link rel="stylesheet" href="styles/main.css?v=2.1.26">
+  <link rel="stylesheet" href="styles/chat.css?v=2.1.26">
+  <link rel="stylesheet" href="styles/tiles.css?v=2.1.26">
+  <link rel="stylesheet" href="app.css?v=2.1.26">
+  <link rel="stylesheet" href="css/mobile.css?v=2.1.26">
   <style>
     /* Agent-driven UI: Chat header — compact */
     .chat-header {
@@ -81,6 +81,37 @@
       from { opacity: 0; transform: translateY(8px); }
       to { opacity: 1; transform: translateY(0); }
     }
+
+    /* Team banner in chat */
+    .team-banner {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      background: rgba(249,166,2,0.08);
+      border-bottom: 1px solid rgba(249,166,2,0.15);
+      font-size: 12.5px;
+      color: #c4b897;
+      flex-shrink: 0;
+    }
+    .team-banner.hidden { display: none; }
+    .team-banner-icon { font-size: 14px; }
+    .team-banner-sep { opacity: 0.4; }
+    #team-banner-name { font-weight: 600; color: var(--sc-accent, #F9A602); }
+    #team-banner-agents { opacity: 0.7; }
+    .team-exit-btn {
+      margin-left: auto;
+      background: none;
+      border: 1px solid rgba(249,166,2,0.2);
+      border-radius: 6px;
+      color: #8a7e6e;
+      font-size: 11px;
+      padding: 3px 8px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .team-exit-btn:hover { color: #f0ead6; border-color: rgba(249,166,2,0.4); }
 
     /* Activity state CSS hooks — surfaces glow when active */
     html[data-activity-state="coding"] .surface.editor-surface,
@@ -177,6 +208,13 @@
               <span class="chat-header-model" id="chat-header-model">Claude</span>
             </div>
           </div>
+          <div id="team-banner" class="team-banner hidden">
+            <span class="team-banner-icon">👥</span>
+            <span id="team-banner-name">Team</span>
+            <span class="team-banner-sep">&middot;</span>
+            <span id="team-banner-agents">0 agents</span>
+            <button id="team-exit-btn" class="team-exit-btn">✕ Exit team</button>
+          </div>
           <div id="messages" class="messages" role="log" aria-label="Chat messages" aria-live="polite"></div>
           <div class="msg-thinking" id="thinking-indicator" style="display:none">
             <div class="dot"></div><div class="dot"></div><div class="dot"></div>
@@ -205,43 +243,43 @@
   <sc-workspaces></sc-workspaces>
 
   <!-- Scripts (ESM) -->
-  <script type="module" src="components/sc-landing.js?v=2.1.25"></script>
-  <script type="module" src="components/sc-auth.js?v=2.1.25"></script>
-  <script type="module" src="components/sc-plans.js?v=2.1.25"></script>
-  <script type="module" src="components/sc-agent-switcher.js?v=2.1.25"></script>
-  <script type="module" src="components/sc-setup-wizard.js?v=2.1.25"></script>
-  <script type="module" src="components/sc-chat.js?v=2.1.25"></script>
-  <script type="module" src="components/sc-canvas.js?v=2.1.25"></script>
-  <script type="module" src="components/sc-tile.js?v=2.1.25"></script>
-  <script type="module" src="components/sc-admin.js?v=2.1.25"></script>
-  <script type="module" src="components/sc-settings.js?v=2.1.25"></script>
-  <script type="module" src="components/sc-agent-config.js?v=2.1.25"></script>
-  <script type="module" src="components/sc-terminal.js?v=2.1.25"></script>
-  <script type="module" src="components/sc-filetree.js?v=2.1.25"></script>
-  <script type="module" src="components/sc-editor.js?v=2.1.25"></script>
-  <script type="module" src="components/sc-search.js?v=2.1.25"></script>
-  <script type="module" src="components/sc-workspace-bar.js?v=2.1.25"></script>
-  <script type="module" src="components/sc-webapp.js?v=2.1.25"></script>
-  <script type="module" src="components/sc-agent-wizard.js?v=2.1.25"></script>
-  <script type="module" src="components/sc-onboarding.js?v=2.1.25"></script>
-  <script type="module" src="components/sc-dashboard.js?v=2.1.25"></script>
-  <script type="module" src="components/sc-notes.js?v=2.1.25"></script>
-  <script type="module" src="components/sc-calendar.js?v=2.1.25"></script>
-  <script type="module" src="components/sc-email.js?v=2.1.25"></script>
-  <script type="module" src="components/sc-billing.js?v=2.1.25"></script>
-  <script type="module" src="components/sc-widget-store.js?v=2.1.25"></script>
-  <script type="module" src="components/sc-teams.js?v=2.1.25"></script>
-  <script type="module" src="components/sc-workspaces.js?v=2.1.25"></script>
-  <script type="module" src="components/sc-command-palette.js?v=2.1.25"></script>
-  <script type="module" src="lib/ws-client.js?v=2.1.25"></script>
-  <script type="module" src="lib/surface-manager.js?v=2.1.25"></script>
-  <script type="module" src="lib/activity-monitor.js?v=2.1.25"></script>
-  <script type="module" src="lib/agent-presence.js?v=2.1.25"></script>
-  <script type="module" src="lib/virtual-scroller.js?v=2.1.25"></script>
-  <script type="module" src="lib/mobile-ux.js?v=2.1.25"></script>
-  <script type="module" src="lib/mobile-surface-stack.js?v=2.1.25"></script>
-  <script type="module" src="lib/agent-orchestrator.js?v=2.1.25"></script>
-  <script type="module" src="lib/performance.js?v=2.1.25"></script>
-  <script type="module" src="lib/app.js?v=2.1.25"></script>
+  <script type="module" src="components/sc-landing.js?v=2.1.26"></script>
+  <script type="module" src="components/sc-auth.js?v=2.1.26"></script>
+  <script type="module" src="components/sc-plans.js?v=2.1.26"></script>
+  <script type="module" src="components/sc-agent-switcher.js?v=2.1.26"></script>
+  <script type="module" src="components/sc-setup-wizard.js?v=2.1.26"></script>
+  <script type="module" src="components/sc-chat.js?v=2.1.26"></script>
+  <script type="module" src="components/sc-canvas.js?v=2.1.26"></script>
+  <script type="module" src="components/sc-tile.js?v=2.1.26"></script>
+  <script type="module" src="components/sc-admin.js?v=2.1.26"></script>
+  <script type="module" src="components/sc-settings.js?v=2.1.26"></script>
+  <script type="module" src="components/sc-agent-config.js?v=2.1.26"></script>
+  <script type="module" src="components/sc-terminal.js?v=2.1.26"></script>
+  <script type="module" src="components/sc-filetree.js?v=2.1.26"></script>
+  <script type="module" src="components/sc-editor.js?v=2.1.26"></script>
+  <script type="module" src="components/sc-search.js?v=2.1.26"></script>
+  <script type="module" src="components/sc-workspace-bar.js?v=2.1.26"></script>
+  <script type="module" src="components/sc-webapp.js?v=2.1.26"></script>
+  <script type="module" src="components/sc-agent-wizard.js?v=2.1.26"></script>
+  <script type="module" src="components/sc-onboarding.js?v=2.1.26"></script>
+  <script type="module" src="components/sc-dashboard.js?v=2.1.26"></script>
+  <script type="module" src="components/sc-notes.js?v=2.1.26"></script>
+  <script type="module" src="components/sc-calendar.js?v=2.1.26"></script>
+  <script type="module" src="components/sc-email.js?v=2.1.26"></script>
+  <script type="module" src="components/sc-billing.js?v=2.1.26"></script>
+  <script type="module" src="components/sc-widget-store.js?v=2.1.26"></script>
+  <script type="module" src="components/sc-teams.js?v=2.1.26"></script>
+  <script type="module" src="components/sc-workspaces.js?v=2.1.26"></script>
+  <script type="module" src="components/sc-command-palette.js?v=2.1.26"></script>
+  <script type="module" src="lib/ws-client.js?v=2.1.26"></script>
+  <script type="module" src="lib/surface-manager.js?v=2.1.26"></script>
+  <script type="module" src="lib/activity-monitor.js?v=2.1.26"></script>
+  <script type="module" src="lib/agent-presence.js?v=2.1.26"></script>
+  <script type="module" src="lib/virtual-scroller.js?v=2.1.26"></script>
+  <script type="module" src="lib/mobile-ux.js?v=2.1.26"></script>
+  <script type="module" src="lib/mobile-surface-stack.js?v=2.1.26"></script>
+  <script type="module" src="lib/agent-orchestrator.js?v=2.1.26"></script>
+  <script type="module" src="lib/performance.js?v=2.1.26"></script>
+  <script type="module" src="lib/app.js?v=2.1.26"></script>
 </body>
 </html>

@@ -162,8 +162,10 @@ export function send(type, payload) {
 }
 
 /** Send a chat message to the active agent */
-export function sendChat(text, agentId) {
-  return send('chat', { text, agentId: agentId || undefined });
+export function sendChat(text, agentId, teamId) {
+  const payload = { text, agentId: agentId || undefined };
+  if (teamId) payload.teamId = teamId;
+  return send('chat', payload);
 }
 
 /** Send a widget action */

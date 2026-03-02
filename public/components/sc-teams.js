@@ -793,7 +793,7 @@ export class ScTeams extends HTMLElement {
     this.$.detailContent.querySelector('#btn-team-chat').addEventListener('click', () => {
       this.dispatchEvent(new CustomEvent('team-chat', {
         bubbles: true, composed: true,
-        detail: { teamId: t.id, teamName: t.name }
+        detail: { teamId: t.id, teamName: t.name, agentCount: (t.agents || []).length }
       }));
     });
 

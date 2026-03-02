@@ -31,6 +31,9 @@ let $statusDot, $statusText, $statusBadge, $topbarUser, $logoutBtn, $userMenuBtn
 let $agentSwitcher;
 let $mobileAgentBtn;
 let $workspaceBar;
+let $teamBanner, $teamBannerName, $teamBannerAgents, $teamExitBtn;
+let _activeTeamId = null;
+let _activeTeamName = null;
 
 function resolveDOM() {
   $loadingScreen = document.getElementById('loading-screen');
@@ -54,6 +57,10 @@ function resolveDOM() {
   $agentSwitcher = document.querySelector('sc-agent-switcher');
   $mobileAgentBtn = document.getElementById('mobile-agent-btn');
   $workspaceBar = document.querySelector('sc-workspace-bar');
+  $teamBanner = document.getElementById('team-banner');
+  $teamBannerName = document.getElementById('team-banner-name');
+  $teamBannerAgents = document.getElementById('team-banner-agents');
+  $teamExitBtn = document.getElementById('team-exit-btn');
 }
 
 /* ------------------------------------------------------------------ */
@@ -192,7 +199,7 @@ function sendMessage() {
 
   // Send with active agent ID for per-agent conversation isolation
   const activeAgentId = $agentSwitcher?._activeAgentId || null;
-  sendChat(text, activeAgentId);
+  sendChat(text, activeAgentId, _activeTeamId || undefined);
   $msgInput.value = '';
   autoResize($msgInput);
   $msgInput.focus();
@@ -1275,17 +1282,31 @@ async function init() {
     if (t) t.removeAttribute('open');
   });
   document.addEventListener('team-chat', (e) => {
-    const { teamId, teamName } = e.detail || {};
+    const { teamId, teamName, agentCount } = e.detail || {};
     if (!teamId) return;
+    // Close teams panel
     const t = document.querySelector('sc-teams');
     if (t) t.removeAttribute('open');
-    // Set team mode on chat component
-    const chat = document.querySelector('sc-chat');
-    if (chat) {
-      chat.teamId = teamId;
-      chat.teamName = teamName;
-    }
+    // Activate team mode
+    _activeTeamId = teamId;
+    _activeTeamName = teamName || 'Team';
+    if ($teamBanner) $teamBanner.classList.remove('hidden');
+    if ($teamBannerName) $teamBannerName.textContent = _activeTeamName;
+    if ($teamBannerAgents) $teamBannerAgents.textContent = (agentCount || '?') + ' agents';
+    if ($msgInput) $msgInput.placeholder = 'Message ' + _activeTeamName + '...';
+    // Focus chat
+    $msgInput?.focus();
   });
+
+  // Exit team mode
+  if ($teamExitBtn) {
+    $teamExitBtn.addEventListener('click', () => {
+      _activeTeamId = null;
+      _activeTeamName = null;
+      if ($teamBanner) $teamBanner.classList.add('hidden');
+      if ($msgInput) $msgInput.placeholder = 'Message Scratchy\u2026 (Shift+Enter for new line)';
+    });
+  }
 
   // Workspaces panel events
   document.addEventListener('workspaces-close', () => {
