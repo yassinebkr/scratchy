@@ -100,6 +100,21 @@ export function registerUsageRoutes(router, requireAuth) {
     }
   });
 
+  // Per-agent usage breakdown
+  router.get('/api/usage/agents', requireAuth, (req, res) => {
+    try {
+      const tracker = getUsageTracker();
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ ok: false, error: 'Authentication required' });
+
+      const agents = tracker.getAgentUsage(userId);
+      res.json({ ok: true, data: { agents } });
+    } catch (err) {
+      console.error('[usage] Error fetching agent usage:', err);
+      res.status(500).json({ ok: false, error: 'Failed to fetch agent usage' });
+    }
+  });
+
   // Tier limits
   router.get('/api/usage/limits', requireAuth, (req, res) => {
     try {

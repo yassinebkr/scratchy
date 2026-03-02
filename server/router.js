@@ -974,6 +974,31 @@ export function createRouter(opts = {}) {
           }
         }
 
+        // PUT /api/agents/:id/limits — set per-agent quotas (admin only)
+        const limitsMatch = matchRoute('/api/agents/:id/limits', pathname);
+        if (limitsMatch && method === 'PUT') {
+          const user = await requireAuth(req, res);
+          if (!user) return;
+          if (user.role !== 'admin') return json(res, 403, { ok: false, error: 'Admin access required' });
+
+          const agent = agents.getAgent(limitsMatch.id);
+          if (!agent) return json(res, 404, { ok: false, error: 'Agent not found' });
+
+          const body = await parseJsonBody(req);
+          const messagesPerDay = body.messagesPerDay === undefined ? undefined : body.messagesPerDay;
+          const tokensPerDay = body.tokensPerDay === undefined ? undefined : body.tokensPerDay;
+
+          try {
+            const updates = {};
+            if (messagesPerDay !== undefined) updates.messagesPerDay = messagesPerDay;
+            if (tokensPerDay !== undefined) updates.tokensPerDay = tokensPerDay;
+            const updated = agents.updateAgent(limitsMatch.id, updates);
+            return json(res, 200, { ok: true, data: { id: updated.id, messagesPerDay: updated.messagesPerDay, tokensPerDay: updated.tokensPerDay } });
+          } catch (err) {
+            return json(res, 400, { ok: false, error: err.message });
+          }
+        }
+
         // GET/PUT/DELETE /api/agents/:id
         const agentMatch = matchRoute('/api/agents/:id', pathname);
         if (agentMatch) {

@@ -88,6 +88,8 @@ export function initSchema(db) {
       enabled       INTEGER NOT NULL DEFAULT 1,
       isBuiltin     INTEGER NOT NULL DEFAULT 0,
       userId        TEXT REFERENCES users(id) ON DELETE CASCADE,
+      messagesPerDay INTEGER DEFAULT NULL,
+      tokensPerDay   INTEGER DEFAULT NULL,
       createdAt     TEXT NOT NULL DEFAULT (datetime('now')),
       updatedAt     TEXT NOT NULL DEFAULT (datetime('now'))
     );
@@ -291,6 +293,15 @@ export function initSchema(db) {
 
   // Migrate existing memory_chunks tables to v2 schema (consolidation support)
   _migrateMemoryChunksV2(db);
+
+  // Migrate agents table: add per-agent quota columns
+  const agentCols = db.pragma('table_info(agents)');
+  if (!agentCols.some(c => c.name === 'messagesPerDay')) {
+    db.exec(`ALTER TABLE agents ADD COLUMN messagesPerDay INTEGER DEFAULT NULL`);
+  }
+  if (!agentCols.some(c => c.name === 'tokensPerDay')) {
+    db.exec(`ALTER TABLE agents ADD COLUMN tokensPerDay INTEGER DEFAULT NULL`);
+  }
 }
 
 /**

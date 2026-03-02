@@ -855,7 +855,7 @@ export async function routeMessage(userId, agentId, message, ws) {
       return;
     }
 
-    // Daily quota check
+    // Daily quota check (user-level)
     const quota = tracker.check(userId, 'message');
     if (!quota.allowed) {
       sendJson(ws, {
@@ -864,6 +864,20 @@ export async function routeMessage(userId, agentId, message, ws) {
         ts: Date.now(),
       });
       return;
+    }
+
+    // Per-agent quota check (if agent has custom limits)
+    if (agentId) {
+      const agentQuota = tracker.checkAgent(userId, agentId, 'message');
+      if (!agentQuota.allowed && agentQuota.scope === 'agent') {
+        const agentName = resolveAgent(agentId)?.name || agentId;
+        sendJson(ws, {
+          type: 'chat', from: 'system',
+          text: `📊 Agent "${agentName}" has reached its daily message limit (${agentQuota.limit}). Try another agent or wait until reset.`,
+          ts: Date.now(),
+        });
+        return;
+      }
     }
   } catch (rateLimitErr) {
     // Usage tracker not initialized yet — allow the message through
@@ -1094,11 +1108,11 @@ export async function routeMessage(userId, agentId, message, ws) {
       // Log usage (best-effort, don't block)
       try {
         const tracker = getUsageTracker();
-        tracker.log(userId, 'message', 1, { agentId: effectiveAgentId, model: modelLabel });
+        tracker.log(userId, 'message', 1, { agentId: effectiveAgentId, model: modelLabel }, effectiveAgentId);
         // Estimate tokens: ~4 chars per token for both input and output
         const inputTokens = Math.ceil(augmentedPrompt.length / 4);
         const outputTokens = Math.ceil(response.length / 4);
-        tracker.log(userId, 'tokens', inputTokens + outputTokens, { input: inputTokens, output: outputTokens });
+        tracker.log(userId, 'tokens', inputTokens + outputTokens, { input: inputTokens, output: outputTokens }, effectiveAgentId);
       } catch (usageErr) {
         // Usage tracking is non-critical — don't break chat flow
         console.warn('[orchestrator] Usage tracking error:', usageErr.message);
@@ -1197,9 +1211,10 @@ export async function routeTeamChat(userId, teamId, message, ws) {
     if (response) {
       try {
         const tracker = getUsageTracker();
-        tracker.log(userId, 'message', 1, { teamId, model: 'team' });
+        const orchestratorId = team?.agents?.find(a => a.role === 'orchestrator')?.agentId || null;
+        tracker.log(userId, 'message', 1, { teamId, model: 'team' }, orchestratorId);
         const tokens = Math.ceil((text.length + response.length) / 4);
-        tracker.log(userId, 'tokens', tokens, { teamId });
+        tracker.log(userId, 'tokens', tokens, { teamId }, orchestratorId);
       } catch {}
     }
   } catch (err) {
