@@ -43,6 +43,7 @@ const SVG = {
   palette:  '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="9" cy="9" r="7"/><circle cx="6.5" cy="7" r="1" fill="currentColor" stroke="none"/><circle cx="9" cy="5.5" r="1" fill="currentColor" stroke="none"/><circle cx="11.5" cy="7" r="1" fill="currentColor" stroke="none"/><path d="M14 10.5c0 1.5-1.5 3.5-3 3.5h-1c-1 0-1.5.5-1.5 1.2"/></svg>',
   lens:     '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="7.5" cy="7.5" r="5"/><line x1="11.5" y1="11.5" x2="16" y2="16"/><line x1="5.5" y1="7.5" x2="9.5" y2="7.5"/><line x1="7.5" y1="5.5" x2="7.5" y2="9.5"/></svg>',
   pen:      '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.5 2.5l3 3L5 16H2v-3z"/></svg>',
+  group:    '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="6" cy="6" r="3"/><circle cx="12" cy="6" r="3"/><path d="M1 16c0-2.5 2-4 5-4s5 1.5 5 4"/><path d="M13 12c2 0 4 1.5 4 4"/></svg>',
 };
 
 /* ─── Models ─────────────────────────────────────────────── */
@@ -1459,6 +1460,36 @@ const STYLES = /* css */ `
     animation: none !important;
   }
 }
+
+/* ── Team groups ─────────────────────────────────────────── */
+.team-group { margin-bottom: 4px; }
+.team-header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border-radius: 8px; cursor: pointer;
+  transition: background 150ms; border: 1px solid transparent;
+}
+.team-header:hover { background: rgba(255,255,255,0.03); border-color: rgba(249,166,2,0.12); }
+.team-header.active { background: rgba(249,166,2,0.08); border-color: rgba(249,166,2,0.25); }
+.team-icon {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: rgba(249,166,2,0.12);
+  display: flex; align-items: center; justify-content: center;
+  color: #F9A602; flex-shrink: 0;
+}
+.team-info { flex: 1; min-width: 0; }
+.team-name { display: block; font-weight: 600; font-size: 13px; color: #f0ead6; }
+.team-count { font-size: 11px; color: #8a7e6a; }
+.team-chevron {
+  font-size: 12px; color: #8a7e6a; transition: transform 200ms;
+  cursor: pointer; padding: 4px;
+}
+.team-group.expanded .team-chevron { transform: rotate(90deg); }
+.team-members {
+  padding-left: 20px; overflow: hidden; max-height: 0;
+  transition: max-height 300ms ease;
+}
+.team-group.expanded .team-members { max-height: 500px; }
+.team-members .agent-card { transform: scale(0.95); margin-bottom: 2px; }
 `;
 
 /* ─── HTML Template ──────────────────────────────────────── */
@@ -1602,7 +1633,9 @@ export class ScAgentSwitcher extends HTMLElement {
 
     /* State */
     this._agents = [];
+    this._teams = [];
     this._filtered = [];          // after search filter
+    this._filteredTeams = [];     // after search filter (teams)
     this._activeAgentId = null;
     this._focusedIndex = -1;
     this._token = null;
@@ -1801,10 +1834,9 @@ export class ScAgentSwitcher extends HTMLElement {
   /* ═══ API Methods ═════════════════════════════════════════ */
 
   async loadAgents() {
+    const hdrs = this._token ? { 'Authorization': `Bearer ${this._token}` } : {};
     try {
-      const res = await fetch('/api/agents', {
-        headers: this._token ? { 'Authorization': `Bearer ${this._token}` } : {},
-      });
+      const res = await fetch('/api/agents', { headers: hdrs });
       if (res.ok) {
         this._agents = await res.json();
       } else {
@@ -1812,6 +1844,17 @@ export class ScAgentSwitcher extends HTMLElement {
       }
     } catch {
       this._agents = [];
+    }
+    /* Fetch teams alongside agents */
+    try {
+      const tRes = await fetch('/api/teams', { headers: hdrs });
+      if (tRes.ok) {
+        this._teams = await tRes.json();
+      } else {
+        this._teams = [];
+      }
+    } catch {
+      this._teams = [];
     }
     this._applyFilter();
     this._renderList();
@@ -1822,15 +1865,31 @@ export class ScAgentSwitcher extends HTMLElement {
   _applyFilter() {
     if (!this._searchQuery) {
       this._filtered = [...this._agents];
+      this._filteredTeams = [...(this._teams || [])];
     } else {
       const q = this._searchQuery;
+      /* Build set of agent ids that belong to teams matching the query */
+      const teamMatchedIds = new Set();
+      (this._teams || []).forEach(t => {
+        if ((t.name || '').toLowerCase().includes(q)) {
+          (t.members || []).forEach(m => teamMatchedIds.add(m.id || m));
+        }
+      });
       this._filtered = this._agents.filter(a => {
+        if (teamMatchedIds.has(a.id)) return true;
         const haystack = [
           a.name, a.role, a.description, a.model,
           ...(a.capabilities || []),
           ...(a.surfaces || []),
         ].filter(Boolean).join(' ').toLowerCase();
         return haystack.includes(q);
+      });
+      this._filteredTeams = (this._teams || []).filter(t => {
+        if ((t.name || '').toLowerCase().includes(q)) return true;
+        return (t.members || []).some(m => {
+          const mid = m.id || m;
+          return this._filtered.some(a => a.id === mid);
+        });
       });
     }
 
@@ -1864,34 +1923,116 @@ export class ScAgentSwitcher extends HTMLElement {
         capabilities: t.capabilities || [],
       }));
       this._filtered = [...this._agents];
+      this._filteredTeams = [];
       if (!this._activeAgentId) {
         this._activeAgentId = this._agents[0].id;
       }
       // Fall through to render the cards normally
     }
 
-    if (this._filtered.length === 0 && this._searchQuery) {
+    if (this._filtered.length === 0 && this._searchQuery && (!this._filteredTeams || this._filteredTeams.length === 0)) {
       this._gridEl.innerHTML = `<div class="no-results">No agents match \u201C${this._esc(this._searchQuery)}\u201D</div>`;
       this._focusedIndex = -1;
       return;
     }
 
-    /* Render agent cards */
-    for (let i = 0; i < this._filtered.length; i++) {
-      const agent = this._filtered[i];
-      const card = this._createCardEl(agent, i);
+    /* Classify agents: main (template-*) vs team members vs stray workers */
+    const teamMemberIds = new Set();
+    const teams = this._filteredTeams || [];
+    teams.forEach(t => (t.members || []).forEach(m => teamMemberIds.add(m.id || m)));
+
+    const mainAgents = this._filtered.filter(a => a.id && a.id.startsWith('template-'));
+    /* Stray workers (not main, not in any team) are hidden */
+
+    let cardIndex = 0;
+
+    /* 1) Render main agent cards */
+    for (const agent of mainAgents) {
+      const card = this._createCardEl(agent, cardIndex++);
       this._gridEl.appendChild(card);
     }
 
-    /* Add Agent button at bottom of rail */
+    /* 2) Render team groups (expandable) */
+    for (const team of teams) {
+      const memberIds = (team.members || []).map(m => m.id || m);
+      const memberAgents = memberIds
+        .map(mid => this._filtered.find(a => a.id === mid))
+        .filter(Boolean);
+      const group = this._createTeamGroupEl(team, memberAgents, cardIndex);
+      this._gridEl.appendChild(group);
+      cardIndex += memberAgents.length;
+    }
+
+    /* 3) Add Agent button at bottom of rail */
     const addBtn = document.createElement('div');
     addBtn.className = 'agent-card add-card'
-      + (this._focusedIndex === this._filtered.length ? ' focused' : '');
+      + (this._focusedIndex === cardIndex ? ' focused' : '');
     addBtn.dataset.action = 'add';
     addBtn.setAttribute('role', 'option');
     addBtn.setAttribute('aria-label', 'Add new agent');
     addBtn.innerHTML = `<span class="add-icon">${SVG.plus}</span>`;
     this._gridEl.appendChild(addBtn);
+  }
+
+  /**
+   * Creates an expandable team group element.
+   * @param {Object} team - Team object with name, id, members
+   * @param {Array} members - Resolved agent objects for this team
+   * @param {number} startIndex - Card index offset for keyboard nav
+   * @returns {HTMLElement}
+   */
+  _createTeamGroupEl(team, members, startIndex) {
+    const group = document.createElement('div');
+    group.className = 'team-group';
+    group.dataset.teamId = team.id || '';
+
+    const header = document.createElement('div');
+    header.className = 'team-header';
+    header.setAttribute('role', 'button');
+    header.setAttribute('aria-expanded', 'false');
+    header.setAttribute('aria-label', `${team.name || 'Team'} \u2014 ${members.length} agents`);
+    header.innerHTML = `
+      <div class="team-icon">${SVG.group}</div>
+      <div class="team-info">
+        <span class="team-name">${this._esc(team.name || 'Team')}</span>
+        <span class="team-count">${members.length} agent${members.length !== 1 ? 's' : ''}</span>
+      </div>
+      <span class="team-chevron">\u25B8</span>
+    `;
+
+    const membersContainer = document.createElement('div');
+    membersContainer.className = 'team-members';
+
+    for (let i = 0; i < members.length; i++) {
+      const card = this._createCardEl(members[i], startIndex + i);
+      membersContainer.appendChild(card);
+    }
+
+    /* Clicking the header area (not chevron) dispatches team-chat */
+    header.addEventListener('click', (e) => {
+      if (e.target.closest('.team-chevron')) return;
+      this.dispatchEvent(new CustomEvent('team-chat', {
+        bubbles: true,
+        composed: true,
+        detail: {
+          teamId: team.id,
+          teamName: team.name,
+          agentCount: members.length,
+        },
+      }));
+    });
+
+    /* Clicking the chevron toggles expand/collapse */
+    const chevron = header.querySelector('.team-chevron');
+    chevron.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const expanded = group.classList.toggle('expanded');
+      header.setAttribute('aria-expanded', String(expanded));
+    });
+
+    group.appendChild(header);
+    group.appendChild(membersContainer);
+    return group;
   }
 
   _createCardEl(agent, index) {

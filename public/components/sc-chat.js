@@ -94,18 +94,23 @@ const STYLES = `
   handleTeamEvent(event) {
     const type = event.type;
     if (type === 'team-message-start') {
-      this._addTeamStatusMsg('[Team: ' + (event.teamName || 'DevOps Team') + '] ' + (event.agentName || 'Agent') + ' is orchestrating...');
+      this._addTeamStatusMsg((event.agentName || 'Agent') + ' is orchestrating...');
+    } else if (type === 'team-planning') {
+      this._renderTeamPlanCard(event);
     } else if (type === 'team-delegation') {
       if (event.status === 'start') {
-        this._addTeamStatusMsg('\u21B3 Delegating to ' + event.agentName + ': ' + (event.task || 'task'));
+        this._renderWorkerCard(event);
       } else if (event.status === 'complete') {
-        this._addTeamStatusMsg('\u21B3 ' + event.agentName + ' completed');
+        this._completeWorkerCard(event.agentName, true);
       } else if (event.status === 'error') {
-        this._addTeamStatusMsg('\u21B3 ' + event.agentName + ' failed: ' + (event.error || 'timeout'));
+        this._completeWorkerCard(event.agentName, false, event.error);
       }
     } else if (type === 'team-worker-stream') {
       this._updateWorkerStream(event);
+    } else if (type === 'team-delegations-end') {
+      this._renderDelegationsEnd(event);
     } else if (type === 'team-message-end') {
+      this._workerCards = {};
       this._workerStreamEl = null;
     }
   }
@@ -123,39 +128,99 @@ const STYLES = `
     if (!this._userScrolled) this._doScrollToBottom();
   }
 
-  _updateWorkerStream(event) {
-    if (!this._workerStreamEl || this._workerStreamEl.dataset.agent !== event.agentName) {
-      const wrap = document.createElement('div');
-      wrap.className = 'msg msg--assistant';
-      wrap.style.maxWidth = '100%';
-      wrap.style.width = '100%';
-      
-      const details = document.createElement('details');
-      details.className = 'team-worker-stream';
-      details.open = true;
-      
-      const summary = document.createElement('summary');
-      summary.className = 'team-worker-summary';
-      
-      const headerWrap = document.createElement('div');
-      headerWrap.className = 'team-worker-header';
-      const color = getAvatarColor(event.agentName || '');
-      headerWrap.innerHTML = '<span class="team-avatar-dot" style="background:' + color.bg + '"></span> ' + this._escapeHtml(event.agentName || 'Worker');
-      
-      summary.appendChild(headerWrap);
-      
-      const content = document.createElement('div');
-      content.className = 'team-worker-content';
-      
-      details.appendChild(summary);
-      details.appendChild(content);
-      wrap.appendChild(details);
-      
-      this._listEl.appendChild(wrap);
-      this._workerStreamEl = content;
-      this._workerStreamEl.dataset.agent = event.agentName;
+  _renderTeamPlanCard(event) {
+    const card = document.createElement('div');
+    card.className = 'team-plan-card';
+    let html = '<div class="team-plan-title">Plan</div>';
+    const workers = event.workers || event.delegations || [];
+    workers.forEach(w => {
+      const name = w.agentName || w.name || 'Worker';
+      const task = w.task || w.summary || '';
+      const color = getAvatarColor(name);
+      html += '<div class="team-plan-row">' +
+        '<span class="team-avatar-dot" style="background:' + color.bg + '"></span>' +
+        '<span class="team-plan-name">' + this._escapeHtml(name) + '</span>' +
+        '<span class="team-plan-task">' + this._escapeHtml(task) + '</span>' +
+        '</div>';
+    });
+    card.innerHTML = html;
+    this._listEl.appendChild(card);
+    if (!this._userScrolled) this._doScrollToBottom();
+  }
+
+  _renderWorkerCard(event) {
+    if (!this._workerCards) this._workerCards = {};
+    const name = event.agentName || 'Worker';
+    const color = getAvatarColor(name);
+    const card = document.createElement('div');
+    card.className = 'team-worker-card';
+    card.dataset.agent = name;
+
+    const header = document.createElement('div');
+    header.className = 'team-worker-card-header';
+    header.innerHTML =
+      '<span class="team-avatar-dot" style="background:' + color.bg + '"></span>' +
+      '<span class="team-worker-card-name">' + this._escapeHtml(name) + '</span>' +
+      '<span class="team-worker-card-task">' + this._escapeHtml(event.task || '') + '</span>' +
+      '<span class="team-worker-spinner" id="spinner-' + this._escapeHtml(name) + '"></span>';
+
+    const details = document.createElement('details');
+    details.className = 'team-worker-card-details';
+    const summary = document.createElement('summary');
+    summary.className = 'team-worker-card-summary';
+    summary.textContent = 'Show output';
+    const content = document.createElement('div');
+    content.className = 'team-worker-card-content';
+    details.appendChild(summary);
+    details.appendChild(content);
+
+    card.appendChild(header);
+    card.appendChild(details);
+    this._listEl.appendChild(card);
+    this._workerCards[name] = { card, content, header };
+    if (!this._userScrolled) this._doScrollToBottom();
+  }
+
+  _completeWorkerCard(agentName, success, error) {
+    if (!this._workerCards) return;
+    const entry = this._workerCards[agentName];
+    if (!entry) return;
+    const spinner = entry.header.querySelector('.team-worker-spinner');
+    if (spinner) {
+      spinner.classList.remove('team-worker-spinner');
+      if (success) {
+        spinner.textContent = '\u2713';
+        spinner.className = 'team-worker-done-icon';
+        spinner.style.color = '#22c55e';
+      } else {
+        spinner.textContent = '\u2717';
+        spinner.className = 'team-worker-done-icon';
+        spinner.style.color = '#ef4444';
+      }
     }
-    this._workerStreamEl.textContent += (event.text || event.chunk || '');
+  }
+
+  _updateWorkerStream(event) {
+    const name = event.agentName || 'Worker';
+    if (!this._workerCards) this._workerCards = {};
+    if (!this._workerCards[name]) {
+      this._renderWorkerCard({ agentName: name, task: '' });
+    }
+    const entry = this._workerCards[name];
+    if (entry && entry.content) {
+      entry.content.textContent += (event.text || event.chunk || '');
+    }
+    if (!this._userScrolled) this._doScrollToBottom();
+  }
+
+  _renderDelegationsEnd(event) {
+    const feedback = event.reviewerFeedback || event.feedback;
+    if (!feedback) return;
+    const passed = feedback.passed !== false && feedback.status !== 'issues';
+    const badge = document.createElement('div');
+    badge.className = 'team-qa-badge ' + (passed ? 'team-qa-pass' : 'team-qa-issues');
+    badge.textContent = passed ? 'PASS' : 'ISSUES FOUND';
+    this._listEl.appendChild(badge);
     if (!this._userScrolled) this._doScrollToBottom();
   }
 
@@ -381,6 +446,7 @@ const STYLES = `
     border-bottom-left-radius: 2px;
     width: fit-content;
     animation: msg-enter-left 200ms ease-out both;
+    touch-action: manipulation;
   }
   .typing-dot {
     width: 6px;
@@ -388,10 +454,15 @@ const STYLES = `
     border-radius: 50%;
     background: var(--accent);
     animation: typing-bounce 1.2s ease-in-out infinite;
+    -webkit-animation: typing-bounce 1.2s ease-in-out infinite;
   }
-  .typing-dot:nth-child(2) { animation-delay: 0.15s; }
-  .typing-dot:nth-child(3) { animation-delay: 0.3s; }
+  .typing-dot:nth-child(2) { animation-delay: 0.15s; -webkit-animation-delay: 0.15s; }
+  .typing-dot:nth-child(3) { animation-delay: 0.3s; -webkit-animation-delay: 0.3s; }
 
+  @-webkit-keyframes typing-bounce {
+    0%, 60%, 100% { -webkit-transform: translateY(0); transform: translateY(0); opacity: 0.4; }
+    30% { -webkit-transform: translateY(-6px); transform: translateY(-6px); opacity: 1; }
+  }
   @keyframes typing-bounce {
     0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
     30% { transform: translateY(-6px); opacity: 1; }
@@ -828,35 +899,133 @@ const STYLES = `
     border-radius: var(--sc-radius-full);
     text-align: center;
   }
-  .team-worker-stream {
-    margin-top: 8px;
-    padding: 8px 12px;
-    background: var(--sc-surface);
-    border-radius: var(--sc-radius);
-    border: 1px solid var(--sc-border);
+
+  /* ─── Team Plan Card ─── */
+  .team-plan-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(249,166,2,0.12);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin: 8px 0;
     width: 100%;
+    max-width: 90%;
   }
-  .team-worker-summary {
+  .team-plan-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: #F9A602;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+  }
+  .team-plan-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+  }
+  .team-plan-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: #f0ead6;
+    white-space: nowrap;
+  }
+  .team-plan-task {
+    font-size: 13px;
+    color: #8a7e6a;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* ─── Team Worker Card ─── */
+  .team-worker-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(249,166,2,0.12);
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin: 6px 0;
+    width: 100%;
+    max-width: 90%;
+  }
+  .team-worker-card-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .team-worker-card-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: #f0ead6;
+    white-space: nowrap;
+  }
+  .team-worker-card-task {
+    font-size: 13px;
+    color: #8a7e6a;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .team-worker-spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(249,166,2,0.2);
+    border-top-color: #F9A602;
+    border-radius: 50%;
+    animation: team-spin 0.8s linear infinite;
+    flex-shrink: 0;
+  }
+  @keyframes team-spin { to { transform: rotate(360deg); } }
+  .team-worker-done-icon {
+    font-size: 14px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .team-worker-card-details {
+    margin-top: 8px;
+  }
+  .team-worker-card-summary {
     cursor: pointer;
     user-select: none;
-    color: var(--sc-text);
-    font-size: var(--sc-font-size-sm);
-    font-weight: 500;
+    font-size: 12px;
+    color: #8a7e6a;
+    transition: color 0.15s;
   }
-  .team-worker-header {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    vertical-align: middle;
+  .team-worker-card-summary:hover {
+    color: #f0ead6;
   }
-  .team-worker-content {
-    margin-top: 8px;
-    font-family: var(--sc-mono);
-    font-size: var(--sc-font-size-xs);
-    color: var(--sc-text-muted);
+  .team-worker-card-content {
+    margin-top: 6px;
+    font-family: var(--sc-mono, 'Geist Mono', monospace);
+    font-size: 12px;
+    color: #8a7e6a;
     max-height: 200px;
     overflow-y: auto;
     white-space: pre-wrap;
+    line-height: 1.5;
+  }
+
+  /* ─── QA Badge ─── */
+  .team-qa-badge {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    margin: 8px 0;
+  }
+  .team-qa-pass {
+    background: rgba(34,197,94,0.15);
+    color: #22c55e;
+    border: 1px solid rgba(34,197,94,0.3);
+  }
+  .team-qa-issues {
+    background: rgba(234,179,8,0.15);
+    color: #eab308;
+    border: 1px solid rgba(234,179,8,0.3);
   }
 
   @media (max-width: 480px) {
@@ -1246,24 +1415,31 @@ class ScChat extends HTMLElement {
   }
 
   /**
-   * Set typing indicator state.
+   * Set typing indicator state with debounce.
    * @param {boolean} isTyping
+   * @param {string} [agentId]
    */
-  setTyping(isTyping) {
+  setTyping(isTyping, agentId) {
     isTyping = !!isTyping;
-    if (this._isTyping === isTyping) return;
-    this._isTyping = isTyping;
-
-    const existing = this._listEl.querySelector('.typing-indicator');
-    if (isTyping && !existing) {
+    clearTimeout(this._typingDebounceTimer);
+    if (!isTyping) {
+      this._isTyping = false;
+      const existing = this._listEl.querySelector('.typing-indicator');
+      if (existing) existing.remove();
+      return;
+    }
+    this._typingDebounceTimer = setTimeout(() => {
+      if (this._isTyping) return;
+      this._isTyping = true;
+      const stale = this._listEl.querySelector('.typing-indicator');
+      if (stale) stale.remove();
       const el = document.createElement('div');
       el.className = 'typing-indicator';
+      el.style.touchAction = 'manipulation';
       el.innerHTML = '<span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>';
       this._listEl.appendChild(el);
       if (!this._userScrolled) this._doScrollToBottom();
-    } else if (!isTyping && existing) {
-      existing.remove();
-    }
+    }, 300);
   }
 
   /**

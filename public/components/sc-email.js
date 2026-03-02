@@ -145,6 +145,9 @@ textarea { min-height:140px; line-height:1.5; }
 .toast.visible { opacity:1; transform:translateX(-50%) translateY(0); }
 .toast.toast-success { border-color:rgba(34,197,94,0.3); }
 .toast.toast-error   { border-color:rgba(239,68,68,0.3); }
+
+.recipient-warning { display:none; padding:8px 12px; margin-bottom:8px; background:rgba(243,156,18,0.1); border:1px solid rgba(243,156,18,0.3); border-radius:6px; color:#f39c12; font-size:12px; }
+.recipient-warning.show { display:block; }
 `;
 
 const IC = {
@@ -305,6 +308,13 @@ class ScEmail extends HTMLElement {
       toInput?.focus();
       return;
     }
+    const verified = ['yabbo000666@gmail.com'];
+    if (!verified.includes(to.toLowerCase())) {
+      this._toast('Test mode — can only send to verified emails', 'error');
+      this._sending = false;
+      this._render();
+      return;
+    }
     this._composeState = { to, subject, body };
     this._sending = true;
     this._render();
@@ -428,6 +438,7 @@ class ScEmail extends HTMLElement {
       <label class="field"><span class="label-text">To</span>
         <input type="email" id="email-to" placeholder="recipient@example.com" ${d} value="${this._esc(cs.to || '')}">
         <div class="field-error" id="to-error">Please enter a valid email address</div>
+        <div class="recipient-warning" id="recipient-warn"></div>
       </label>
       <label class="field"><span class="label-text">Subject</span>
         <input type="text" id="email-subject" placeholder="Subject (optional)" ${d} value="${this._esc(cs.subject || '')}">
@@ -493,6 +504,24 @@ class ScEmail extends HTMLElement {
       if (a === 'resend' && this._selected) return this._handleResend(this._selected);
       if (a === 'delete' && this._selected) return this._handleDelete(this._selected.id);
     });
+
+    // Blur handler on To input — warn about unverified recipients
+    if (this._view === 'compose') {
+      const toInput = root.querySelector('#email-to');
+      const warn = root.querySelector('#recipient-warn');
+      if (toInput && warn) {
+        toInput.addEventListener('blur', () => {
+          const val = toInput.value.trim().toLowerCase();
+          const verified = ['yabbo000666@gmail.com'];
+          if (val && this._validEmail(val) && !verified.includes(val)) {
+            warn.textContent = 'Test mode — only yabbo000666@gmail.com is verified';
+            warn.classList.add('show');
+          } else {
+            warn.classList.remove('show');
+          }
+        });
+      }
+    }
 
     // Ctrl+Enter sends in compose
     if (this._view === 'compose') {
