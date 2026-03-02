@@ -27,6 +27,7 @@ import { readFileSync } from 'node:fs';
 import { join as pathJoin } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
 import { NullClawAdapter } from '../lib/nullclaw-adapter.js';
+import { addTurn as ctxAddTurn, buildContext as ctxBuild, stats as ctxStats } from '../lib/context-manager.js';
 import {
   generateConfig,
   auditToolEvent,
@@ -571,11 +572,34 @@ function buildAugmentedPrompt(userMessage, agentConfig, history, contextBlock, t
     parts.push(`[Retrieved context]\n${contextBlock}\n`);
   }
 
-  // ── Conversation history ──
+  // ── Conversation history (with observation masking + canvas pruning) ──
   if (history.length > 0) {
-    const historyLines = history.map(h =>
-      `${h.role === 'user' ? 'User' : 'Assistant'}: ${h.content}`
-    );
+    const CANVAS_RE = /```(?:scratchy-canvas|scratchy-toon|scratchy-tpl|scratchy-ui)\n[\s\S]*?```/g;
+    const TOOL_XML_RE = /<tool_(?:call|result)>[\s\S]*?<\/tool_(?:call|result)>/g;
+    const KEEP_RECENT = 6; // turns to keep unmasked
+    const CANVAS_KEEP = 3; // turns to keep canvas blocks
+
+    const historyLines = history.map((h, idx) => {
+      const age = history.length - idx; // 1 = most recent
+      let content = h.content;
+
+      // Observation masking: replace old tool call/result XML with summary
+      if (age > KEEP_RECENT && TOOL_XML_RE.test(content)) {
+        TOOL_XML_RE.lastIndex = 0;
+        content = content.replace(TOOL_XML_RE, '').trim();
+        if (content.length < 50) {
+          content = '[tool interaction — details masked]';
+        }
+      }
+
+      // Canvas pruning: strip old canvas code blocks
+      if (age > CANVAS_KEEP) {
+        CANVAS_RE.lastIndex = 0;
+        content = content.replace(CANVAS_RE, '[canvas output removed]');
+      }
+
+      return `${h.role === 'user' ? 'User' : 'Assistant'}: ${content}`;
+    });
     parts.push(`[Conversation history]\n${historyLines.join('\n')}\n`);
   }
 
@@ -978,6 +1002,10 @@ export async function routeMessage(userId, agentId, message, ws) {
   // Save user message to per-agent history
   appendHistory(userId, effectiveAgentId, 'user', text);
 
+  // Track turn in context manager (for observation masking/canvas pruning)
+  const ctxSessionKey = `${userId}:agent:${effectiveAgentId}`;
+  ctxAddTurn(ctxSessionKey, 'user', text);
+
   // Typing indicator
   sendJson(ws, { type: 'typing', status: 'start', agentId: effectiveAgentId, ts: Date.now() });
 
@@ -1191,6 +1219,9 @@ export async function routeMessage(userId, agentId, message, ws) {
         ? `nullclaw-gateway:${agent.model || 'default'}`
         : 'nullclaw';
       appendHistory(userId, effectiveAgentId, 'assistant', response, modelLabel);
+
+      // Track in context manager
+      ctxAddTurn(ctxSessionKey, 'assistant', response);
 
       // Log usage (best-effort, don't block)
       try {
