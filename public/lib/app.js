@@ -387,6 +387,53 @@ function showEmptyStateIfNeeded() {
   }, 0);
 }
 
+/**
+ * Strip internal/GenUI blocks from message text.
+ * Used by streaming, stream-end, and history rendering for consistency.
+ * @param {string} text - Raw message text
+ * @param {object} [opts]
+ * @param {boolean} [opts.streaming] - Replace canvas blocks with placeholder instead of removing
+ * @returns {string} Cleaned text
+ */
+function stripInternalBlocks(text, opts) {
+  const streaming = opts && opts.streaming;
+  let s = text;
+
+  // Tool call XML blocks (closed)
+  s = s.replace(/<tool_call[^>]*>[\s\S]*?<\/tool_call>/g, '');
+  s = s.replace(/<tool_result[^>]*>[\s\S]*?<\/tool_result>/g, '');
+  s = s.replace(/<tool_use[^>]*>[\s\S]*?<\/tool_use>/g, '');
+  // Tool call XML (unclosed — still streaming)
+  s = s.replace(/<tool_(?:call|result|use)[^>]*>[\s\S]*$/g, '');
+
+  // Orchestrator [DELEGATE] blocks (closed)
+  s = s.replace(/\[DELEGATE\][\s\S]*?\[\/DELEGATE\]/g, '');
+  // [DELEGATE] blocks (unclosed — still streaming)
+  s = s.replace(/\[DELEGATE\][\s\S]*$/g, '');
+
+  var ph = streaming ? '\u2728 Rendering UI\u2026' : '';
+
+  // Fenced GenUI blocks (closed): ```scratchy-canvas/toon/tpl ... ```
+  s = s.replace(/```scratchy-(canvas|toon|tpl)\s*\n[\s\S]*?```/g, ph);
+  // Fenced GenUI blocks (unclosed — still streaming)
+  s = s.replace(/```scratchy-(canvas|toon|tpl)[\s\S]*$/g, ph);
+
+  // Unfenced legacy: scratchy-canvas\n{...}\n{...}
+  s = s.replace(/(?:^|\n)\s*scratchy-canvas\s*\n(?:\s*\{[^\n]+\}\s*\n?)+/gi, '');
+  // Unfenced legacy: just "scratchy-canvas" at end of text (no JSON yet)
+  s = s.replace(/(?:^|\n)\s*scratchy-canvas\s*$/gi, '');
+
+  // Collapse multiple consecutive placeholders into one
+  if (streaming) {
+    s = s.replace(/(?:\u2728 Rendering UI\u2026[\t ]*\n?)+/g, '\u2728 Rendering UI\u2026');
+  }
+
+  // Collapse leftover whitespace
+  s = s.replace(/\n{3,}/g, '\n\n').trim();
+
+  return s;
+}
+
 /** Basic markdown → HTML (bold, italic, inline code, code blocks, newlines) */
 function formatMarkdown(text) {
   let html = escapeHtml(text);
@@ -448,17 +495,8 @@ async function loadChatHistory(agentId) {
       for (const msg of messages) {
         let content = msg.content;
 
-        // Strip tool call XML + GenUI code blocks + delegation blocks (same as chat-stream-end)
-        content = content.replace(/<tool_call[^>]*>[\s\S]*?<\/tool_call>/g, '');
-        content = content.replace(/<tool_result[^>]*>[\s\S]*?<\/tool_result>/g, '');
-        content = content.replace(/<tool_use[^>]*>[\s\S]*?<\/tool_use>/g, '');
-        content = content.replace(/<tool_(?:call|result|use)[^>]*>[\s\S]*$/g, '');
-        content = content.replace(/\[DELEGATE\][\s\S]*?\[\/DELEGATE\]/g, '');
-        content = content.replace(/\[DELEGATE\][\s\S]*$/g, '');
-        content = content.replace(/```scratchy-(canvas|toon|tpl)\s*\n[\s\S]*?```/g, '');
-        content = content.replace(/```scratchy-(canvas|toon|tpl)[\s\S]*$/g, '');
-        content = content.replace(/(?:^|\n)\s*scratchy-canvas\s*\n(?:\s*\{[^\n]+\}\s*\n?)+/gi, '');
-        content = content.replace(/\n{3,}/g, '\n\n').trim();
+        // Strip tool call XML + GenUI code blocks + delegation blocks
+        content = stripInternalBlocks(content);
 
         // Skip empty messages (all GenUI ops with no text)
         if (!content) continue;
@@ -712,20 +750,8 @@ function wireWsEvents() {
       $messages.appendChild(_streamDiv);
     }
     _streamRaw += msg.delta;
-    // Live-filter: strip delegation blocks + replace canvas blocks with placeholder
-    let display = _streamRaw;
-    // Strip [DELEGATE]...[/DELEGATE] blocks (complete)
-    display = display.replace(/\[DELEGATE\][\s\S]*?\[\/DELEGATE\]/g, '');
-    // Strip unclosed [DELEGATE] blocks (in progress)
-    display = display.replace(/\[DELEGATE\][\s\S]*$/g, '');
-    // Replace fenced canvas blocks with placeholder (complete)
-    display = display.replace(/```scratchy-(canvas|toon|tpl)\s*\n[\s\S]*?```/g, '\u2728 Rendering UI\u2026');
-    // Replace unclosed fenced canvas blocks (in progress)
-    display = display.replace(/```scratchy-(canvas|toon|tpl)[\s\S]*$/g, '\u2728 Rendering UI\u2026');
-    // Replace unfenced canvas blocks
-    display = display.replace(/(?:^|\n)\s*scratchy-canvas\s*\n(?:\s*\{[^\n]+\}\s*\n?)+/gi, '');
-    // Collapse whitespace
-    display = display.replace(/\n{3,}/g, '\n\n').trim();
+    // Live-filter: strip internal blocks, show placeholder for canvas
+    var display = stripInternalBlocks(_streamRaw, { streaming: true });
     _streamDiv.textContent = display;
     $messages.scrollTop = $messages.scrollHeight;
   });
@@ -735,23 +761,8 @@ function wireWsEvents() {
       _streamDiv.classList.remove('streaming');
       let raw = _streamRaw || _streamDiv.textContent;
       _streamRaw = '';
-      // Strip tool call XML blocks (NullClaw tool use)
-      raw = raw.replace(/<tool_call[^>]*>[\s\S]*?<\/tool_call>/g, '');
-      raw = raw.replace(/<tool_result[^>]*>[\s\S]*?<\/tool_result>/g, '');
-      raw = raw.replace(/<tool_use[^>]*>[\s\S]*?<\/tool_use>/g, '');
-      // Strip unclosed tool tags at end of stream
-      raw = raw.replace(/<tool_(?:call|result|use)[^>]*>[\s\S]*$/g, '');
-      // Strip orchestrator delegation blocks
-      raw = raw.replace(/\[DELEGATE\][\s\S]*?\[\/DELEGATE\]/g, '');
-      raw = raw.replace(/\[DELEGATE\][\s\S]*$/g, '');
-      // Fenced GenUI blocks: ```scratchy-canvas ... ```
-      raw = raw.replace(/```scratchy-(canvas|toon|tpl)\s*\n[\s\S]*?```/g, '');
-      // Unclosed fenced GenUI blocks (no closing ```)
-      raw = raw.replace(/```scratchy-(canvas|toon|tpl)[\s\S]*$/g, '');
-      // Unfenced blocks: scratchy-canvas\n{"op":...}\n...
-      raw = raw.replace(/(?:^|\n)\s*scratchy-canvas\s*\n(?:\s*\{[^\n]+\}\s*\n?)+/gi, '');
-      // Collapse leftover whitespace
-      raw = raw.replace(/\n{3,}/g, '\n\n').trim();
+      // Strip all internal blocks (tool_call, DELEGATE, GenUI fences, etc.)
+      raw = stripInternalBlocks(raw);
       // Convert markdown-ish text to basic HTML (bold, code, newlines)
       _streamDiv.innerHTML = formatMarkdown(raw);
       if (!raw) _streamDiv.remove(); // remove empty bubble if all content was GenUI ops

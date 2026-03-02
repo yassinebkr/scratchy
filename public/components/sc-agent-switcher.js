@@ -1461,48 +1461,105 @@ const STYLES = /* css */ `
   }
 }
 
+/* ── Team separator ───────────────────────────────────────── */
+.team-separator {
+  width: 24px;
+  height: 1px;
+  background: var(--border);
+  margin: 6px 0;
+  flex-shrink: 0;
+  opacity: 0.6;
+}
+
 /* ── Team groups (icon rail mode) ─────────────────────────── */
 .team-group {
   margin-bottom: 2px;
   display: flex;
   flex-direction: column;
   align-items: center;
+  position: relative;
 }
+
 .team-header {
-  display: flex; align-items: center; justify-content: center;
-  width: 44px; height: 44px; min-height: 44px;
-  padding: 0; cursor: pointer;
-  transition: background 150ms, border-color 150ms;
-  border: 1.5px dashed rgba(249,166,2,0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0;
+  cursor: pointer;
+  transition: background 0.15s ease-out, border-color 0.15s ease-out, box-shadow 0.15s ease-out;
+  border: 1.5px dashed rgba(249,166,2,0.22);
   border-radius: 50%;
   position: relative;
   flex-shrink: 0;
+  background: transparent;
 }
+
 .team-header:hover {
   background: rgba(249,166,2,0.08);
-  border-color: rgba(249,166,2,0.45);
+  border-color: rgba(249,166,2,0.50);
+  box-shadow: 0 0 16px -4px rgba(249,166,2,0.18);
 }
+
+.team-header:hover .team-icon {
+  transform: scale(1.06);
+}
+
 .team-header.active {
   background: rgba(249,166,2,0.10);
   border-color: var(--accent);
   border-style: solid;
+  box-shadow: 0 0 20px -4px rgba(249,166,2,0.25);
 }
+
 .team-icon {
-  width: 36px; height: 36px; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 12px; font-weight: 700; letter-spacing: 0.3px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
   flex-shrink: 0;
   user-select: none;
+  transition: transform 0.15s ease-out;
 }
+
+/* Group badge — member count overlay */
+.team-badge {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #0d0b07;
+  font-size: 9px;
+  font-weight: 700;
+  font-family: var(--font);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  border: 2px solid var(--bg);
+  z-index: 1;
+  pointer-events: none;
+  line-height: 1;
+}
+
 /* Hide text labels in icon rail — use tooltip instead */
 .team-info { display: none; }
 .team-chevron { display: none; }
+
 /* Team members hidden in icon rail */
-.team-members {
-  padding-left: 0; overflow: hidden; max-height: 0;
-  transition: max-height 300ms ease;
-}
-/* CSS tooltip for team names — same pattern as agent cards */
+.team-members { display: none; }
+
+/* CSS tooltip for team — positioned right of rail */
 .team-header[data-tooltip]::after {
   content: attr(data-tooltip);
   position: absolute;
@@ -1523,6 +1580,7 @@ const STYLES = /* css */ `
   z-index: 200;
   box-shadow: 0 4px 12px rgba(0,0,0,0.3);
 }
+
 .team-header[data-tooltip]:hover::after { opacity: 1; }
 `;
 
@@ -1985,7 +2043,12 @@ export class ScAgentSwitcher extends HTMLElement {
       this._gridEl.appendChild(card);
     }
 
-    /* 2) Render team groups (expandable) */
+    /* 2) Render team groups */
+    if (teams.length > 0 && mainAgents.length > 0) {
+      const sep = document.createElement('div');
+      sep.className = 'team-separator';
+      this._gridEl.appendChild(sep);
+    }
     for (const team of teams) {
       const agentIds = (team.agents || []).map(a => a.id || a);
       const memberAgents = agentIds
@@ -2022,28 +2085,16 @@ export class ScAgentSwitcher extends HTMLElement {
     const header = document.createElement('div');
     header.className = 'team-header';
     header.setAttribute('role', 'button');
-    header.setAttribute('aria-expanded', 'false');
     header.setAttribute('aria-label', `${team.name || 'Team'} \u2014 ${members.length} agents`);
     const teamColor = this._getAvatarColor(team.name || 'Team');
     const teamInitials = this._getInitials(team.name || 'Team');
     header.dataset.tooltip = `${team.name || 'Team'} \u2014 ${members.length} agent${members.length !== 1 ? 's' : ''}`;
     header.innerHTML = `
       <div class="team-icon" style="background:${teamColor.bg};color:${teamColor.fg}">
-        <span style="font-size:12px;font-weight:700;letter-spacing:0.3px">${this._esc(teamInitials)}</span>
+        ${this._esc(teamInitials)}
       </div>
-      <div class="team-info">
-        <span class="team-name">${this._esc(team.name || 'Team')}</span>
-        <span class="team-count">${members.length} agent${members.length !== 1 ? 's' : ''}</span>
-      </div>
+      <span class="team-badge">${members.length}</span>
     `;
-
-    const membersContainer = document.createElement('div');
-    membersContainer.className = 'team-members';
-
-    for (let i = 0; i < members.length; i++) {
-      const card = this._createCardEl(members[i], startIndex + i);
-      membersContainer.appendChild(card);
-    }
 
     /* Clicking the header dispatches team-chat */
     header.addEventListener('click', () => {
@@ -2059,7 +2110,6 @@ export class ScAgentSwitcher extends HTMLElement {
     });
 
     group.appendChild(header);
-    group.appendChild(membersContainer);
     return group;
   }
 
