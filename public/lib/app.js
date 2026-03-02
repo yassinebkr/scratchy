@@ -32,6 +32,7 @@ let $agentSwitcher;
 let $mobileAgentBtn;
 let $workspaceBar;
 let $teamBanner, $teamBannerName, $teamBannerAgents, $teamExitBtn;
+let _skipMenuClose = false;
 let _activeTeamId = sessionStorage.getItem('scratchy_teamId') || null;
 let _activeTeamName = sessionStorage.getItem('scratchy_teamName') || null;
 
@@ -925,9 +926,8 @@ function wireNewUIModules() {
   });
 
   // User menu click from workspace bar → toggle the existing user menu
-  // Uses _skipMenuClose flag to prevent the document-level click handler
+  // _skipMenuClose prevents the document-level click handler
   // from immediately re-hiding the menu (click bubbles from shadow DOM).
-  let _skipMenuClose = false;
   document.addEventListener('user-menu-click', () => {
     if ($userMenu) {
       _skipMenuClose = true;

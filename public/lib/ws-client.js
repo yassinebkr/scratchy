@@ -165,6 +165,7 @@ export function send(type, payload) {
 export function sendChat(text, agentId, teamId) {
   const payload = { text, agentId: agentId || undefined };
   if (teamId) payload.teamId = teamId;
+  console.log('[ws] sendChat payload:', JSON.stringify(payload));
   return send('chat', payload);
 }
 
