@@ -2013,9 +2013,13 @@ export class ScAgentSwitcher extends HTMLElement {
     header.setAttribute('role', 'button');
     header.setAttribute('aria-expanded', 'false');
     header.setAttribute('aria-label', `${team.name || 'Team'} \u2014 ${members.length} agents`);
+    const teamColor = this._getAvatarColor(team.name || 'Team');
+    const teamInitials = this._getInitials(team.name || 'Team');
     header.dataset.tooltip = `${team.name || 'Team'} \u2014 ${members.length} agent${members.length !== 1 ? 's' : ''}`;
     header.innerHTML = `
-      <div class="team-icon">${SVG.group}</div>
+      <div class="team-icon" style="background:${teamColor.bg};color:${teamColor.fg}">
+        <span style="font-size:12px;font-weight:700;letter-spacing:0.3px">${this._esc(teamInitials)}</span>
+      </div>
       <div class="team-info">
         <span class="team-name">${this._esc(team.name || 'Team')}</span>
         <span class="team-count">${members.length} agent${members.length !== 1 ? 's' : ''}</span>

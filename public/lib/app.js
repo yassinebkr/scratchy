@@ -448,11 +448,13 @@ async function loadChatHistory(agentId) {
       for (const msg of messages) {
         let content = msg.content;
 
-        // Strip tool call XML + GenUI code blocks (same as chat-stream-end)
+        // Strip tool call XML + GenUI code blocks + delegation blocks (same as chat-stream-end)
         content = content.replace(/<tool_call[^>]*>[\s\S]*?<\/tool_call>/g, '');
         content = content.replace(/<tool_result[^>]*>[\s\S]*?<\/tool_result>/g, '');
         content = content.replace(/<tool_use[^>]*>[\s\S]*?<\/tool_use>/g, '');
         content = content.replace(/<tool_(?:call|result|use)[^>]*>[\s\S]*$/g, '');
+        content = content.replace(/\[DELEGATE\][\s\S]*?\[\/DELEGATE\]/g, '');
+        content = content.replace(/\[DELEGATE\][\s\S]*$/g, '');
         content = content.replace(/```scratchy-(canvas|toon|tpl)\s*\n[\s\S]*?```/g, '');
         content = content.replace(/```scratchy-(canvas|toon|tpl)[\s\S]*$/g, '');
         content = content.replace(/(?:^|\n)\s*scratchy-canvas\s*\n(?:\s*\{[^\n]+\}\s*\n?)+/gi, '');
@@ -694,6 +696,9 @@ function wireWsEvents() {
 
   // Streaming: create a message bubble on first chunk, append deltas
   let _streamDiv = null;
+  // Raw stream buffer — holds unfiltered text; _streamDiv shows filtered version
+  let _streamRaw = '';
+
   on('chat-stream', (msg) => {
     if (!$messages) return;
     // Remove empty state and typing dots once real content arrives
@@ -703,22 +708,42 @@ function wireWsEvents() {
       _streamDiv = document.createElement('div');
       _streamDiv.className = 'msg msg-assistant streaming';
       _streamDiv.textContent = '';
+      _streamRaw = '';
       $messages.appendChild(_streamDiv);
     }
-    _streamDiv.textContent += msg.delta;
+    _streamRaw += msg.delta;
+    // Live-filter: strip delegation blocks + replace canvas blocks with placeholder
+    let display = _streamRaw;
+    // Strip [DELEGATE]...[/DELEGATE] blocks (complete)
+    display = display.replace(/\[DELEGATE\][\s\S]*?\[\/DELEGATE\]/g, '');
+    // Strip unclosed [DELEGATE] blocks (in progress)
+    display = display.replace(/\[DELEGATE\][\s\S]*$/g, '');
+    // Replace fenced canvas blocks with placeholder (complete)
+    display = display.replace(/```scratchy-(canvas|toon|tpl)\s*\n[\s\S]*?```/g, '\u2728 Rendering UI\u2026');
+    // Replace unclosed fenced canvas blocks (in progress)
+    display = display.replace(/```scratchy-(canvas|toon|tpl)[\s\S]*$/g, '\u2728 Rendering UI\u2026');
+    // Replace unfenced canvas blocks
+    display = display.replace(/(?:^|\n)\s*scratchy-canvas\s*\n(?:\s*\{[^\n]+\}\s*\n?)+/gi, '');
+    // Collapse whitespace
+    display = display.replace(/\n{3,}/g, '\n\n').trim();
+    _streamDiv.textContent = display;
     $messages.scrollTop = $messages.scrollHeight;
   });
 
   on('chat-stream-end', () => {
     if (_streamDiv) {
       _streamDiv.classList.remove('streaming');
-      let raw = _streamDiv.textContent;
+      let raw = _streamRaw || _streamDiv.textContent;
+      _streamRaw = '';
       // Strip tool call XML blocks (NullClaw tool use)
       raw = raw.replace(/<tool_call[^>]*>[\s\S]*?<\/tool_call>/g, '');
       raw = raw.replace(/<tool_result[^>]*>[\s\S]*?<\/tool_result>/g, '');
       raw = raw.replace(/<tool_use[^>]*>[\s\S]*?<\/tool_use>/g, '');
       // Strip unclosed tool tags at end of stream
       raw = raw.replace(/<tool_(?:call|result|use)[^>]*>[\s\S]*$/g, '');
+      // Strip orchestrator delegation blocks
+      raw = raw.replace(/\[DELEGATE\][\s\S]*?\[\/DELEGATE\]/g, '');
+      raw = raw.replace(/\[DELEGATE\][\s\S]*$/g, '');
       // Fenced GenUI blocks: ```scratchy-canvas ... ```
       raw = raw.replace(/```scratchy-(canvas|toon|tpl)\s*\n[\s\S]*?```/g, '');
       // Unclosed fenced GenUI blocks (no closing ```)
