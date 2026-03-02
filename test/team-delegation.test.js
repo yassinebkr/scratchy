@@ -373,3 +373,150 @@ ctx
     });
   });
 });
+
+/* ------------------------------------------------------------------ */
+/*  parseTaskPlan — structured plan parser tests                       */
+/* ------------------------------------------------------------------ */
+
+// Inline copy of parseTaskPlan for testing
+function parseTaskPlan(text, validAgentNames, agentNameToId) {
+  let cleaned = text.trim();
+  cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+  cleaned = cleaned.trim();
+  const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) return { plan: null, error: 'No JSON object found in response' };
+  cleaned = jsonMatch[0];
+  cleaned = cleaned.replace(/,\s*([\]}])/g, '$1');
+  let parsed;
+  try { parsed = JSON.parse(cleaned); } catch (err) { return { plan: null, error: `JSON parse error: ${err.message}` }; }
+  if (!parsed.tasks || !Array.isArray(parsed.tasks)) return { plan: null, error: 'Missing or invalid "tasks" array' };
+  if (parsed.tasks.length === 0) return { plan: [], error: null };
+  if (parsed.tasks.length > 6) return { plan: null, error: `Too many tasks (${parsed.tasks.length}), max 6` };
+  const plan = [];
+  for (let i = 0; i < parsed.tasks.length; i++) {
+    const t = parsed.tasks[i];
+    if (!t.agent || !t.task) return { plan: null, error: `Task ${i} missing "agent" or "task" field` };
+    const agentNameLower = t.agent.toLowerCase();
+    let resolvedId = null, resolvedName = null;
+    for (const [name, id] of agentNameToId) {
+      if (name.toLowerCase() === agentNameLower) { resolvedId = id; resolvedName = name; break; }
+    }
+    if (!resolvedId) return { plan: null, error: `Unknown agent "${t.agent}". Available: ${[...validAgentNames].join(', ')}` };
+    const dependsOn = Array.isArray(t.depends_on) ? t.depends_on : [];
+    for (const dep of dependsOn) {
+      if (typeof dep !== 'number' || dep < 0 || dep >= parsed.tasks.length || dep === i) return { plan: null, error: `Task ${i} has invalid depends_on: ${dep}` };
+    }
+    for (const dep of dependsOn) {
+      const depTask = parsed.tasks[dep];
+      if (depTask.depends_on && depTask.depends_on.includes(i)) return { plan: null, error: `Circular dependency between tasks ${i} and ${dep}` };
+    }
+    plan.push({ agentId: resolvedId, agentName: resolvedName, task: t.task, files: Array.isArray(t.files) ? t.files : [], dependsOn });
+  }
+  return { plan, error: null };
+}
+
+const TEST_AGENT_NAMES = new Set(['Component', 'Layout', 'Interact', 'Visualizer']);
+const TEST_AGENT_MAP = new Map([['Component', 'id-comp'], ['Layout', 'id-layout'], ['Interact', 'id-interact'], ['Visualizer', 'id-viz']]);
+
+describe('parseTaskPlan', () => {
+  it('parses a valid 3-task plan', () => {
+    const input = '{"tasks":[{"agent":"Component","task":"Build toast","files":["tokens.css"],"depends_on":[]},{"agent":"Layout","task":"Build API client","files":[],"depends_on":[]},{"agent":"Interact","task":"Build skeleton","files":["tokens.css"],"depends_on":[]}]}';
+    const { plan, error } = parseTaskPlan(input, TEST_AGENT_NAMES, TEST_AGENT_MAP);
+    assert.equal(error, null);
+    assert.equal(plan.length, 3);
+    assert.equal(plan[0].agentId, 'id-comp');
+    assert.equal(plan[1].agentName, 'Layout');
+    assert.deepEqual(plan[0].files, ['tokens.css']);
+    assert.deepEqual(plan[0].dependsOn, []);
+  });
+
+  it('strips markdown code fences', () => {
+    const input = '```json\n{"tasks":[{"agent":"Component","task":"Do stuff","files":[],"depends_on":[]}]}\n```';
+    const { plan, error } = parseTaskPlan(input, TEST_AGENT_NAMES, TEST_AGENT_MAP);
+    assert.equal(error, null);
+    assert.equal(plan.length, 1);
+  });
+
+  it('handles trailing commas', () => {
+    const input = '{"tasks":[{"agent":"Component","task":"Do stuff","files":[],"depends_on":[],},]}';
+    const { plan, error } = parseTaskPlan(input, TEST_AGENT_NAMES, TEST_AGENT_MAP);
+    assert.equal(error, null);
+    assert.equal(plan.length, 1);
+  });
+
+  it('extracts JSON from surrounding text', () => {
+    const input = 'Here is my plan:\n{"tasks":[{"agent":"Layout","task":"Create API","files":[],"depends_on":[]}]}\nLet me know if this works.';
+    const { plan, error } = parseTaskPlan(input, TEST_AGENT_NAMES, TEST_AGENT_MAP);
+    assert.equal(error, null);
+    assert.equal(plan.length, 1);
+  });
+
+  it('rejects unknown agent names', () => {
+    const input = '{"tasks":[{"agent":"Unknown","task":"Do stuff","files":[],"depends_on":[]}]}';
+    const { plan, error } = parseTaskPlan(input, TEST_AGENT_NAMES, TEST_AGENT_MAP);
+    assert.notEqual(error, null);
+    assert.ok(error.includes('Unknown agent'));
+  });
+
+  it('rejects too many tasks', () => {
+    const tasks = Array.from({ length: 7 }, (_, i) => `{"agent":"Component","task":"Task ${i}","files":[],"depends_on":[]}`);
+    const input = `{"tasks":[${tasks.join(',')}]}`;
+    const { plan, error } = parseTaskPlan(input, TEST_AGENT_NAMES, TEST_AGENT_MAP);
+    assert.notEqual(error, null);
+    assert.ok(error.includes('Too many tasks'));
+  });
+
+  it('returns empty plan for empty tasks array', () => {
+    const { plan, error } = parseTaskPlan('{"tasks":[]}', TEST_AGENT_NAMES, TEST_AGENT_MAP);
+    assert.equal(error, null);
+    assert.equal(plan.length, 0);
+  });
+
+  it('detects circular dependencies', () => {
+    const input = '{"tasks":[{"agent":"Component","task":"A","files":[],"depends_on":[1]},{"agent":"Layout","task":"B","files":[],"depends_on":[0]}]}';
+    const { plan, error } = parseTaskPlan(input, TEST_AGENT_NAMES, TEST_AGENT_MAP);
+    assert.notEqual(error, null);
+    assert.ok(error.includes('Circular'));
+  });
+
+  it('validates depends_on indices', () => {
+    const input = '{"tasks":[{"agent":"Component","task":"A","files":[],"depends_on":[5]}]}';
+    const { plan, error } = parseTaskPlan(input, TEST_AGENT_NAMES, TEST_AGENT_MAP);
+    assert.notEqual(error, null);
+    assert.ok(error.includes('invalid depends_on'));
+  });
+
+  it('rejects self-dependency', () => {
+    const input = '{"tasks":[{"agent":"Component","task":"A","files":[],"depends_on":[0]}]}';
+    const { plan, error } = parseTaskPlan(input, TEST_AGENT_NAMES, TEST_AGENT_MAP);
+    assert.notEqual(error, null);
+  });
+
+  it('agent name matching is case-insensitive', () => {
+    const input = '{"tasks":[{"agent":"component","task":"Do stuff","files":[],"depends_on":[]}]}';
+    const { plan, error } = parseTaskPlan(input, TEST_AGENT_NAMES, TEST_AGENT_MAP);
+    assert.equal(error, null);
+    assert.equal(plan[0].agentId, 'id-comp');
+  });
+
+  it('handles valid dependencies (sequential chain)', () => {
+    const input = '{"tasks":[{"agent":"Component","task":"Build A","files":[],"depends_on":[]},{"agent":"Layout","task":"Use A output","files":[],"depends_on":[0]}]}';
+    const { plan, error } = parseTaskPlan(input, TEST_AGENT_NAMES, TEST_AGENT_MAP);
+    assert.equal(error, null);
+    assert.equal(plan.length, 2);
+    assert.deepEqual(plan[0].dependsOn, []);
+    assert.deepEqual(plan[1].dependsOn, [0]);
+  });
+
+  it('rejects missing task field', () => {
+    const input = '{"tasks":[{"agent":"Component","files":[]}]}';
+    const { plan, error } = parseTaskPlan(input, TEST_AGENT_NAMES, TEST_AGENT_MAP);
+    assert.notEqual(error, null);
+    assert.ok(error.includes('missing'));
+  });
+
+  it('rejects non-JSON input', () => {
+    const { plan, error } = parseTaskPlan('This is just text with no JSON', TEST_AGENT_NAMES, TEST_AGENT_MAP);
+    assert.notEqual(error, null);
+  });
+});
