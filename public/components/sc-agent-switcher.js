@@ -1946,7 +1946,7 @@ export class ScAgentSwitcher extends HTMLElement {
         capabilities: t.capabilities || [],
       }));
       this._filtered = [...this._agents];
-      this._filteredTeams = [];
+      // Keep _filteredTeams — don't clear teams just because agents are empty
       if (!this._activeAgentId) {
         this._activeAgentId = this._agents[0].id;
       }
@@ -1959,13 +1959,12 @@ export class ScAgentSwitcher extends HTMLElement {
       return;
     }
 
-    /* Classify agents: main (template-*) vs team members vs stray workers */
+    /* Classify agents: standalone (not in any team) vs team members */
     const teamAgentIds = new Set();
     const teams = this._filteredTeams || [];
     teams.forEach(t => (t.agents || []).forEach(a => teamAgentIds.add(a.id || a)));
 
-    const mainAgents = this._filtered.filter(a => a.id && a.id.startsWith('template-'));
-    /* Stray workers (not main, not in any team) are hidden */
+    const mainAgents = this._filtered.filter(a => !teamAgentIds.has(a.id));
 
     let cardIndex = 0;
 
