@@ -11,6 +11,11 @@
 import { listSkills, getSkill, getSkillsForAgent, getToolsForAgent } from '../../lib/skills/index.js';
 import { scanSkill, formatReport } from '../../lib/skill-scanner.js';
 
+/* ── Input-validation helpers ── */
+const MAX_ID   = 200;
+const MAX_NAME = 200;
+const MAX_PROMPT = 50000;
+
 /**
  * Register skills routes on the app.
  * @param {Object} app — Express-like app (or raw http router)
@@ -37,8 +42,13 @@ export function registerSkillRoutes(app, deps = {}) {
    * GET /api/skills/:id — Get a single skill's metadata
    */
   app.get('/api/skills/:id', (req, res) => {
+    const skillId = req.params.id;
+    if (typeof skillId !== 'string' || !skillId.trim() || skillId.length > MAX_ID) {
+      return res.status(400).json({ ok: false, error: 'Invalid skill ID' });
+    }
+
     try {
-      const skill = getSkill(req.params.id);
+      const skill = getSkill(skillId.trim());
       if (!skill) {
         return res.status(404).json({ ok: false, error: 'Skill not found' });
       }
@@ -55,16 +65,21 @@ export function registerSkillRoutes(app, deps = {}) {
    * GET /api/skills/agent/:name — Get skills + tools for an agent
    */
   app.get('/api/skills/agent/:name', (req, res) => {
+    const agentName = req.params.name;
+    if (typeof agentName !== 'string' || !agentName.trim() || agentName.length > MAX_NAME) {
+      return res.status(400).json({ ok: false, error: 'Invalid agent name' });
+    }
+
     try {
-      const agentName = req.params.name;
-      const skills = getSkillsForAgent(agentName).map(s => ({
+      const name = agentName.trim();
+      const skills = getSkillsForAgent(name).map(s => ({
         id: s.id, name: s.name, description: s.description, category: s.category,
       }));
-      const tools = getToolsForAgent(agentName);
+      const tools = getToolsForAgent(name);
       res.json({
         ok: true,
         data: {
-          agent: agentName,
+          agent: name,
           skills,
           tools: tools || 'unrestricted',
           skillCount: skills.length,
@@ -84,12 +99,24 @@ export function registerSkillRoutes(app, deps = {}) {
   app.post('/api/skills/scan', (req, res) => {
     try {
       const manifest = req.body;
-      if (!manifest || !manifest.id || !manifest.prompt) {
-        return res.status(400).json({
-          ok: false,
-          error: 'Manifest must include at least: id, prompt',
-        });
+      if (!manifest || typeof manifest !== 'object') {
+        return res.status(400).json({ ok: false, error: 'Request body must be a JSON object' });
       }
+      if (typeof manifest.id !== 'string' || !manifest.id.trim()) {
+        return res.status(400).json({ ok: false, error: 'id is required and must be a non-empty string' });
+      }
+      if (typeof manifest.prompt !== 'string' || !manifest.prompt.trim()) {
+        return res.status(400).json({ ok: false, error: 'prompt is required and must be a non-empty string' });
+      }
+      if (manifest.tools != null && !Array.isArray(manifest.tools)) {
+        return res.status(400).json({ ok: false, error: 'tools must be an array if provided' });
+      }
+
+      // Sanitize lengths
+      manifest.id = manifest.id.trim().slice(0, MAX_ID);
+      manifest.prompt = manifest.prompt.trim().slice(0, MAX_PROMPT);
+      if (manifest.name != null) manifest.name = String(manifest.name).trim().slice(0, MAX_NAME);
+      if (manifest.source != null) manifest.source = String(manifest.source).trim().slice(0, MAX_NAME);
 
       const report = scanSkill(manifest);
       const formatted = formatReport(report);

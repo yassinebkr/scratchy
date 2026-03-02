@@ -4,6 +4,15 @@
  * DELETE /api/chat/history — clears conversation history for the authenticated user.
  */
 
+/* ── Input-validation helpers ── */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function isUUID(s) { return typeof s === 'string' && UUID_RE.test(s); }
+
+function jsonRes(res, status, data) {
+  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
+  res.end(JSON.stringify(data));
+}
+
 /**
  * Create chat routes.
  * @param {Object} opts
@@ -17,64 +26,90 @@ export function createChatRoutes({ authenticate, getDb }) {
     if (req.method === 'GET' && pathname === '/api/chat/history') {
       const user = await authenticate(req);
       if (!user) {
-        res.writeHead(401, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Unauthorized' }));
+        jsonRes(res, 401, { ok: false, error: 'Authentication required' });
         return true;
       }
 
       const url = new URL(req.url, 'http://localhost');
-      const limit = Math.min(parseInt(url.searchParams.get('limit') || '50', 10), 200);
-      const before = url.searchParams.get('before') || null;
-      const agentId = url.searchParams.get('agentId') || null;
+
+      // Validate & clamp limit
+      const rawLimit = url.searchParams.get('limit');
+      let limit = 50;
+      if (rawLimit != null) {
+        limit = parseInt(rawLimit, 10);
+        if (isNaN(limit) || limit < 1) limit = 1;
+        if (limit > 200) limit = 200;
+      }
+
+      // Validate before cursor (numeric row id)
+      const rawBefore = url.searchParams.get('before') || null;
+      let before = null;
+      if (rawBefore != null) {
+        before = parseInt(rawBefore, 10);
+        if (isNaN(before) || before < 0) {
+          jsonRes(res, 400, { ok: false, error: 'before must be a positive integer' });
+          return true;
+        }
+      }
+
+      // Validate agentId if provided
+      const rawAgentId = url.searchParams.get('agentId') || null;
+      if (rawAgentId != null && !isUUID(rawAgentId)) {
+        jsonRes(res, 400, { ok: false, error: 'agentId must be a valid UUID' });
+        return true;
+      }
+      const agentId = rawAgentId;
 
       const db = getDb();
       if (!db) {
-        res.writeHead(503, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Database unavailable' }));
+        jsonRes(res, 503, { ok: false, error: 'Database unavailable' });
         return true;
       }
 
-      let rows;
-      if (agentId) {
-        // Per-agent conversation history
-        if (before) {
-          rows = db.prepare(
-            'SELECT id, agentId, role, content, model, createdAt FROM conversation_history WHERE userId = ? AND agentId = ? AND id < ? ORDER BY id DESC LIMIT ?'
-          ).all(user.id, agentId, before, limit);
+      try {
+        let rows;
+        if (agentId) {
+          // Per-agent conversation history
+          if (before != null) {
+            rows = db.prepare(
+              'SELECT id, agentId, role, content, model, createdAt FROM conversation_history WHERE userId = ? AND agentId = ? AND id < ? ORDER BY id DESC LIMIT ?'
+            ).all(user.id, agentId, before, limit);
+          } else {
+            rows = db.prepare(
+              'SELECT id, agentId, role, content, model, createdAt FROM conversation_history WHERE userId = ? AND agentId = ? ORDER BY id DESC LIMIT ?'
+            ).all(user.id, agentId, limit);
+          }
         } else {
-          rows = db.prepare(
-            'SELECT id, agentId, role, content, model, createdAt FROM conversation_history WHERE userId = ? AND agentId = ? ORDER BY id DESC LIMIT ?'
-          ).all(user.id, agentId, limit);
+          // All conversations (legacy / no agent filter)
+          if (before != null) {
+            rows = db.prepare(
+              'SELECT id, agentId, role, content, model, createdAt FROM conversation_history WHERE userId = ? AND id < ? ORDER BY id DESC LIMIT ?'
+            ).all(user.id, before, limit);
+          } else {
+            rows = db.prepare(
+              'SELECT id, agentId, role, content, model, createdAt FROM conversation_history WHERE userId = ? ORDER BY id DESC LIMIT ?'
+            ).all(user.id, limit);
+          }
         }
-      } else {
-        // All conversations (legacy / no agent filter)
-        if (before) {
-          rows = db.prepare(
-            'SELECT id, agentId, role, content, model, createdAt FROM conversation_history WHERE userId = ? AND id < ? ORDER BY id DESC LIMIT ?'
-          ).all(user.id, before, limit);
-        } else {
-          rows = db.prepare(
-            'SELECT id, agentId, role, content, model, createdAt FROM conversation_history WHERE userId = ? ORDER BY id DESC LIMIT ?'
-          ).all(user.id, limit);
-        }
+
+        // Reverse to chronological order
+        rows.reverse();
+
+        jsonRes(res, 200, {
+          messages: rows.map(r => ({
+            id: r.id,
+            agentId: r.agentId || null,
+            role: r.role,
+            content: r.content,
+            model: r.model,
+            createdAt: r.createdAt,
+          })),
+          hasMore: rows.length === limit,
+          cursor: rows.length > 0 ? rows[0].id : null,
+        });
+      } catch (err) {
+        jsonRes(res, 500, { ok: false, error: 'Failed to fetch chat history' });
       }
-
-      // Reverse to chronological order
-      rows.reverse();
-
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({
-        messages: rows.map(r => ({
-          id: r.id,
-          agentId: r.agentId || null,
-          role: r.role,
-          content: r.content,
-          model: r.model,
-          createdAt: r.createdAt,
-        })),
-        hasMore: rows.length === limit,
-        cursor: rows.length > 0 ? rows[0].id : null,
-      }));
       return true;
     }
 
@@ -82,28 +117,36 @@ export function createChatRoutes({ authenticate, getDb }) {
     if (req.method === 'DELETE' && pathname === '/api/chat/history') {
       const user = await authenticate(req);
       if (!user) {
-        res.writeHead(401, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Unauthorized' }));
+        jsonRes(res, 401, { ok: false, error: 'Authentication required' });
         return true;
       }
 
       const db = getDb();
       if (!db) {
-        res.writeHead(503, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Database unavailable' }));
+        jsonRes(res, 503, { ok: false, error: 'Database unavailable' });
         return true;
       }
 
       const delUrl = new URL(req.url, 'http://localhost');
       const delAgentId = delUrl.searchParams.get('agentId') || null;
-      if (delAgentId) {
-        db.prepare('DELETE FROM conversation_history WHERE userId = ? AND agentId = ?').run(user.id, delAgentId);
-      } else {
-        db.prepare('DELETE FROM conversation_history WHERE userId = ?').run(user.id);
+
+      // Validate agentId if provided
+      if (delAgentId != null && !isUUID(delAgentId)) {
+        jsonRes(res, 400, { ok: false, error: 'agentId must be a valid UUID' });
+        return true;
       }
 
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: true }));
+      try {
+        if (delAgentId) {
+          db.prepare('DELETE FROM conversation_history WHERE userId = ? AND agentId = ?').run(user.id, delAgentId);
+        } else {
+          db.prepare('DELETE FROM conversation_history WHERE userId = ?').run(user.id);
+        }
+
+        jsonRes(res, 200, { ok: true });
+      } catch (err) {
+        jsonRes(res, 500, { ok: false, error: 'Failed to clear chat history' });
+      }
       return true;
     }
 

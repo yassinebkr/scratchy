@@ -9,6 +9,9 @@
 
 import { getUsageTracker } from '../../lib/usage-tracker.js';
 
+/* ── Input-validation helpers ── */
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
 /**
  * Register usage routes on the router.
  * @param {import('express').Router} router
@@ -19,7 +22,10 @@ export function registerUsageRoutes(router, requireAuth) {
   router.get('/api/usage', requireAuth, (req, res) => {
     try {
       const tracker = getUsageTracker();
-      const userId = req.user.id;
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ ok: false, error: 'Authentication required' });
+      }
       const today = tracker.getToday(userId);
       const limits = tracker.getLimits(userId);
 
@@ -45,7 +51,7 @@ export function registerUsageRoutes(router, requireAuth) {
       });
     } catch (err) {
       console.error('[usage] Error fetching usage:', err);
-      res.status(500).json({ error: 'Failed to fetch usage' });
+      res.status(500).json({ ok: false, error: 'Failed to fetch usage' });
     }
   });
 
@@ -53,14 +59,44 @@ export function registerUsageRoutes(router, requireAuth) {
   router.get('/api/usage/history', requireAuth, (req, res) => {
     try {
       const tracker = getUsageTracker();
-      const userId = req.user.id;
-      const from = req.query.from || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
-      const to = req.query.to || new Date().toISOString().slice(0, 10);
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ ok: false, error: 'Authentication required' });
+      }
+
+      const defaultFrom = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+      const defaultTo   = new Date().toISOString().slice(0, 10);
+      const from = req.query.from || defaultFrom;
+      const to   = req.query.to   || defaultTo;
+
+      // Validate date formats (YYYY-MM-DD)
+      if (!DATE_RE.test(from)) {
+        return res.status(400).json({ ok: false, error: 'from must be in YYYY-MM-DD format' });
+      }
+      if (!DATE_RE.test(to)) {
+        return res.status(400).json({ ok: false, error: 'to must be in YYYY-MM-DD format' });
+      }
+      // Ensure valid date values
+      if (isNaN(Date.parse(from))) {
+        return res.status(400).json({ ok: false, error: 'from is not a valid date' });
+      }
+      if (isNaN(Date.parse(to))) {
+        return res.status(400).json({ ok: false, error: 'to is not a valid date' });
+      }
+      // Sanity check: range must not exceed 366 days
+      const diffMs = Date.parse(to) - Date.parse(from);
+      if (diffMs < 0) {
+        return res.status(400).json({ ok: false, error: 'from must be before to' });
+      }
+      if (diffMs > 366 * 86400000) {
+        return res.status(400).json({ ok: false, error: 'Date range must not exceed 366 days' });
+      }
+
       const data = tracker.getRange(userId, from, to);
       res.json({ from, to, data });
     } catch (err) {
       console.error('[usage] Error fetching history:', err);
-      res.status(500).json({ error: 'Failed to fetch usage history' });
+      res.status(500).json({ ok: false, error: 'Failed to fetch usage history' });
     }
   });
 
@@ -68,10 +104,14 @@ export function registerUsageRoutes(router, requireAuth) {
   router.get('/api/usage/limits', requireAuth, (req, res) => {
     try {
       const tracker = getUsageTracker();
-      const limits = tracker.getLimits(req.user.id);
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ ok: false, error: 'Authentication required' });
+      }
+      const limits = tracker.getLimits(userId);
       res.json(limits);
     } catch (err) {
-      res.status(500).json({ error: 'Failed to fetch limits' });
+      res.status(500).json({ ok: false, error: 'Failed to fetch limits' });
     }
   });
 }

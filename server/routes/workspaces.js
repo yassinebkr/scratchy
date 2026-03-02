@@ -17,6 +17,15 @@
 
 import * as workspacesState from '../../state/workspaces.js';
 
+/* ── Input-validation helpers ── */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function isUUID(s) { return typeof s === 'string' && UUID_RE.test(s); }
+
+const MAX_NAME  = 200;
+const MAX_DESC  = 2000;
+const MAX_SHORT = 100;
+const VALID_LAYOUT_MODES = ['auto', 'dashboard', 'focus', 'columns', 'rows'];
+
 /**
  * @param {object} opts
  * @param {Function} opts.authenticate — (req) => user | null
@@ -97,24 +106,40 @@ export function createWorkspaceRoutes(opts) {
         if (!user) return true;
 
         const body = await parseBody(req);
-        if (!body.name) {
-          json(res, 400, { error: 'name is required' });
+        if (typeof body.name !== 'string' || !body.name.trim()) {
+          json(res, 400, { ok: false, error: 'name is required and must be a non-empty string' });
+          return true;
+        }
+        const name = body.name.trim().slice(0, MAX_NAME);
+        const description = body.description != null ? String(body.description).trim().slice(0, MAX_DESC) : '';
+        const icon = body.icon != null ? String(body.icon).trim().slice(0, MAX_SHORT) : undefined;
+        if (body.ops != null && !Array.isArray(body.ops)) {
+          json(res, 400, { ok: false, error: 'ops must be an array' });
+          return true;
+        }
+        if (body.surfaces != null && !Array.isArray(body.surfaces)) {
+          json(res, 400, { ok: false, error: 'surfaces must be an array' });
+          return true;
+        }
+        const layoutMode = body.layoutMode ? String(body.layoutMode).trim() : 'auto';
+        if (!VALID_LAYOUT_MODES.includes(layoutMode)) {
+          json(res, 400, { ok: false, error: `layoutMode must be one of: ${VALID_LAYOUT_MODES.join(', ')}` });
           return true;
         }
 
         try {
           const ws = workspacesState.createWorkspace(user.id, {
-            name: String(body.name),
-            description: body.description ? String(body.description) : '',
-            icon: body.icon ? String(body.icon) : undefined,
+            name,
+            description,
+            icon,
             ops: body.ops || [],
             surfaces: body.surfaces || [],
-            layoutMode: body.layoutMode ? String(body.layoutMode) : 'auto',
+            layoutMode,
             isDefault: !!body.isDefault,
           });
           json(res, 201, ws);
         } catch (err) {
-          json(res, 500, { error: err.message });
+          json(res, 500, { ok: false, error: 'Failed to create workspace' });
         }
         return true;
       }
@@ -146,10 +171,15 @@ export function createWorkspaceRoutes(opts) {
           const user = await requireAuth(req, res);
           if (!user) return true;
 
+          if (typeof m.key !== 'string' || !m.key.trim() || m.key.length > MAX_SHORT) {
+            json(res, 400, { ok: false, error: 'Invalid template key' });
+            return true;
+          }
+
           const body = await parseBody(req);
           const template = workspacesState.getTemplate(m.key);
           if (!template) {
-            json(res, 404, { error: 'Template not found' });
+            json(res, 404, { ok: false, error: 'Template not found' });
             return true;
           }
 
@@ -158,19 +188,21 @@ export function createWorkspaceRoutes(opts) {
           const userLevel = tierOrder[getUserTier(user)] || 0;
           const templateLevel = tierOrder[template.tier] || 0;
           if (templateLevel > userLevel) {
-            json(res, 403, { error: 'This template requires a higher plan tier' });
+            json(res, 403, { ok: false, error: 'This template requires a higher plan tier' });
             return true;
           }
+
+          const templateName = body.name ? String(body.name).trim().slice(0, MAX_NAME) : undefined;
 
           try {
             const ws = workspacesState.createFromTemplate(
               user.id,
               m.key,
-              body.name ? String(body.name) : undefined
+              templateName
             );
             json(res, 201, ws);
           } catch (err) {
-            json(res, 500, { error: err.message });
+            json(res, 500, { ok: false, error: 'Failed to create workspace from template' });
           }
           return true;
         }
@@ -182,20 +214,34 @@ export function createWorkspaceRoutes(opts) {
         if (!user) return true;
 
         const body = await parseBody(req);
-        if (!body.name) {
-          json(res, 400, { error: 'name is required' });
+        if (typeof body.name !== 'string' || !body.name.trim()) {
+          json(res, 400, { ok: false, error: 'name is required and must be a non-empty string' });
+          return true;
+        }
+        const name = body.name.trim().slice(0, MAX_NAME);
+        if (body.ops != null && !Array.isArray(body.ops)) {
+          json(res, 400, { ok: false, error: 'ops must be an array' });
+          return true;
+        }
+        if (body.surfaces != null && !Array.isArray(body.surfaces)) {
+          json(res, 400, { ok: false, error: 'surfaces must be an array' });
+          return true;
+        }
+        const layoutMode = body.layoutMode ? String(body.layoutMode).trim() : 'auto';
+        if (!VALID_LAYOUT_MODES.includes(layoutMode)) {
+          json(res, 400, { ok: false, error: `layoutMode must be one of: ${VALID_LAYOUT_MODES.join(', ')}` });
           return true;
         }
 
         try {
-          const ws = workspacesState.saveCurrentAsWorkspace(user.id, String(body.name), {
+          const ws = workspacesState.saveCurrentAsWorkspace(user.id, name, {
             ops: body.ops || [],
             surfaces: body.surfaces || [],
-            layoutMode: body.layoutMode || 'auto',
+            layoutMode,
           });
           json(res, 201, ws);
         } catch (err) {
-          json(res, 500, { error: err.message });
+          json(res, 500, { ok: false, error: 'Failed to save workspace' });
         }
         return true;
       }
@@ -203,13 +249,19 @@ export function createWorkspaceRoutes(opts) {
       // GET /api/workspaces/:id
       {
         const m = matchRoute('/api/workspaces/:id', pathname);
+        if (m && !isUUID(m.id)) {
+          // Skip non-UUID :id — could be a sub-path like /api/workspaces/active
+          // (already matched above), so only reject if we actually matched /:id
+        }
+
         if (m && method === 'GET') {
+          if (!isUUID(m.id)) { json(res, 400, { ok: false, error: 'Invalid workspace ID format' }); return true; }
           const user = await requireAuth(req, res);
           if (!user) return true;
 
           const ws = workspacesState.getWorkspace(m.id);
           if (!ws || ws.userId !== user.id) {
-            json(res, 404, { error: 'Workspace not found' });
+            json(res, 404, { ok: false, error: 'Workspace not found' });
             return true;
           }
 
@@ -219,38 +271,57 @@ export function createWorkspaceRoutes(opts) {
 
         // PATCH /api/workspaces/:id
         if (m && method === 'PATCH') {
+          if (!isUUID(m.id)) { json(res, 400, { ok: false, error: 'Invalid workspace ID format' }); return true; }
           const user = await requireAuth(req, res);
           if (!user) return true;
 
           const ws = workspacesState.getWorkspace(m.id);
           if (!ws || ws.userId !== user.id) {
-            json(res, 404, { error: 'Workspace not found' });
+            json(res, 404, { ok: false, error: 'Workspace not found' });
             return true;
           }
 
           const body = await parseBody(req);
           const updates = {};
-          if (body.name !== undefined) updates.name = String(body.name);
-          if (body.description !== undefined) updates.description = String(body.description);
-          if (body.icon !== undefined) updates.icon = String(body.icon);
-          if (body.ops !== undefined) updates.ops = body.ops;
-          if (body.surfaces !== undefined) updates.surfaces = body.surfaces;
-          if (body.layoutMode !== undefined) updates.layoutMode = String(body.layoutMode);
+          if (body.name !== undefined) {
+            if (typeof body.name !== 'string' || !body.name.trim()) { json(res, 400, { ok: false, error: 'name must be a non-empty string' }); return true; }
+            updates.name = body.name.trim().slice(0, MAX_NAME);
+          }
+          if (body.description !== undefined) updates.description = String(body.description).trim().slice(0, MAX_DESC);
+          if (body.icon !== undefined) updates.icon = String(body.icon).trim().slice(0, MAX_SHORT);
+          if (body.ops !== undefined) {
+            if (!Array.isArray(body.ops)) { json(res, 400, { ok: false, error: 'ops must be an array' }); return true; }
+            updates.ops = body.ops;
+          }
+          if (body.surfaces !== undefined) {
+            if (!Array.isArray(body.surfaces)) { json(res, 400, { ok: false, error: 'surfaces must be an array' }); return true; }
+            updates.surfaces = body.surfaces;
+          }
+          if (body.layoutMode !== undefined) {
+            const lm = String(body.layoutMode).trim();
+            if (!VALID_LAYOUT_MODES.includes(lm)) { json(res, 400, { ok: false, error: `layoutMode must be one of: ${VALID_LAYOUT_MODES.join(', ')}` }); return true; }
+            updates.layoutMode = lm;
+          }
           if (body.isDefault !== undefined) updates.isDefault = !!body.isDefault;
 
-          const updated = workspacesState.updateWorkspace(m.id, updates);
-          json(res, 200, updated);
+          try {
+            const updated = workspacesState.updateWorkspace(m.id, updates);
+            json(res, 200, updated);
+          } catch (err) {
+            json(res, 500, { ok: false, error: 'Failed to update workspace' });
+          }
           return true;
         }
 
         // DELETE /api/workspaces/:id
         if (m && method === 'DELETE') {
+          if (!isUUID(m.id)) { json(res, 400, { ok: false, error: 'Invalid workspace ID format' }); return true; }
           const user = await requireAuth(req, res);
           if (!user) return true;
 
           const ws = workspacesState.getWorkspace(m.id);
           if (!ws || ws.userId !== user.id) {
-            json(res, 404, { error: 'Workspace not found' });
+            json(res, 404, { ok: false, error: 'Workspace not found' });
             return true;
           }
 
@@ -262,12 +333,13 @@ export function createWorkspaceRoutes(opts) {
         // POST /api/workspaces/:id/activate
         const activateMatch = matchRoute('/api/workspaces/:id/activate', pathname);
         if (activateMatch && method === 'POST') {
+          if (!isUUID(activateMatch.id)) { json(res, 400, { ok: false, error: 'Invalid workspace ID format' }); return true; }
           const user = await requireAuth(req, res);
           if (!user) return true;
 
           const ok = workspacesState.activateWorkspace(user.id, activateMatch.id);
           if (!ok) {
-            json(res, 404, { error: 'Workspace not found or not yours' });
+            json(res, 404, { ok: false, error: 'Workspace not found or not yours' });
             return true;
           }
 

@@ -27,6 +27,18 @@ import * as teams from '../../state/teams.js';
 import { TEAM_PACKAGES } from '../../lib/team-router.js';
 import * as agents from '../../state/agents.js';
 
+/* ── Input-validation helpers ── */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function isUUID(s) { return typeof s === 'string' && UUID_RE.test(s); }
+
+const MAX_NAME  = 200;
+const MAX_DESC  = 2000;
+const MAX_KEY   = 200;
+const MAX_CONTENT = 50000;
+const MAX_SHORT = 100;        // icon, color, role …
+const VALID_ROLES = ['owner', 'admin', 'member', 'viewer'];
+const VALID_AGENT_ROLES = ['owner', 'admin', 'worker', 'viewer'];
+
 /**
  * Create the team routes handler.
  * @param {Object} opts
@@ -160,20 +172,20 @@ export function createTeamRoutes({ authenticate, matchRoute }) {
         if (!user) return true;
 
         const body = await parseJsonBody(req);
-        if (!body.name) {
-          json(res, 400, { error: 'name is required' });
+        if (typeof body.name !== 'string' || !body.name.trim()) {
+          json(res, 400, { ok: false, error: 'name is required and must be a non-empty string' });
           return true;
         }
+        const name = body.name.trim().slice(0, MAX_NAME);
+        const description = body.description != null ? String(body.description).trim().slice(0, MAX_DESC) : undefined;
+        const icon = body.icon != null ? String(body.icon).trim().slice(0, MAX_SHORT) : undefined;
+        const color = body.color != null ? String(body.color).trim().slice(0, MAX_SHORT) : undefined;
 
         try {
-          const team = teams.createTeam(String(body.name), user.id, {
-            description: body.description ? String(body.description) : undefined,
-            icon: body.icon ? String(body.icon) : undefined,
-            color: body.color ? String(body.color) : undefined,
-          });
+          const team = teams.createTeam(name, user.id, { description, icon, color });
           json(res, 201, team);
         } catch (err) {
-          json(res, 400, { error: err.message });
+          json(res, 400, { ok: false, error: 'Failed to create team' });
         }
         return true;
       }
@@ -192,9 +204,13 @@ export function createTeamRoutes({ authenticate, matchRoute }) {
           const user = await requireAuth(req, res);
           if (!user) return true;
 
+          if (typeof m.key !== 'string' || !m.key.trim() || m.key.length > MAX_SHORT) {
+            json(res, 400, { ok: false, error: 'Invalid package key' });
+            return true;
+          }
           const pkg = TEAM_PACKAGES[m.key];
           if (!pkg) {
-            json(res, 404, { error: `Package "${m.key}" not found` });
+            json(res, 404, { ok: false, error: 'Package not found' });
             return true;
           }
 
@@ -222,7 +238,7 @@ export function createTeamRoutes({ authenticate, matchRoute }) {
             const fullTeam = teams.getTeam(team.id);
             json(res, 201, fullTeam);
           } catch (err) {
-            json(res, 400, { error: err.message });
+            json(res, 400, { ok: false, error: 'Failed to create team from package' });
           }
           return true;
         }
@@ -233,17 +249,31 @@ export function createTeamRoutes({ authenticate, matchRoute }) {
       {
         const m = matchRoute('/api/teams/:id/memory/:memId', pathname);
         if (m) {
+          if (!isUUID(m.id)) { json(res, 400, { ok: false, error: 'Invalid team ID format' }); return true; }
+          if (!isUUID(m.memId)) { json(res, 400, { ok: false, error: 'Invalid memory entry ID format' }); return true; }
+
           if (method === 'PUT') {
             const ctx = await requireMember(req, res, m.id);
             if (!ctx) return true;
 
             const body = await parseJsonBody(req);
+            // Sanitize updatable fields
+            const sanitized = {};
+            if (body.key != null) {
+              if (typeof body.key !== 'string' || !body.key.trim()) { json(res, 400, { ok: false, error: 'key must be a non-empty string' }); return true; }
+              sanitized.key = body.key.trim().slice(0, MAX_KEY);
+            }
+            if (body.content != null) {
+              if (typeof body.content !== 'string') { json(res, 400, { ok: false, error: 'content must be a string' }); return true; }
+              sanitized.content = body.content.trim().slice(0, MAX_CONTENT);
+            }
+
             try {
-              const updated = teams.updateMemory(m.memId, body);
-              if (!updated) { json(res, 404, { error: 'Memory entry not found' }); return true; }
+              const updated = teams.updateMemory(m.memId, sanitized);
+              if (!updated) { json(res, 404, { ok: false, error: 'Memory entry not found' }); return true; }
               json(res, 200, updated);
             } catch (err) {
-              json(res, 400, { error: err.message });
+              json(res, 400, { ok: false, error: 'Failed to update memory entry' });
             }
             return true;
           }
@@ -253,7 +283,7 @@ export function createTeamRoutes({ authenticate, matchRoute }) {
             if (!ctx) return true;
 
             const deleted = teams.deleteMemory(m.memId);
-            json(res, deleted ? 200 : 404, deleted ? { ok: true } : { error: 'Not found' });
+            json(res, deleted ? 200 : 404, deleted ? { ok: true } : { ok: false, error: 'Not found' });
             return true;
           }
 
@@ -265,6 +295,8 @@ export function createTeamRoutes({ authenticate, matchRoute }) {
       {
         const m = matchRoute('/api/teams/:id/memory', pathname);
         if (m) {
+          if (!isUUID(m.id)) { json(res, 400, { ok: false, error: 'Invalid team ID format' }); return true; }
+
           if (method === 'GET') {
             const ctx = await requireMember(req, res, m.id);
             if (!ctx) return true;
@@ -279,18 +311,24 @@ export function createTeamRoutes({ authenticate, matchRoute }) {
             if (!ctx) return true;
 
             const body = await parseJsonBody(req);
-            if (!body.key || !body.content) {
-              json(res, 400, { error: 'key and content are required' });
+            if (typeof body.key !== 'string' || !body.key.trim()) {
+              json(res, 400, { ok: false, error: 'key is required and must be a non-empty string' });
               return true;
             }
+            if (typeof body.content !== 'string' || !body.content.trim()) {
+              json(res, 400, { ok: false, error: 'content is required and must be a non-empty string' });
+              return true;
+            }
+            const key = body.key.trim().slice(0, MAX_KEY);
+            const content = body.content.trim().slice(0, MAX_CONTENT);
 
             try {
-              const entry = teams.addMemory(m.id, String(body.key), String(body.content), {
+              const entry = teams.addMemory(m.id, key, content, {
                 createdBy: ctx.user.id,
               });
               json(res, 201, entry);
             } catch (err) {
-              json(res, 400, { error: err.message });
+              json(res, 400, { ok: false, error: 'Failed to add memory entry' });
             }
             return true;
           }
@@ -304,21 +342,29 @@ export function createTeamRoutes({ authenticate, matchRoute }) {
       {
         const m = matchRoute('/api/teams/:id/members/:userId', pathname);
         if (m) {
+          if (!isUUID(m.id)) { json(res, 400, { ok: false, error: 'Invalid team ID format' }); return true; }
+          if (!isUUID(m.userId)) { json(res, 400, { ok: false, error: 'Invalid user ID format' }); return true; }
+
           if (method === 'PUT') {
             const ctx = await requireManager(req, res, m.id);
             if (!ctx) return true;
 
             const body = await parseJsonBody(req);
-            if (!body.role) {
-              json(res, 400, { error: 'role is required' });
+            if (typeof body.role !== 'string' || !body.role.trim()) {
+              json(res, 400, { ok: false, error: 'role is required and must be a non-empty string' });
+              return true;
+            }
+            const role = body.role.trim().toLowerCase();
+            if (!VALID_ROLES.includes(role)) {
+              json(res, 400, { ok: false, error: `role must be one of: ${VALID_ROLES.join(', ')}` });
               return true;
             }
 
             try {
-              const updated = teams.updateMemberRole(m.id, m.userId, String(body.role));
-              json(res, updated ? 200 : 404, updated ? { ok: true } : { error: 'Member not found' });
+              const updated = teams.updateMemberRole(m.id, m.userId, role);
+              json(res, updated ? 200 : 404, updated ? { ok: true } : { ok: false, error: 'Member not found' });
             } catch (err) {
-              json(res, 400, { error: err.message });
+              json(res, 400, { ok: false, error: 'Failed to update member role' });
             }
             return true;
           }
@@ -329,15 +375,15 @@ export function createTeamRoutes({ authenticate, matchRoute }) {
 
             // Can't remove yourself if you're the owner
             if (m.userId === ctx.user.id && teams.isOwner(m.id, m.userId)) {
-              json(res, 400, { error: 'Cannot remove team owner' });
+              json(res, 400, { ok: false, error: 'Cannot remove team owner' });
               return true;
             }
 
             try {
               const removed = teams.removeMember(m.id, m.userId);
-              json(res, removed ? 200 : 404, removed ? { ok: true } : { error: 'Member not found' });
+              json(res, removed ? 200 : 404, removed ? { ok: true } : { ok: false, error: 'Member not found' });
             } catch (err) {
-              json(res, 400, { error: err.message });
+              json(res, 400, { ok: false, error: 'Failed to remove member' });
             }
             return true;
           }
@@ -350,20 +396,27 @@ export function createTeamRoutes({ authenticate, matchRoute }) {
       {
         const m = matchRoute('/api/teams/:id/members', pathname);
         if (m && method === 'POST') {
+          if (!isUUID(m.id)) { json(res, 400, { ok: false, error: 'Invalid team ID format' }); return true; }
+
           const ctx = await requireManager(req, res, m.id);
           if (!ctx) return true;
 
           const body = await parseJsonBody(req);
-          if (!body.userId) {
-            json(res, 400, { error: 'userId is required' });
+          if (!isUUID(body.userId)) {
+            json(res, 400, { ok: false, error: 'userId is required and must be a valid UUID' });
+            return true;
+          }
+          const role = body.role ? String(body.role).trim().toLowerCase() : 'member';
+          if (!VALID_ROLES.includes(role)) {
+            json(res, 400, { ok: false, error: `role must be one of: ${VALID_ROLES.join(', ')}` });
             return true;
           }
 
           try {
-            const member = teams.addMember(m.id, String(body.userId), body.role || 'member');
+            const member = teams.addMember(m.id, body.userId, role);
             json(res, 201, member);
           } catch (err) {
-            json(res, 400, { error: err.message });
+            json(res, 400, { ok: false, error: 'Failed to add member' });
           }
           return true;
         }
@@ -374,21 +427,29 @@ export function createTeamRoutes({ authenticate, matchRoute }) {
       {
         const m = matchRoute('/api/teams/:id/agents/:agentId', pathname);
         if (m) {
+          if (!isUUID(m.id)) { json(res, 400, { ok: false, error: 'Invalid team ID format' }); return true; }
+          if (!isUUID(m.agentId)) { json(res, 400, { ok: false, error: 'Invalid agent ID format' }); return true; }
+
           if (method === 'PUT') {
             const ctx = await requireManager(req, res, m.id);
             if (!ctx) return true;
 
             const body = await parseJsonBody(req);
-            if (!body.role) {
-              json(res, 400, { error: 'role is required' });
+            if (typeof body.role !== 'string' || !body.role.trim()) {
+              json(res, 400, { ok: false, error: 'role is required and must be a non-empty string' });
+              return true;
+            }
+            const role = body.role.trim().toLowerCase();
+            if (!VALID_AGENT_ROLES.includes(role)) {
+              json(res, 400, { ok: false, error: `role must be one of: ${VALID_AGENT_ROLES.join(', ')}` });
               return true;
             }
 
             try {
-              const updated = teams.updateAgentRole(m.id, m.agentId, String(body.role));
-              json(res, updated ? 200 : 404, updated ? { ok: true } : { error: 'Agent not found in team' });
+              const updated = teams.updateAgentRole(m.id, m.agentId, role);
+              json(res, updated ? 200 : 404, updated ? { ok: true } : { ok: false, error: 'Agent not found in team' });
             } catch (err) {
-              json(res, 400, { error: err.message });
+              json(res, 400, { ok: false, error: 'Failed to update agent role' });
             }
             return true;
           }
@@ -398,7 +459,7 @@ export function createTeamRoutes({ authenticate, matchRoute }) {
             if (!ctx) return true;
 
             const removed = teams.removeAgent(m.id, m.agentId);
-            json(res, removed ? 200 : 404, removed ? { ok: true } : { error: 'Agent not found in team' });
+            json(res, removed ? 200 : 404, removed ? { ok: true } : { ok: false, error: 'Agent not found in team' });
             return true;
           }
 
@@ -410,23 +471,30 @@ export function createTeamRoutes({ authenticate, matchRoute }) {
       {
         const m = matchRoute('/api/teams/:id/agents', pathname);
         if (m && method === 'POST') {
+          if (!isUUID(m.id)) { json(res, 400, { ok: false, error: 'Invalid team ID format' }); return true; }
+
           const ctx = await requireManager(req, res, m.id);
           if (!ctx) return true;
 
           const body = await parseJsonBody(req);
-          if (!body.agentId) {
-            json(res, 400, { error: 'agentId is required' });
+          if (!isUUID(body.agentId)) {
+            json(res, 400, { ok: false, error: 'agentId is required and must be a valid UUID' });
+            return true;
+          }
+          const role = body.role ? String(body.role).trim().toLowerCase() : 'worker';
+          if (!VALID_AGENT_ROLES.includes(role)) {
+            json(res, 400, { ok: false, error: `role must be one of: ${VALID_AGENT_ROLES.join(', ')}` });
             return true;
           }
 
           try {
-            const assignment = teams.addAgent(m.id, String(body.agentId), {
-              role: body.role || 'worker',
+            const assignment = teams.addAgent(m.id, body.agentId, {
+              role,
               addedBy: ctx.user.id,
             });
             json(res, 201, assignment);
           } catch (err) {
-            json(res, 400, { error: err.message });
+            json(res, 400, { ok: false, error: 'Failed to assign agent' });
           }
           return true;
         }
@@ -436,12 +504,14 @@ export function createTeamRoutes({ authenticate, matchRoute }) {
       {
         const m = matchRoute('/api/teams/:id', pathname);
         if (m) {
+          if (!isUUID(m.id)) { json(res, 400, { ok: false, error: 'Invalid team ID format' }); return true; }
+
           if (method === 'GET') {
             const ctx = await requireMember(req, res, m.id);
             if (!ctx) return true;
 
             const team = teams.getTeam(m.id);
-            if (!team) { json(res, 404, { error: 'Team not found' }); return true; }
+            if (!team) { json(res, 404, { ok: false, error: 'Team not found' }); return true; }
 
             json(res, 200, team);
             return true;
@@ -452,12 +522,22 @@ export function createTeamRoutes({ authenticate, matchRoute }) {
             if (!ctx) return true;
 
             const body = await parseJsonBody(req);
+            // Sanitize allowed fields
+            const sanitized = {};
+            if (body.name != null) {
+              if (typeof body.name !== 'string' || !body.name.trim()) { json(res, 400, { ok: false, error: 'name must be a non-empty string' }); return true; }
+              sanitized.name = body.name.trim().slice(0, MAX_NAME);
+            }
+            if (body.description != null) sanitized.description = String(body.description).trim().slice(0, MAX_DESC);
+            if (body.icon != null) sanitized.icon = String(body.icon).trim().slice(0, MAX_SHORT);
+            if (body.color != null) sanitized.color = String(body.color).trim().slice(0, MAX_SHORT);
+
             try {
-              const updated = teams.updateTeam(m.id, body);
-              if (!updated) { json(res, 404, { error: 'Team not found' }); return true; }
+              const updated = teams.updateTeam(m.id, sanitized);
+              if (!updated) { json(res, 404, { ok: false, error: 'Team not found' }); return true; }
               json(res, 200, updated);
             } catch (err) {
-              json(res, 400, { error: err.message });
+              json(res, 400, { ok: false, error: 'Failed to update team' });
             }
             return true;
           }
@@ -468,12 +548,12 @@ export function createTeamRoutes({ authenticate, matchRoute }) {
 
             // Only owner or global admin can delete
             if (user.role !== 'admin' && !teams.isOwner(m.id, user.id)) {
-              json(res, 403, { error: 'Only the team owner can delete this team' });
+              json(res, 403, { ok: false, error: 'Only the team owner can delete this team' });
               return true;
             }
 
             const deleted = teams.deleteTeam(m.id);
-            json(res, deleted ? 200 : 404, deleted ? { ok: true } : { error: 'Team not found' });
+            json(res, deleted ? 200 : 404, deleted ? { ok: true } : { ok: false, error: 'Team not found' });
             return true;
           }
         }
