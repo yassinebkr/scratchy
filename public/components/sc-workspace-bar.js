@@ -472,6 +472,15 @@ template.innerHTML = /* html */ `
 
   <!-- Surface pills -->
   <div class="surfaces" role="group" aria-label="Surfaces">
+    <button class="pill" data-type="dashboard" aria-pressed="false" title="Dashboard">
+      <svg viewBox="0 0 16 16" aria-hidden="true">
+        <rect x="2" y="2" width="5" height="5" rx="1"/>
+        <rect x="9" y="2" width="5" height="5" rx="1"/>
+        <rect x="2" y="9" width="5" height="5" rx="1"/>
+        <rect x="9" y="9" width="5" height="5" rx="1"/>
+      </svg>
+      <span class="pill-label">Dashboard</span>
+    </button>
     <button class="pill" data-type="terminal" aria-pressed="false" title="Terminal">
       <svg viewBox="0 0 16 16" aria-hidden="true">
         <polyline points="4 6 7 9 4 12"/>
