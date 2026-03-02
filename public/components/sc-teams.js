@@ -727,31 +727,36 @@ export class ScTeams extends HTMLElement {
     const t = this.activeTeam;
     if (!t) return;
 
-    let membersHtml = (t.members || []).map(m => `
+    let membersHtml = (t.members || []).map(m => {
+      const name = m.displayName || m.username || m.name || m.userId || '?';
+      return `
       <div class="list-row">
         <div class="list-info">
-          <div class="avatar">${(m.name || m.userId || '?').charAt(0)}</div>
+          <div class="avatar">${name.charAt(0).toUpperCase()}</div>
           <div>
-            <div class="list-name">${this.esc(m.name || m.userId)}</div>
+            <div class="list-name">${this.esc(name)}</div>
             <div class="badge ${m.role}">${this.esc(m.role)}</div>
           </div>
         </div>
         <button class="btn btn-ghost" data-action="remove-member" data-id="${m.userId}">${ICONS.trash}</button>
       </div>
-    `).join('');
+    `}).join('');
 
-    let agentsHtml = (t.agents || []).map(a => `
+    let agentsHtml = (t.agents || []).map(a => {
+      const name = a.agentName || a.name || a.agentId || 'Agent';
+      const avatar = a.avatar || name.charAt(0).toUpperCase();
+      return `
       <div class="list-row">
         <div class="list-info">
-          <div class="avatar" style="background:var(--surface-hover); color:var(--text)">${(a.name || a.agentId || 'A').charAt(0)}</div>
+          <div class="avatar" style="background:var(--surface-hover); color:var(--text)">${avatar}</div>
           <div>
-            <div class="list-name">${this.esc(a.name || a.agentId)}</div>
+            <div class="list-name">${this.esc(name)}</div>
             <div class="badge">${this.esc(a.role)}</div>
           </div>
         </div>
         <button class="btn btn-ghost" data-action="remove-agent" data-id="${a.agentId}">${ICONS.trash}</button>
       </div>
-    `).join('');
+    `}).join('');
 
     this.$.detailContent.innerHTML = `
       <div class="detail-header">
