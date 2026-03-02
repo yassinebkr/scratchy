@@ -611,7 +611,16 @@ export class ScTeams extends HTMLElement {
     this.$.dialogCancel.addEventListener('click', () => this.closeDialog());
     this.$.dialogForm.addEventListener('submit', (e) => this.handleDialogSubmit(e));
 
-    this.loadData();
+    // Don't load immediately — wait for the panel to be opened (token may not exist yet)
+  }
+
+  static get observedAttributes() { return ['open']; }
+
+  attributeChangedCallback(name, _old, val) {
+    if (name === 'open' && val != null) {
+      // Reload data every time the panel opens (ensures fresh auth + data)
+      this.loadData();
+    }
   }
 
   get authHeaders() {
