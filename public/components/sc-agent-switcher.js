@@ -1582,6 +1582,53 @@ const STYLES = /* css */ `
 }
 
 .team-header[data-tooltip]:hover::after { opacity: 1; }
+
+/* ── Teams scroll container ──────────────────────────────── */
+.teams-scroll-container {
+  max-height: 40vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.teams-scroll-container::-webkit-scrollbar { width: 4px; }
+.teams-scroll-container::-webkit-scrollbar-track { background: transparent; }
+.teams-scroll-container::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* ── Mobile compact team cards ───────────────────────────── */
+@media (max-width: 640px) {
+  .team-header {
+    width: auto;
+    min-width: 44px;
+    height: 40px;
+    min-height: 40px;
+    border-radius: 8px;
+    padding: 0 10px;
+    gap: 8px;
+    flex-direction: row;
+  }
+
+  .team-icon {
+    width: 28px;
+    height: 28px;
+    font-size: 10px;
+  }
+
+  .team-badge {
+    position: static;
+    border: none;
+    font-size: 10px;
+    min-width: 18px;
+    height: 18px;
+  }
+
+  .team-info { display: none !important; }
+  .team-members { display: none !important; }
+}
 `;
 
 /* ─── HTML Template ──────────────────────────────────────── */
@@ -1926,6 +1973,8 @@ export class ScAgentSwitcher extends HTMLElement {
   /* ═══ API Methods ═════════════════════════════════════════ */
 
   async loadAgents() {
+    // Re-read token — it may have been set after initial connectedCallback
+    this._token = localStorage.getItem('scratchy_token');
     const hdrs = this._token ? { 'Authorization': `Bearer ${this._token}` } : {};
     try {
       const res = await fetch('/api/agents', { headers: hdrs });
@@ -2044,19 +2093,24 @@ export class ScAgentSwitcher extends HTMLElement {
     }
 
     /* 2) Render team groups */
-    if (teams.length > 0 && mainAgents.length > 0) {
-      const sep = document.createElement('div');
-      sep.className = 'team-separator';
-      this._gridEl.appendChild(sep);
-    }
-    for (const team of teams) {
-      const agentIds = (team.agents || []).map(a => a.id || a);
-      const memberAgents = agentIds
-        .map(aid => this._filtered.find(a => a.id === aid))
-        .filter(Boolean);
-      const group = this._createTeamGroupEl(team, memberAgents, cardIndex);
-      this._gridEl.appendChild(group);
-      cardIndex += memberAgents.length;
+    if (teams.length > 0) {
+      if (mainAgents.length > 0) {
+        const sep = document.createElement('div');
+        sep.className = 'team-separator';
+        this._gridEl.appendChild(sep);
+      }
+      const teamsContainer = document.createElement('div');
+      teamsContainer.className = 'teams-scroll-container';
+      for (const team of teams) {
+        const agentIds = (team.agents || []).map(a => a.id || a);
+        const memberAgents = agentIds
+          .map(aid => this._filtered.find(a => a.id === aid))
+          .filter(Boolean);
+        const group = this._createTeamGroupEl(team, memberAgents, cardIndex);
+        teamsContainer.appendChild(group);
+        cardIndex += memberAgents.length;
+      }
+      this._gridEl.appendChild(teamsContainer);
     }
 
     /* 3) Add Agent button at bottom of rail */

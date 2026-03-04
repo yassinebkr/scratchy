@@ -23,7 +23,7 @@
  */
 
 import { spawn } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { join as pathJoin } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
 import { NullClawAdapter } from '../lib/nullclaw-adapter.js';
@@ -75,7 +75,7 @@ const MEMORY_TOP_K = 5;
 const MAX_MESSAGE_SIZE = 100 * 1024;
 
 /** Abort SSE stream if no data received for this duration */
-const STREAM_INACTIVITY_TIMEOUT = 60_000;
+const STREAM_INACTIVITY_TIMEOUT = 90_000;
 
 /** Max concurrent requests per user */
 const MAX_CONCURRENT_PER_USER = 3;
@@ -86,6 +86,62 @@ const _activeRequests = new Map();
 /** Adapter port range — offset from chat-handler's 29000-29999 */
 const ADAPTER_PORT_MIN = 28_000;
 const ADAPTER_PORT_MAX = 28_999;
+
+/** Soul files directory — per-agent personality/rules loaded at prompt time */
+const SOULS_DIR = pathJoin(process.cwd(), '.scratchy-data', 'souls');
+
+/** Cache of loaded soul files — keyed by agent name (lowercase) */
+const _soulCache = new Map();
+
+/**
+ * Load the soul file for an agent. Soul files give agents distinct
+ * personalities, expertise areas, communication styles, and rules.
+ *
+ * Lookup order:
+ *   1. .scratchy-data/souls/{agentName}.md  (case-insensitive match)
+ *   2. .scratchy-data/souls/{agentId}.md    (UUID fallback)
+ *   3. null (no soul — uses generic system prompt only)
+ *
+ * Results are cached in memory (invalidated on file change via mtime check).
+ *
+ * @param {Object} agentConfig — agent row from SQLite
+ * @returns {string|null} Soul markdown content, or null if no soul file exists
+ */
+function loadSoul(agentConfig) {
+  const name = (agentConfig.name || '').toLowerCase().trim();
+  const id = agentConfig.id;
+
+  // Check cache (with mtime validation)
+  const cached = _soulCache.get(name);
+  if (cached) {
+    try {
+      const stat = require('node:fs').statSync(cached.path);
+      if (stat.mtimeMs === cached.mtimeMs) return cached.content;
+    } catch { /* file deleted — fall through to reload */ }
+  }
+
+  // Try name-based lookup first, then ID-based
+  const candidates = [
+    pathJoin(SOULS_DIR, `${name}.md`),
+    pathJoin(SOULS_DIR, `${id}.md`),
+  ];
+
+  for (const soulPath of candidates) {
+    if (existsSync(soulPath)) {
+      try {
+        const content = readFileSync(soulPath, 'utf-8');
+        const stat = require('node:fs').statSync(soulPath);
+        _soulCache.set(name, { path: soulPath, content, mtimeMs: stat.mtimeMs });
+        console.log(`[orchestrator] Loaded soul for ${agentConfig.name} (${soulPath})`);
+        return content;
+      } catch (err) {
+        console.warn(`[orchestrator] Failed to read soul file ${soulPath}:`, err.message);
+      }
+    }
+  }
+
+  return null;
+}
 
 /* ------------------------------------------------------------------ */
 /*  Streaming text filter — strips tool XML from client output        */
@@ -477,9 +533,11 @@ function appendHistory(userId, agentId, role, content, model) {
  *
  * @param {string} query
  * @param {string} userId
+ * @param {Object} [opts]
+ * @param {string} [opts.agentId] — if provided, also search agent-scoped memories
  * @returns {Promise<string>} TOON-formatted context block
  */
-async function retrieveContext(query, userId) {
+async function retrieveContext(query, userId, opts = {}) {
   if (!_embedder) return '';
 
   const parts = [];
@@ -499,6 +557,7 @@ async function retrieveContext(query, userId) {
   }
 
   try {
+    // Search global memories (not agent-scoped)
     const memoryResults = await searchMemory(query, {
       embedder: _embedder,
       memory,
@@ -508,6 +567,21 @@ async function retrieveContext(query, userId) {
     });
     if (memoryResults.length > 0) {
       parts.push(formatResultsAsToon(memoryResults, { label: 'memories' }));
+    }
+
+    // Also search agent-scoped memories (if agentId provided)
+    if (opts.agentId) {
+      const agentMemories = await searchMemory(query, {
+        embedder: _embedder,
+        memory,
+        userId,
+        agentId: opts.agentId,
+        topK: 3,
+        minScore: 0.25,
+      });
+      if (agentMemories.length > 0) {
+        parts.push(formatResultsAsToon(agentMemories, { label: 'agent-memories' }));
+      }
     }
   } catch (err) {
     console.warn('[orchestrator] Memory search failed:', err.message);
@@ -534,7 +608,16 @@ async function retrieveContext(query, userId) {
 function buildAugmentedPrompt(userMessage, agentConfig, history, contextBlock, tools) {
   const parts = [];
 
-  // ── Agent system prompt (identity / instructions) ──
+  // ── Agent soul (personality / expertise / rules) ──
+  // Soul files are rich personality definitions that make agents feel alive.
+  // They're loaded from .scratchy-data/souls/{name}.md and take priority
+  // over the generic system prompt for identity/behavior.
+  const soul = loadSoul(agentConfig);
+  if (soul) {
+    parts.push(`[Soul]\n${soul}\n`);
+  }
+
+  // ── Agent system prompt (GenUI protocol / technical instructions) ──
   if (agentConfig.systemPrompt) {
     parts.push(`[System]\n${agentConfig.systemPrompt}\n`);
   }
@@ -860,7 +943,7 @@ function handleA2UIResponse(response, ws, userId) {
  * @param {string} userMessage
  * @param {string} assistantResponse
  */
-async function runPostResponsePipeline(userId, userMessage, assistantResponse) {
+async function runPostResponsePipeline(userId, userMessage, assistantResponse, agentId) {
   try {
     if (_embedder) {
       await extractMemories(userMessage, assistantResponse, {
@@ -868,6 +951,7 @@ async function runPostResponsePipeline(userId, userMessage, assistantResponse) {
         embedder: _embedder,
         memory,
         userId,
+        agentId: agentId || null,
       });
     }
   } catch (err) {
@@ -1016,10 +1100,10 @@ export async function routeMessage(userId, agentId, message, ws) {
     // ── Step 3: Retrieve per-agent conversation history ──
     const history = getHistory(userId, effectiveAgentId, HISTORY_TURNS);
 
-    // ── Step 4: Semantic context retrieval ──
-    const contextBlock = await retrieveContext(text, userId);
+    // ── Step 4: Semantic context retrieval (with agent-scoped memories) ──
+    const contextBlock = await retrieveContext(text, userId, { agentId: effectiveAgentId });
 
-    // ── Step 5: Build augmented prompt ──
+    // ── Step 5: Build augmented prompt (soul + system + context + history) ──
     const augmentedPrompt = buildAugmentedPrompt(text, agent, history, contextBlock, tools);
 
     // ── Step 6+7: Send to NullClaw and stream response ──
@@ -1239,7 +1323,7 @@ export async function routeMessage(userId, agentId, message, ws) {
 
     // ── Async post-response pipeline (memory extraction) ──
     if (response) {
-      runPostResponsePipeline(userId, text, response).catch(err => {
+      runPostResponsePipeline(userId, text, response, effectiveAgentId).catch(err => {
         console.warn(`[orchestrator] Post-response pipeline error for ${userId}:`, err.message);
       });
     }

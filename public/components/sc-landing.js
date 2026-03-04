@@ -20,42 +20,42 @@ const PLANS = [
 ];
 
 const FEATURES = [
-  { icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="4"/><circle cx="9" cy="16" r="1"/><circle cx="15" cy="16" r="1"/></svg>', title: 'Multi-Agent', desc: 'Switch between specialist AI agents with different capabilities and knowledge.' },
-  { icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.37 2.63a2.12 2.12 0 0 1 3 3L14 13l-4 1 1-4Z"/><path d="M20 7v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7"/><path d="M2 12h4"/></svg>', title: 'Generative UI', desc: '39+ interactive components — charts, forms, dashboards — rendered inline.' },
-  { icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8v5a6 6 0 0 1-12 0V8Z"/><path d="M6 11h12"/></svg>', title: 'MCP Tools', desc: 'Connect external tools and data sources via the Model Context Protocol.' },
-  { icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg>', title: 'Self-hosted', desc: 'Your data stays on your server. Full control, zero third-party dependencies.' },
-  { icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>', title: 'Real-time', desc: 'Streaming responses, live tool events, and cross-device sync.' },
-  { icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>', title: 'Multi-user', desc: 'Shared workspaces with per-user isolation, quotas, and roles.' },
+  { icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="4"/><circle cx="9" cy="16" r="1"/><circle cx="15" cy="16" r="1"/></svg>', title: 'Multi-Agent Teams', desc: 'Specialist agents that collaborate. An orchestrator splits work, workers execute in parallel, and results merge.' },
+  { icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.37 2.63a2.12 2.12 0 0 1 3 3L14 13l-4 1 1-4Z"/><path d="M20 7v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2V7"/><path d="M2 12h4"/></svg>', title: 'Generative UI', desc: '34 interactive canvas components. Agents render charts, forms, dashboards, and live data — not just text.' },
+  { icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg>', title: 'Self-hosted & Open', desc: 'Runs on your machine. Your data never leaves. Open-core — inspect and extend everything.' },
+  { icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>', title: 'Streaming Everything', desc: 'Responses stream token-by-token. Tool usage shows live. Canvas tiles appear as the agent builds them.' },
+  { icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>', title: 'Multi-user with Quotas', desc: 'Invite users with per-account quotas, rate limits, and role-based access. Encrypted user store.' },
+  { icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8v5a6 6 0 0 1-12 0V8Z"/><path d="M6 11h12"/></svg>', title: 'Agent Memory', desc: 'Agents remember across conversations. Semantic search over past interactions, scoped per-agent and per-user.' },
 ];
 
 const AGENTS = [
   {
-    name: 'Aria',
-    role: 'Research Assistant',
-    desc: 'Deep web research, summarisation, and fact-checking across hundreds of sources in seconds.',
-    status: 'online',
-    avatar: '<svg width="40" height="40" viewBox="0 0 40 40" fill="none"><circle cx="20" cy="20" r="20" fill="rgba(249,166,2,0.12)"/><circle cx="20" cy="15" r="7" stroke="#F9A602" stroke-width="1.5" fill="none"/><path d="M8 34c0-6.627 5.373-12 12-12s12 5.373 12 12" stroke="#F9A602" stroke-width="1.5" fill="none"/></svg>',
-  },
-  {
     name: 'Atlas',
-    role: 'Code Engineer',
-    desc: 'Writes, reviews, and refactors production code with full context of your codebase.',
+    role: 'Code Architect',
+    desc: 'Systems-first coding. Plans architecture, then implements. Production-ready code with proper error handling.',
     status: 'online',
     avatar: '<svg width="40" height="40" viewBox="0 0 40 40" fill="none"><circle cx="20" cy="20" r="20" fill="rgba(249,166,2,0.12)"/><path d="M14 12l6 4-6 4V12z" stroke="#DAA520" stroke-width="1.5" fill="none"/><path d="M20 12l6 4-6 4V12z" stroke="#DAA520" stroke-width="1.5" fill="none"/><rect x="12" y="24" width="16" height="4" rx="1" stroke="#DAA520" stroke-width="1.5" fill="none"/></svg>',
   },
   {
-    name: 'Nova',
-    role: 'Creative Writer',
-    desc: 'Blog posts, marketing copy, emails — polished first drafts in your brand voice.',
+    name: 'Iris',
+    role: 'Design Engineer',
+    desc: 'UI/UX that works beautifully. Mobile-first, accessible, with proper design tokens and spacing systems.',
     status: 'online',
-    avatar: '<svg width="40" height="40" viewBox="0 0 40 40" fill="none"><circle cx="20" cy="20" r="20" fill="rgba(249,166,2,0.12)"/><path d="M15 28V14l5 4 5-4v14" stroke="#FFBF00" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/><line x1="15" y1="21" x2="25" y2="21" stroke="#FFBF00" stroke-width="1.5"/></svg>',
+    avatar: '<svg width="40" height="40" viewBox="0 0 40 40" fill="none"><circle cx="20" cy="20" r="20" fill="rgba(99,102,241,0.12)"/><rect x="10" y="10" width="20" height="20" rx="4" stroke="#6366f1" stroke-width="1.5" fill="none"/><line x1="10" y1="16" x2="30" y2="16" stroke="#6366f1" stroke-width="1.5"/><line x1="18" y1="16" x2="18" y2="30" stroke="#6366f1" stroke-width="1.5"/></svg>',
   },
   {
-    name: 'Bolt',
-    role: 'Data Analyst',
-    desc: 'Turns raw data into charts, dashboards, and insights you can act on immediately.',
+    name: 'Nova',
+    role: 'Research & Analysis',
+    desc: 'Finds, cross-references, and synthesizes information. Always cites sources, always flags uncertainty.',
     status: 'online',
-    avatar: '<svg width="40" height="40" viewBox="0 0 40 40" fill="none"><circle cx="20" cy="20" r="20" fill="rgba(249,166,2,0.12)"/><rect x="12" y="22" width="4" height="6" rx="1" stroke="#F9A602" stroke-width="1.5" fill="none"/><rect x="18" y="16" width="4" height="12" rx="1" stroke="#F9A602" stroke-width="1.5" fill="none"/><rect x="24" y="12" width="4" height="16" rx="1" stroke="#F9A602" stroke-width="1.5" fill="none"/></svg>',
+    avatar: '<svg width="40" height="40" viewBox="0 0 40 40" fill="none"><circle cx="20" cy="20" r="20" fill="rgba(16,185,129,0.12)"/><circle cx="20" cy="18" r="6" stroke="#10b981" stroke-width="1.5" fill="none"/><path d="M24 22l4 6" stroke="#10b981" stroke-width="1.5" stroke-linecap="round"/></svg>',
+  },
+  {
+    name: 'Echo',
+    role: 'Writer & Communicator',
+    desc: 'Clear, sharp writing. Docs, marketing copy, emails — no AI slop, no filler. Every sentence earns its place.',
+    status: 'online',
+    avatar: '<svg width="40" height="40" viewBox="0 0 40 40" fill="none"><circle cx="20" cy="20" r="20" fill="rgba(244,114,82,0.12)"/><path d="M15 28V14l5 4 5-4v14" stroke="#f47252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/><line x1="15" y1="21" x2="25" y2="21" stroke="#f47252" stroke-width="1.5"/></svg>',
   },
 ];
 
@@ -80,30 +80,27 @@ const INTEGRATION_STEPS = [
   },
   {
     num: '3',
-    title: 'Automate',
-    desc: 'Your agents work across tools seamlessly — research, write, deploy, all in one conversation.',
+    title: 'Build',
+    desc: 'Agents use tools to read files, run commands, search the web, and render interactive UI — all in chat.',
     icon: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>',
   },
 ];
 
 const METRICS = [
-  { value: '10x', label: 'Faster research' },
-  { value: '500+', label: 'Tasks automated daily' },
-  { value: '87%', label: 'Time saved on first drafts' },
-  { value: '4.9/5', label: 'User satisfaction' },
+  { value: '34', label: 'Canvas components' },
+  { value: '15', label: 'Specialist agents' },
+  { value: '<2s', label: 'Agent startup time' },
+  { value: '∞', label: 'Messages with BYOK' },
 ];
 
-const TESTIMONIALS = [
-  { quote: 'Scratchy replaced three separate tools for our team. Research, writing, and data analysis — all in one place.', author: 'Sarah K.', role: 'Head of Product, Fintech Startup' },
-  { quote: 'The agent switching is seamless. I go from coding with Atlas to writing docs with Nova in the same conversation.', author: 'Marcus R.', role: 'Senior Engineer, Dev Agency' },
-  { quote: 'Self-hosted AI chat that actually works. We had it running in production within 20 minutes of deploy.', author: 'Lin W.', role: 'CTO, Data Consultancy' },
-];
+/* Testimonials removed — no fake social proof. Will add real ones when we have real users. */
+const TESTIMONIALS = [];
 
 const CHANGELOG = [
-  { version: 'v2.4', date: 'Feb 2026', title: 'Context Engine v2', desc: 'Agents now share long-term memory across conversations.' },
-  { version: 'v2.3', date: 'Jan 2026', title: 'MCP Tool Marketplace', desc: '20+ pre-built integrations with one-click install.' },
-  { version: 'v2.2', date: 'Dec 2025', title: 'Generative UI Overhaul', desc: '39+ inline components — charts, tables, forms, and more.' },
-  { version: 'v2.1', date: 'Nov 2025', title: 'Team Workspaces', desc: 'Multi-user support with per-seat quotas and role-based access.' },
+  { version: 'v2.1', date: 'Mar 2026', title: 'Agent Soul System', desc: 'Each agent gets personality, expertise rules, and persistent memory across conversations.' },
+  { version: 'v2.0', date: 'Feb 2026', title: 'Multi-Agent Teams', desc: 'Orchestrator delegates work to specialist workers in parallel. Server-managed sandboxes.' },
+  { version: 'v1.9', date: 'Feb 2026', title: 'Billing & BYOK', desc: 'Stripe integration, usage tracking, and bring-your-own-key with unlimited messages.' },
+  { version: 'v1.8', date: 'Feb 2026', title: 'Generative UI Canvas', desc: '34 interactive components rendered by agents — charts, forms, dashboards, code blocks.' },
 ];
 
 /* ── Styles ── */
@@ -1149,9 +1146,9 @@ const STYLES = /* css */ `
     left: 0;
     right: 0;
     flex-direction: column;
-    background: rgba(13,11,7,0.97);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    background: rgba(13,11,7,0.98);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
     padding: 0 clamp(16px, 4vw, 48px);
     gap: 4px;
     border-bottom: 1px solid transparent;
@@ -1185,7 +1182,8 @@ const STYLES = /* css */ `
   /* ── Mobile Nav: styled links ── */
   .nav-links a {
     display: block;
-    padding: 12px 16px;
+    padding: 16px 24px;
+    min-height: 48px;
     background: rgba(249,166,2,0.04);
     border-radius: 8px;
     color: var(--muted);
@@ -1215,13 +1213,14 @@ const STYLES = /* css */ `
   }
   .hero-badge { margin-bottom: 16px; }
   .hero h1 {
-    font-size: 36px;
+    font-size: clamp(28px, 7vw, 42px);
     letter-spacing: -1px;
     line-height: 1.1;
   }
   .hero-sub {
     margin-top: 12px;
-    font-size: 16px;
+    font-size: 15px;
+    padding: 0 16px;
   }
   .hero-cta { margin-top: 24px; }
   .hero-trust { flex-direction: column; gap: 8px; margin-top: 24px; }
@@ -1242,7 +1241,13 @@ const STYLES = /* css */ `
   .steps-row { flex-direction: column; align-items: center; gap: 32px; }
   .steps-line { display: none; }
   .footer { flex-direction: column; gap: 16px; text-align: center; }
-  .section { padding: 64px clamp(16px, 4vw, 48px); }
+  .section { padding: 48px 16px; }
+  .section-title { font-size: clamp(22px, 5vw, 32px); }
+  .section-divider { margin: 0; }
+  .feature-card, .agent-card, .plan-card {
+    background: rgba(26,22,16,0.95);
+    border: 1px solid rgba(249,166,2,0.15);
+  }
 }
 @media (max-width: 480px) {
   .agents-grid { grid-template-columns: 1fr; max-width: 300px; margin: 0 auto; }
@@ -1428,8 +1433,8 @@ class ScLanding extends HTMLElement {
             <span class="hero-badge-dot"></span>
             Now in public beta
           </div>
-          <h1>Your AI team,<br>ready to work</h1>
-          <p class="hero-sub">Specialist AI agents that research, write, code, and analyse — all in one self-hosted workspace. Set up in minutes, not weeks.</p>
+          <h1>AI agents that actually<br>remember and collaborate</h1>
+          <p class="hero-sub">Self-hosted workspace with specialist agents. Each has its own personality, memory, and expertise. They work in teams, delegate tasks, and build things together.</p>
           <div class="hero-cta">
             <button class="btn btn-primary" data-action="get-started">Start Free — No Card Required</button>
             <button class="btn btn-ghost" data-scroll="features">See how it works</button>
@@ -1457,7 +1462,7 @@ class ScLanding extends HTMLElement {
 
       <!-- AI Team / Agent Personas -->
       <section id="team" class="section">
-        <div class="section-eyebrow">Meet Your AI Team</div>
+        <div class="section-eyebrow">Built-in Agents</div>
         <h2 class="section-title">Specialists, not generalists</h2>
         <p class="section-subtitle">Each agent has a role, a personality, and deep expertise. Switch between them mid-conversation.</p>
         <div class="agents-grid">${agentsHtml}</div>
@@ -1470,8 +1475,8 @@ class ScLanding extends HTMLElement {
         <div class="section-eyebrow">Shared Context</div>
         <div class="shared-intel">
           <div class="shared-intel-content">
-            <h3>Your AI team shares a brain</h3>
-            <p>Every agent has access to your shared context — conversations, documents, preferences, and project history. No repeating yourself. No lost context between sessions.</p>
+            <h3>Agents that remember</h3>
+            <p>Each agent has persistent memory scoped to your conversations. Context from past sessions gets recalled automatically via semantic search. No repeating yourself.</p>
             <ul class="shared-intel-features">
               <li>${ICON.database} <span>Persistent memory across conversations</span></li>
               <li>${ICON.share} <span>Context flows between agents automatically</span></li>
@@ -1511,13 +1516,13 @@ class ScLanding extends HTMLElement {
 
       <div class="section-divider"></div>
 
-      <!-- Social Proof -->
+      <!-- Numbers -->
       <section id="proof" class="section">
-        <div class="section-eyebrow">Results</div>
-        <h2 class="section-title">Built to save you hours, not minutes</h2>
-        <p class="section-subtitle">Real impact, measured across hundreds of teams and thousands of tasks.</p>
+        <div class="section-eyebrow">By the Numbers</div>
+        <h2 class="section-title">What's inside</h2>
+        <p class="section-subtitle">Real capabilities, shipping today. No roadmap promises.</p>
         <div class="metrics-row">${metricsHtml}</div>
-        <div class="testimonials-grid">${testimonialsHtml}</div>
+        ${testimonialsHtml ? `<div class="testimonials-grid">${testimonialsHtml}</div>` : ''}
       </section>
 
       <div class="section-divider"></div>

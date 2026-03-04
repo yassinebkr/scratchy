@@ -406,10 +406,12 @@ function stripInternalBlocks(text, opts) {
   // Tool call XML (unclosed — still streaming)
   s = s.replace(/<tool_(?:call|result|use)[^>]*>[\s\S]*$/g, '');
 
-  // Orchestrator [DELEGATE] blocks (closed)
-  s = s.replace(/\[DELEGATE\][\s\S]*?\[\/DELEGATE\]/g, '');
+  // Orchestrator [DELEGATE] blocks (closed) — with or without attributes
+  s = s.replace(/\[DELEGATE[^\]]*\][\s\S]*?\[\/DELEGATE\]/g, '');
   // [DELEGATE] blocks (unclosed — still streaming)
-  s = s.replace(/\[DELEGATE\][\s\S]*$/g, '');
+  s = s.replace(/\[DELEGATE[^\]]*\][\s\S]*$/g, '');
+  // Inline self-closing: [DELEGATE .../]
+  s = s.replace(/\[DELEGATE[^\]]*\/\]/g, '');
 
   var ph = streaming ? '\u2728 Rendering UI\u2026' : '';
 
@@ -706,6 +708,140 @@ function injectTeamUIStyles() {
 /*  WS event handlers                                                 */
 /* ------------------------------------------------------------------ */
 
+let _rateLimitToastTimer = null;
+function showRateLimitToast(message, durationMs = 5000) {
+  // Inject styles if they don't exist
+  if (!document.getElementById('rate-limit-styles')) {
+    const style = document.createElement('style');
+    style.id = 'rate-limit-styles';
+    style.textContent = `
+      .rate-limit-toast {
+        position: absolute;
+        top: 24px;
+        left: 50%;
+        transform: translateX(-50%) translateY(-150%);
+        opacity: 0;
+        width: max-content;
+        max-width: 90%;
+        background: rgba(249, 166, 2, 0.15);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        border: 1px solid rgba(249, 166, 2, 0.3);
+        border-radius: 12px;
+        color: var(--text, #f0ead6);
+        font-family: 'Geist', sans-serif;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        padding: 12px 16px;
+        z-index: 9999;
+        transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.4s ease;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        pointer-events: auto;
+      }
+      .rate-limit-toast.show {
+        transform: translateX(-50%) translateY(0);
+        opacity: 1;
+      }
+      .rate-limit-content {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .rate-limit-message {
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--text, #f0ead6);
+      }
+      .rate-limit-close {
+        background: none;
+        border: none;
+        color: var(--text, #f0ead6);
+        opacity: 0.6;
+        cursor: pointer;
+        font-size: 18px;
+        padding: 0;
+        margin-left: 8px;
+        transition: opacity 0.2s;
+        line-height: 1;
+      }
+      .rate-limit-close:hover {
+        opacity: 1;
+      }
+      .rate-limit-progress-bar {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        height: 3px;
+        background: var(--accent, #F9A602);
+        width: 100%;
+        transform-origin: left;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  // Use the chat container or fallback to body
+  const container = document.querySelector('.chat-area') || ($messages && $messages.parentElement) || document.body;
+  if (container !== document.body) {
+    const style = window.getComputedStyle(container);
+    if (style.position === 'static') container.style.position = 'relative';
+  }
+
+  let toast = document.getElementById('rate-limit-toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'rate-limit-toast';
+    toast.className = 'rate-limit-toast';
+    
+    const content = document.createElement('div');
+    content.className = 'rate-limit-content';
+    
+    const msgSpan = document.createElement('span');
+    msgSpan.className = 'rate-limit-message';
+    msgSpan.id = 'rate-limit-message-text';
+    
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'rate-limit-close';
+    closeBtn.innerHTML = '×';
+    closeBtn.onclick = () => toast.classList.remove('show');
+    
+    content.appendChild(msgSpan);
+    content.appendChild(closeBtn);
+    
+    const progress = document.createElement('div');
+    progress.className = 'rate-limit-progress-bar';
+    progress.id = 'rate-limit-progress';
+    
+    toast.appendChild(content);
+    toast.appendChild(progress);
+    
+    container.appendChild(toast);
+  }
+
+  document.getElementById('rate-limit-message-text').textContent = message || "⏳ The AI team is cooling down — too many requests. Retrying shortly…";
+  
+  const progress = document.getElementById('rate-limit-progress');
+  // Reset animation
+  progress.style.transition = 'none';
+  progress.style.transform = 'scaleX(1)';
+  
+  // Force reflow
+  void progress.offsetWidth;
+  
+  // Start animation
+  progress.style.transition = `transform ${durationMs}ms linear`;
+  progress.style.transform = 'scaleX(0)';
+  
+  // Show toast
+  setTimeout(() => toast.classList.add('show'), 10);
+  
+  if (_rateLimitToastTimer) clearTimeout(_rateLimitToastTimer);
+  _rateLimitToastTimer = setTimeout(() => {
+    toast.classList.remove('show');
+  }, durationMs);
+}
+
 function wireWsEvents() {
   // Inject CSS styles for team UI components
   injectTeamUIStyles();
@@ -768,6 +904,8 @@ function wireWsEvents() {
       if (!raw) _streamDiv.remove(); // remove empty bubble if all content was GenUI ops
       _streamDiv = null;
     }
+    // Safety: clear any typing indicators that survived streaming
+    clearAllTypingIndicators();
   });
 
   // Show "Rendering UI" placeholder when server signals GenUI is coming
@@ -790,22 +928,37 @@ function wireWsEvents() {
   }
 
   let _typingSafetyTimer = null;
-  on('typing', (msg) => {
-    if ($statusText) {
-      if (msg.status === 'start') {
-        $statusText.textContent = 'Thinking…';
-      } else {
-        $statusText.textContent = state.connected ? 'Connected' : 'Disconnected';
-      }
+
+  /** Map team routing phase to human-readable status */
+  function phaseLabel(phase, workerCount) {
+    switch (phase) {
+      case 'planning': return 'Planning tasks…';
+      case 'coordinating': return 'Coordinating team…';
+      case 'delegating': return workerCount ? `Spawning ${workerCount} worker${workerCount > 1 ? 's' : ''}…` : 'Delegating…';
+      case 'synthesizing': return 'Synthesizing results…';
+      default: return 'Thinking…';
     }
-    // Show/hide typing indicator dots in chat area
+  }
+
+  on('typing', (msg) => {
+    const isTeam = !!msg.teamId;
+    const label = msg.status === 'start' ? phaseLabel(msg.phase, msg.workerCount) : null;
+
+    if ($statusText) {
+      $statusText.textContent = label || (state.connected ? 'Connected' : 'Disconnected');
+    }
+    // Show/hide typing indicator in chat area
     if ($messages) {
       if (msg.status === 'start') {
-        // Always deduplicate — remove any existing before adding
         clearAllTypingIndicators();
         const el = document.createElement('div');
         el.className = 'typing-indicator';
-        el.innerHTML = '<span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>';
+        if (isTeam && msg.phase) {
+          // Phase-aware indicator: label + animated dots
+          el.innerHTML = `<span class="typing-phase">${phaseLabel(msg.phase, msg.workerCount)}</span><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>`;
+        } else {
+          el.innerHTML = '<span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>';
+        }
         $messages.appendChild(el);
         $messages.scrollTop = $messages.scrollHeight;
         // Safety: auto-remove after 120s (prevents infinite stuck dots)
@@ -832,8 +985,18 @@ function wireWsEvents() {
     const bubble = document.getElementById('worker-bubble');
     if (bubble) bubble.reset();
     if ($statusText) $statusText.textContent = state.connected ? 'Connected' : 'Disconnected';
-    // Show error message in chat
-    if (msg.error && $messages) {
+    
+    // Check for rate-limit / network errors
+    const errText = msg.error ? msg.error.toLowerCase() : '';
+    const isRateLimit = errText.includes('network error') || 
+                        errText.includes('rate limit') || 
+                        errText.includes('try again') ||
+                        errText.includes('too many requests') ||
+                        errText.includes('cooling down');
+
+    if (isRateLimit) {
+      showRateLimitToast("⏳ The AI team is cooling down — too many requests. Retrying shortly…", 5000);
+    } else if (msg.error && $messages) {
       appendMessage('system', `<span class="msg-error">Team error: ${escapeHtml(msg.error)}</span>`);
     }
   });
@@ -1037,6 +1200,10 @@ async function enterApp() {
   }
 
   showApp();
+
+  // Reload agent switcher now that auth token is available
+  // (connectedCallback may have run before login set the token)
+  if ($agentSwitcher) $agentSwitcher.loadAgents?.();
 
   // Initialize surface manager (must run after showApp so DOM is visible)
   import('./surface-manager.js').then(sm => sm.initSurfaceManager());

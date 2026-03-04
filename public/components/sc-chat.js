@@ -470,7 +470,16 @@ const STYLES = `
 
   @media (prefers-reduced-motion: reduce) {
     .typing-indicator { animation: none !important; }
-    .typing-dot { animation: none !important; opacity: 0.6; }
+    .typing-dot {
+      animation: typing-pulse 1.6s ease-in-out infinite !important;
+      transform: none !important;
+    }
+    .typing-dot:nth-child(2) { animation-delay: 0.25s !important; }
+    .typing-dot:nth-child(3) { animation-delay: 0.5s !important; }
+  }
+  @keyframes typing-pulse {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 1; }
   }
 
   /* ─── Streaming Cursor ─── */

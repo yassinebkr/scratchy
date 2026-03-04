@@ -202,7 +202,7 @@ class MobileSurfaceStack {
     const btn = document.createElement('button');
     btn.className = 'mobile-back-btn';
     btn.setAttribute('aria-label', 'Go back');
-    btn.innerHTML = BACK_ARROW_SVG;
+    btn.innerHTML = `${BACK_ARROW_SVG}<span>Back</span>`;
     btn.style.display = 'none';
 
     btn.addEventListener('click', (e) => {
