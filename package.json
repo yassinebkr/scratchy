@@ -18,6 +18,7 @@
     "@mozilla/readability": "^0.6.0",
     "better-sqlite3": "^12.6.2",
     "dotenv": "^17.3.1",
+    "googleapis": "^171.4.0",
     "linkedom": "^0.18.12",
     "openai": "^6.25.0",
     "robots-parser": "^3.0.1",

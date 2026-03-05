@@ -6,6 +6,7 @@
  */
 
 import crypto from 'node:crypto';
+import * as googleAuth from '../../lib/google-auth.js';
 
 /**
  * Create widget route handlers.
@@ -207,12 +208,15 @@ export function createWidgetRoutes({ authenticate, getDb }) {
 
   // ── Email CRUD + Send ──────────────────────────────────────
 
+  // ── Email Drafts (using email_drafts table) ─────────────
+
   async function emailList(req, res) {
     const user = await requireAuth(req, res); if (!user) return true;
     const db = getDb();
     if (!db) return json(res, 500, { error: 'Database unavailable' }), true;
-    const rows = db.prepare('SELECT * FROM emails WHERE userId = ? ORDER BY createdAt DESC LIMIT 50').all(user.id);
-    json(res, 200, rows);
+    const rows = db.prepare('SELECT * FROM email_drafts WHERE userId = ? ORDER BY updatedAt DESC LIMIT 50').all(user.id);
+    // Add virtual status field for frontend compat (drafts are always 'draft')
+    json(res, 200, rows.map(r => ({ ...r, status: 'draft' })));
     return true;
   }
 
@@ -220,9 +224,9 @@ export function createWidgetRoutes({ authenticate, getDb }) {
     const user = await requireAuth(req, res); if (!user) return true;
     const db = getDb();
     if (!db) return json(res, 500, { error: 'Database unavailable' }), true;
-    const row = db.prepare('SELECT * FROM emails WHERE id = ? AND userId = ?').get(id, user.id);
-    if (!row) return json(res, 404, { error: 'Email not found' }), true;
-    json(res, 200, row);
+    const row = db.prepare('SELECT * FROM email_drafts WHERE id = ? AND userId = ?').get(id, user.id);
+    if (!row) return json(res, 404, { error: 'Draft not found' }), true;
+    json(res, 200, { ...row, status: 'draft' });
     return true;
   }
 
@@ -231,64 +235,81 @@ export function createWidgetRoutes({ authenticate, getDb }) {
     const db = getDb();
     if (!db) return json(res, 500, { error: 'Database unavailable' }), true;
     const body = await parseBody(req);
-    if (!body || !body.to) return json(res, 400, { error: 'to is required' }), true;
 
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
 
-    db.prepare(`INSERT INTO emails (id, userId, "to", subject, body, status, createdAt)
-      VALUES (?, ?, ?, ?, ?, 'draft', ?)`)
-      .run(id, user.id, String(body.to), body.subject || '(no subject)', body.body || '', now);
+    db.prepare(`INSERT INTO email_drafts (id, userId, "to", subject, body, createdAt, updatedAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?)`)
+      .run(id, user.id, String(body?.to || ''), body?.subject || '', body?.body || '', now, now);
 
-    const row = db.prepare('SELECT * FROM emails WHERE id = ?').get(id);
+    const row = db.prepare('SELECT * FROM email_drafts WHERE id = ?').get(id);
     json(res, 201, row);
     return true;
   }
 
+  /**
+   * SECURITY: This is the ONLY path that can send emails.
+   * It's a REST endpoint — only reachable from authenticated browser requests.
+   * The WS widget action handler has NO send action. Agents cannot reach this.
+   *
+   * Flow: draft saved in email_drafts → human clicks Send → this endpoint
+   * → Gmail API creates draft + sends it via drafts.send().
+   */
   async function emailSend(req, res, id) {
     const user = await requireAuth(req, res); if (!user) return true;
     const db = getDb();
     if (!db) return json(res, 500, { error: 'Database unavailable' }), true;
-    const email = db.prepare('SELECT * FROM emails WHERE id = ? AND userId = ?').get(id, user.id);
-    if (!email) return json(res, 404, { error: 'Email not found' }), true;
-    if (email.status === 'sent') return json(res, 400, { error: 'Email already sent' }), true;
 
-    // Send via Resend API
-    const apiKey = process.env.RESEND_API_KEY;
-    if (!apiKey) return json(res, 503, { error: 'Email service not configured (RESEND_API_KEY)' }), true;
+    // Look up draft from the new email_drafts table
+    const draft = db.prepare('SELECT * FROM email_drafts WHERE id = ? AND userId = ?').get(id, user.id);
+    if (!draft) return json(res, 404, { error: 'Draft not found' }), true;
+    if (!draft.to) return json(res, 400, { error: 'Recipient address required' }), true;
+
+    // Get Gmail client for this user
+    const client = await googleAuth.getClient(user.id);
+    if (!client) {
+      return json(res, 403, { error: 'Google account not connected. Please connect via email widget.' }), true;
+    }
 
     try {
-      const sendRes = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          from: process.env.RESEND_FROM || 'onboarding@resend.dev',
-          to: email.to,
-          subject: email.subject,
-          html: email.body,
-        }),
+      const { google: gapis } = await import('googleapis');
+      const gmail = gapis.gmail({ version: 'v1', auth: client });
+
+      // Build RFC 2822 message
+      const messageParts = [
+        `To: ${draft.to}`,
+        `Subject: ${draft.subject || '(no subject)'}`,
+        'Content-Type: text/plain; charset=utf-8',
+        'MIME-Version: 1.0',
+        '',
+        draft.body || '',
+      ];
+      const rawMessage = Buffer.from(messageParts.join('\r\n')).toString('base64url');
+
+      // Create draft then send it (uses gmail.compose scope, not gmail.send)
+      const created = await gmail.users.drafts.create({
+        userId: 'me',
+        requestBody: { message: { raw: rawMessage } },
       });
 
-      if (!sendRes.ok) {
-        const err = await sendRes.json().catch(() => ({ message: 'Unknown error' }));
-        db.prepare("UPDATE emails SET status = 'failed' WHERE id = ?").run(id);
-        return json(res, 500, { error: `Send failed: ${err.message || JSON.stringify(err)}` }), true;
-      }
+      const sent = await gmail.users.drafts.send({
+        userId: 'me',
+        requestBody: { id: created.data.id },
+      });
 
-      const result = await sendRes.json();
-      const now = new Date().toISOString();
-      db.prepare("UPDATE emails SET status = 'sent', sentAt = ?, resendId = ? WHERE id = ?")
-        .run(now, result.id || null, id);
+      // Clean up: delete the local draft
+      db.prepare('DELETE FROM email_drafts WHERE id = ?').run(id);
 
-      const updated = db.prepare('SELECT * FROM emails WHERE id = ?').get(id);
-      json(res, 200, { ok: true, email: updated });
+      console.log(`[email] Sent via Gmail: to=${draft.to} subject=${draft.subject} gmailId=${sent.data.id}`);
+      json(res, 200, { ok: true, gmailMessageId: sent.data.id });
       return true;
     } catch (err) {
-      db.prepare("UPDATE emails SET status = 'failed' WHERE id = ?").run(id);
-      return json(res, 500, { error: `Send error: ${err.message}` }), true;
+      console.error('[email] Gmail send error:', err.message);
+      const msg = err.message?.includes('invalid_grant')
+        ? 'Google session expired. Please reconnect your account.'
+        : `Send failed: ${err.message}`;
+      return json(res, 500, { error: msg }), true;
     }
   }
 
@@ -296,10 +317,18 @@ export function createWidgetRoutes({ authenticate, getDb }) {
     const user = await requireAuth(req, res); if (!user) return true;
     const db = getDb();
     if (!db) return json(res, 500, { error: 'Database unavailable' }), true;
-    const existing = db.prepare('SELECT id FROM emails WHERE id = ? AND userId = ?').get(id, user.id);
-    if (!existing) return json(res, 404, { error: 'Email not found' }), true;
-    db.prepare('DELETE FROM emails WHERE id = ?').run(id);
+    const existing = db.prepare('SELECT id FROM email_drafts WHERE id = ? AND userId = ?').get(id, user.id);
+    if (!existing) return json(res, 404, { error: 'Draft not found' }), true;
+    db.prepare('DELETE FROM email_drafts WHERE id = ?').run(id);
     json(res, 200, { ok: true });
+    return true;
+  }
+
+  // ── Google OAuth status ──
+  async function emailGoogleStatus(req, res) {
+    const user = await requireAuth(req, res); if (!user) return true;
+    const status = googleAuth.getStatus(user.id);
+    json(res, 200, status);
     return true;
   }
 
@@ -346,15 +375,18 @@ export function createWidgetRoutes({ authenticate, getDb }) {
       }
     }
 
-    // ── Email ──
+    // ── Email (drafts + send) ──
     if (method === 'GET' && pathname === '/api/emails')     return emailList(req, res);
     if (method === 'POST' && pathname === '/api/emails')    return emailCreate(req, res);
+    if (method === 'GET' && pathname === '/api/emails/google-status') return emailGoogleStatus(req, res);
     { const m = matchRoute('/api/emails/:id', pathname);
       if (m) {
         if (method === 'GET')    return emailGet(req, res, m.id);
         if (method === 'DELETE') return emailDelete(req, res, m.id);
       }
     }
+    // SECURITY: This is the ONLY send path. REST-only. Human-only.
+    // No widget action can reach this. The agent has no way to call HTTP endpoints.
     { const m = matchRoute('/api/emails/:id/send', pathname);
       if (m && method === 'POST') return emailSend(req, res, m.id);
     }

@@ -21,6 +21,7 @@ import * as workspacesState from '../state/workspaces.js';
 import { adminRoutes } from './routes/admin.js';
 import { createChatRoutes } from './routes/chat.js';
 import { createWidgetRoutes } from './routes/widgets.js';
+import * as googleAuth from '../lib/google-auth.js';
 // Usage routes are handled inline below (custom router, not Express)
 // import { registerUsageRoutes } from './routes/usage.js';
 import { handleBYOK } from './routes/byok.js';
@@ -428,6 +429,35 @@ export function createRouter(opts = {}) {
     ensureStateInit();
 
     try {
+      /* ---------- Google OAuth callback (before auth-required routes) ---------- */
+      if (method === 'GET' && pathname === '/auth/google/callback') {
+        const code = url.searchParams.get('code');
+        const userId = url.searchParams.get('state'); // state = userId
+        if (!code || !userId) {
+          res.writeHead(400, { 'Content-Type': 'text/html' });
+          res.end('<h2>Missing code or state</h2>');
+          return;
+        }
+        try {
+          const { email } = await googleAuth.exchangeCode(userId, code);
+          // Inline success page — JS redirects back to app and triggers email widget
+          res.writeHead(200, { 'Content-Type': 'text/html' });
+          res.end(`<!DOCTYPE html><html><body>
+            <h2>✅ Connected: ${email || 'Google Account'}</h2>
+            <p>Redirecting back to Scratchy...</p>
+            <script>
+              localStorage.setItem('scratchy-post-auth-widget', 'mail-inbox');
+              setTimeout(() => window.location.href = '/', 1000);
+            </script>
+          </body></html>`);
+        } catch (err) {
+          console.error('[google-auth] OAuth callback error:', err.message);
+          res.writeHead(500, { 'Content-Type': 'text/html' });
+          res.end(`<h2>❌ Auth failed</h2><p>${err.message}</p><a href="/">Back to Scratchy</a>`);
+        }
+        return;
+      }
+
       /* ---------- API routes ---------- */
 
       // Health check (no auth required)

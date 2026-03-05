@@ -13,6 +13,7 @@ import { createWsHandler, broadcastToUser } from './ws.js';
 import { initWidgets, destroyWidgets } from './widgets.js';
 import { McpRegistry } from '../lib/mcp-registry.js';
 import { init as initChat, handleChat, shutdown as shutdownChat } from './chat-handler.js';
+import * as googleAuth from '../lib/google-auth.js';
 import { init as initOrchestrator, routeMessage, routeTeamChat, shutdown as shutdownOrchestrator } from './agent-orchestrator.js';
 import { createSurfaceEventHandler } from './surface-events.js';
 import { seedAgents } from './seed-agents.js';
@@ -126,6 +127,18 @@ async function main() {
   /* -- Surface events -- */
   const surfaceHandler = createSurfaceEventHandler();
   console.log('[server] Surface event handler initialized');
+
+  /* -- Google OAuth (for Gmail + Calendar widgets) -- */
+  if (db && process.env.GOOGLE_CLIENT_ID) {
+    googleAuth.init(db, {
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
+      redirectUri: process.env.GOOGLE_REDIRECT_URI || 'https://v2.clawos.fr/auth/google/callback',
+    });
+    console.log('[server] Google OAuth initialized');
+  } else if (!process.env.GOOGLE_CLIENT_ID) {
+    console.warn('[server] Google OAuth not configured (GOOGLE_CLIENT_ID missing)');
+  }
 
   /* -- Widget system -- */
   let handleWidgetAction = async (userId, msg, ws) => {
