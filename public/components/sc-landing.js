@@ -1,7 +1,6 @@
 /**
  * Scratchy v2 — Landing Page Web Component
- * <sc-landing> — Marketing landing page with hero, features, AI team,
- * social proof, integrations, shared intelligence, plans, changelog, and CTA.
+ * <sc-landing> — The one that has personality.
  *
  * Events: landing-action { action: 'get-started' | 'sign-in' | 'select-plan', planId? }
  */
@@ -13,116 +12,114 @@ const AMBER = '#FFBF00';
 /* ── Data ── */
 
 const PLANS = [
-  { id: 'free', name: 'Free', price: 0, period: '', subtitle: 'Forever free', features: ['50 messages / day', '100K tokens / day', 'Sonnet model', '1 seat'], excluded: ['Opus model', 'Priority support'], cta: 'Get Started', highlight: false },
-  { id: 'pro', name: 'Pro', price: 15, period: '/mo', subtitle: 'Most popular', features: ['500 messages / day', '1M tokens / day', 'Sonnet + Opus', '1 seat', 'Priority support'], excluded: [], cta: 'Subscribe', highlight: true, badge: 'Recommended' },
-  { id: 'team', name: 'Team', price: 39, period: '/mo', subtitle: 'For teams', features: ['2,000 messages / day', '5M tokens / day', 'Sonnet + Opus', '5 seats', 'Priority support'], excluded: [], cta: 'Subscribe', highlight: false },
-  { id: 'byok', name: 'BYOK', price: 5, period: '/mo', subtitle: 'Bring Your Own Key', features: ['Unlimited messages', 'Unlimited tokens', 'All models', '1 seat', 'Use your API key'], excluded: [], cta: 'Subscribe', highlight: false },
-];
-
-const FEATURES = [
-  { icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="4"/><circle cx="9" cy="16" r="1"/><circle cx="15" cy="16" r="1"/></svg>', title: 'Multi-Agent Teams', desc: 'Specialist agents that collaborate. An orchestrator splits work, workers execute in parallel, and results merge.' },
-  { icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.37 2.63a2.12 2.12 0 0 1 3 3L14 13l-4 1 1-4Z"/><path d="M20 7v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2V7"/><path d="M2 12h4"/></svg>', title: 'Generative UI', desc: '34 interactive canvas components. Agents render charts, forms, dashboards, and live data — not just text.' },
-  { icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg>', title: 'Self-hosted & Open', desc: 'Runs on your machine. Your data never leaves. Open-core — inspect and extend everything.' },
-  { icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>', title: 'Streaming Everything', desc: 'Responses stream token-by-token. Tool usage shows live. Canvas tiles appear as the agent builds them.' },
-  { icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>', title: 'Multi-user with Quotas', desc: 'Invite users with per-account quotas, rate limits, and role-based access. Encrypted user store.' },
-  { icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8v5a6 6 0 0 1-12 0V8Z"/><path d="M6 11h12"/></svg>', title: 'Agent Memory', desc: 'Agents remember across conversations. Semantic search over past interactions, scoped per-agent and per-user.' },
+  {
+    id: 'free', name: 'Free', price: 0, period: '', subtitle: 'No card, no catch',
+    features: ['50 messages / day', '100K tokens / day', 'Sonnet model', '1 seat'],
+    excluded: ['Opus model', 'Priority support'],
+    cta: 'Get Started', highlight: false,
+  },
+  {
+    id: 'pro', name: 'Pro', price: 15, period: '/mo', subtitle: 'For builders who ship',
+    features: ['500 messages / day', '1M tokens / day', 'Sonnet + Opus', '1 seat', 'Priority support'],
+    excluded: [],
+    cta: 'Subscribe', highlight: true, badge: 'Most Popular',
+  },
+  {
+    id: 'team', name: 'Team', price: 39, period: '/mo', subtitle: 'Your whole crew',
+    features: ['2,000 messages / day', '5M tokens / day', 'Sonnet + Opus', '5 seats', 'Priority support'],
+    excluded: [],
+    cta: 'Subscribe', highlight: false,
+  },
+  {
+    id: 'byok', name: 'BYOK', price: 5, period: '/mo', subtitle: 'Your key, your rules',
+    features: ['Unlimited messages', 'Unlimited tokens', 'All models', '1 seat', 'Use your API key'],
+    excluded: [],
+    cta: 'Subscribe', highlight: false,
+  },
 ];
 
 const AGENTS = [
   {
     name: 'Atlas',
-    role: 'Code Architect',
-    desc: 'Systems-first coding. Plans architecture, then implements. Production-ready code with proper error handling.',
-    status: 'online',
+    role: 'Code',
+    tagline: 'Thinks in systems, ships in PRs.',
+    desc: 'Architecture first, then implementation. Proper error handling, tests, and docs — because "it works on my machine" isn\'t a deployment strategy.',
+    color: '#DAA520',
     avatar: '<svg width="40" height="40" viewBox="0 0 40 40" fill="none"><circle cx="20" cy="20" r="20" fill="rgba(249,166,2,0.12)"/><path d="M14 12l6 4-6 4V12z" stroke="#DAA520" stroke-width="1.5" fill="none"/><path d="M20 12l6 4-6 4V12z" stroke="#DAA520" stroke-width="1.5" fill="none"/><rect x="12" y="24" width="16" height="4" rx="1" stroke="#DAA520" stroke-width="1.5" fill="none"/></svg>',
   },
   {
     name: 'Iris',
-    role: 'Design Engineer',
-    desc: 'UI/UX that works beautifully. Mobile-first, accessible, with proper design tokens and spacing systems.',
-    status: 'online',
+    role: 'Design',
+    tagline: 'Pixels with purpose.',
+    desc: 'Mobile-first, accessible, opinionated. Builds UI systems, not just screens. Will fight you on padding.',
+    color: '#6366f1',
     avatar: '<svg width="40" height="40" viewBox="0 0 40 40" fill="none"><circle cx="20" cy="20" r="20" fill="rgba(99,102,241,0.12)"/><rect x="10" y="10" width="20" height="20" rx="4" stroke="#6366f1" stroke-width="1.5" fill="none"/><line x1="10" y1="16" x2="30" y2="16" stroke="#6366f1" stroke-width="1.5"/><line x1="18" y1="16" x2="18" y2="30" stroke="#6366f1" stroke-width="1.5"/></svg>',
   },
   {
     name: 'Nova',
-    role: 'Research & Analysis',
-    desc: 'Finds, cross-references, and synthesizes information. Always cites sources, always flags uncertainty.',
-    status: 'online',
+    role: 'Research',
+    tagline: 'Reads everything. Trusts nothing.',
+    desc: 'Cross-references, synthesizes, cites sources. Flags uncertainty instead of hallucinating. Your bullshit detector with a library card.',
+    color: '#10b981',
     avatar: '<svg width="40" height="40" viewBox="0 0 40 40" fill="none"><circle cx="20" cy="20" r="20" fill="rgba(16,185,129,0.12)"/><circle cx="20" cy="18" r="6" stroke="#10b981" stroke-width="1.5" fill="none"/><path d="M24 22l4 6" stroke="#10b981" stroke-width="1.5" stroke-linecap="round"/></svg>',
   },
   {
     name: 'Echo',
-    role: 'Writer & Communicator',
-    desc: 'Clear, sharp writing. Docs, marketing copy, emails — no AI slop, no filler. Every sentence earns its place.',
-    status: 'online',
+    role: 'Writer',
+    tagline: 'Every sentence earns its place.',
+    desc: 'Docs, copy, emails — zero filler, zero AI slop. Matches your voice, not some generic "professional tone."',
+    color: '#f47252',
     avatar: '<svg width="40" height="40" viewBox="0 0 40 40" fill="none"><circle cx="20" cy="20" r="20" fill="rgba(244,114,82,0.12)"/><path d="M15 28V14l5 4 5-4v14" stroke="#f47252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/><line x1="15" y1="21" x2="25" y2="21" stroke="#f47252" stroke-width="1.5"/></svg>',
   },
 ];
 
-const STEPS = [
-  { icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg>', title: 'Deploy', desc: 'One command to self-host on any VPS' },
-  { icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>', title: 'Connect', desc: 'Link your AI provider — Anthropic, OpenAI, or Google' },
-  { icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>', title: 'Build', desc: 'Start building with your AI workspace' },
-];
-
-const INTEGRATION_STEPS = [
-  {
-    num: '1',
-    title: 'Connect',
-    desc: 'Link your favourite tools through MCP — databases, APIs, file systems, and more.',
-    icon: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>',
-  },
-  {
-    num: '2',
-    title: 'Configure',
-    desc: 'Define which agents can access which tools. Fine-grained permissions keep you in control.',
-    icon: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
-  },
-  {
-    num: '3',
-    title: 'Build',
-    desc: 'Agents use tools to read files, run commands, search the web, and render interactive UI — all in chat.',
-    icon: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>',
-  },
+const TECH_STACK = [
+  { name: 'NullClaw', desc: 'Zig backend' },
+  { name: 'SQLite', desc: 'Database' },
+  { name: 'Web Components', desc: 'Frontend' },
+  { name: 'Zig', desc: 'Core runtime' },
+  { name: 'MCP', desc: 'Tool protocol' },
+  { name: 'Docker', desc: 'Deploy' },
 ];
 
 const METRICS = [
   { value: '34', label: 'Canvas components' },
-  { value: '15', label: 'Specialist agents' },
-  { value: '<2s', label: 'Agent startup time' },
-  { value: '∞', label: 'Messages with BYOK' },
+  { value: '4', label: 'Specialist agents' },
+  { value: '678KB', label: 'Backend binary' },
+  { value: '<2s', label: 'Cold start' },
 ];
 
-/* Testimonials removed — no fake social proof. Will add real ones when we have real users. */
-const TESTIMONIALS = [];
+/* ── SVG Icons ── */
 
-const CHANGELOG = [
-  { version: 'v2.1', date: 'Mar 2026', title: 'Agent Soul System', desc: 'Each agent gets personality, expertise rules, and persistent memory across conversations.' },
-  { version: 'v2.0', date: 'Feb 2026', title: 'Multi-Agent Teams', desc: 'Orchestrator delegates work to specialist workers in parallel. Server-managed sandboxes.' },
-  { version: 'v1.9', date: 'Feb 2026', title: 'Billing & BYOK', desc: 'Stripe integration, usage tracking, and bring-your-own-key with unlimited messages.' },
-  { version: 'v1.8', date: 'Feb 2026', title: 'Generative UI Canvas', desc: '34 interactive components rendered by agents — charts, forms, dashboards, code blocks.' },
-];
+const ICON = {
+  check: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
+  chevronDown: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>',
+  terminal: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>',
+  copy: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
+  github: '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>',
+  lock: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>',
+  unlock: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>',
+};
 
 /* ── Styles ── */
 
 const STYLES = /* css */ `
 :host {
-  --bg: #0d0b07;
-  --bg-alt: #111009;
-  --surface: rgba(26,22,16,0.85);
-  --surface-solid: #1a1610;
-  --surface-hover: #242016;
+  --bg: #0a0a0f;
+  --bg-alt: #0e0e14;
+  --surface: rgba(255,255,255,0.04);
+  --surface-hover: rgba(255,255,255,0.07);
   --border: rgba(249,166,2,0.10);
-  --border-glass: rgba(249,166,2,0.06);
-  --text: #f0ead6;
-  --muted: #8a7e6a;
+  --border-subtle: rgba(255,255,255,0.06);
+  --text: #e8e6e3;
+  --muted: #7a7a85;
   --accent: ${GOLD};
   --accent-hover: ${GOLDENROD};
   --accent-glow: rgba(249,166,2,0.20);
-  --accent-subtle: rgba(249,166,2,0.05);
-  --accent-subtle-2: rgba(249,166,2,0.08);
+  --accent-subtle: rgba(249,166,2,0.06);
   --success: #34d399;
   --font: 'Geist', system-ui, -apple-system, sans-serif;
+  --mono: 'Geist Mono', 'SF Mono', 'Fira Code', monospace;
 
   display: block;
   width: 100%;
@@ -130,7 +127,7 @@ const STYLES = /* css */ `
   background: var(--bg);
   color: var(--text);
   font-family: var(--font);
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   scroll-behavior: smooth;
@@ -153,9 +150,9 @@ const STYLES = /* css */ `
   border-bottom: 1px solid transparent;
 }
 .nav.scrolled {
-  background: rgba(13,11,7,0.92);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(10,10,15,0.92);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border-bottom-color: var(--border);
 }
 .nav-brand {
@@ -167,9 +164,12 @@ const STYLES = /* css */ `
   align-items: center;
   gap: 8px;
 }
-.nav-brand svg { flex-shrink: 0; }
-.nav-brand img { width: 32px; height: 32px; border-radius: 4px; flex-shrink: 0; object-fit: cover; }
-.hero-logo { width: 120px; height: 120px; border-radius: 50%; margin-bottom: 24px; box-shadow: 0 0 24px rgba(249,166,2,0.25), 0 0 60px rgba(249,166,2,0.1); object-fit: cover; background: var(--bg); border: 2px solid rgba(249,166,2,0.15); }
+.nav-brand img {
+  width: 32px; height: 32px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  object-fit: cover;
+}
 .nav-links {
   display: flex;
   gap: 32px;
@@ -207,6 +207,7 @@ const STYLES = /* css */ `
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 8px;
   padding: 8px 20px;
   border-radius: 8px;
   font-size: 14px;
@@ -230,19 +231,19 @@ const STYLES = /* css */ `
 }
 .btn-primary {
   background: var(--accent);
-  color: #0d0b07;
+  color: #0a0a0f;
 }
 .btn-primary:hover {
   background: var(--accent-hover);
-  box-shadow: 0 0 20px var(--accent-glow);
+  box-shadow: 0 0 24px var(--accent-glow);
 }
 .btn-secondary {
-  background: var(--accent-subtle-2);
+  background: var(--accent-subtle);
   color: var(--accent);
   border: 1px solid var(--border);
 }
 .btn-secondary:hover {
-  background: rgba(249,166,2,0.14);
+  background: rgba(249,166,2,0.12);
   border-color: rgba(249,166,2,0.3);
 }
 .btn:focus-visible {
@@ -275,7 +276,7 @@ const STYLES = /* css */ `
   width: 600px;
   height: 600px;
   border-radius: 50%;
-  opacity: 0.15;
+  opacity: 0.12;
   filter: blur(120px);
   animation: meshFloat 20s ease-in-out infinite alternate;
 }
@@ -307,17 +308,16 @@ const STYLES = /* css */ `
   gap: 8px;
   padding: 6px 16px;
   border-radius: 20px;
-  background: var(--accent-subtle-2);
+  background: var(--accent-subtle);
   border: 1px solid var(--border);
   color: var(--accent);
   font-size: 13px;
   font-weight: 600;
-  margin-bottom: 24px;
+  margin-bottom: 28px;
   letter-spacing: 0.2px;
 }
 .hero-badge-dot {
-  width: 6px;
-  height: 6px;
+  width: 6px; height: 6px;
   border-radius: 50%;
   background: var(--success);
   animation: dotPulse 2s ease-in-out infinite;
@@ -327,24 +327,23 @@ const STYLES = /* css */ `
   50% { opacity: 0.4; }
 }
 .hero h1 {
-  font-size: clamp(44px, 7vw, 72px);
+  font-size: clamp(40px, 6.5vw, 68px);
   font-weight: 800;
   letter-spacing: -2px;
   line-height: 1.05;
-  background: linear-gradient(135deg, var(--text) 20%, var(--accent) 80%);
+  color: var(--text);
+}
+.hero h1 .gold {
+  background: linear-gradient(135deg, var(--accent) 0%, ${AMBER} 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  color: transparent;
-  -webkit-box-decoration-break: clone;
-  box-decoration-break: clone;
-  padding-bottom: 4px;
 }
 .hero-sub {
   margin-top: 20px;
-  font-size: clamp(17px, 2.2vw, 20px);
+  font-size: clamp(16px, 2vw, 19px);
   color: var(--muted);
-  max-width: 560px;
+  max-width: 520px;
   margin-left: auto;
   margin-right: auto;
   line-height: 1.65;
@@ -365,23 +364,8 @@ const STYLES = /* css */ `
   padding: 12px 24px;
   font-size: 15px;
 }
-.hero-trust {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 24px;
-  margin-top: 40px;
-  font-size: 13px;
-  color: var(--muted);
-}
-.hero-trust-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.hero-trust-item svg { color: var(--accent); opacity: 0.7; flex-shrink: 0; }
 .hero-scroll {
-  margin-top: 48px;
+  margin-top: 60px;
   color: var(--muted);
   font-size: 13px;
   cursor: pointer;
@@ -389,7 +373,7 @@ const STYLES = /* css */ `
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 .hero-scroll:hover { color: var(--accent); }
 @keyframes bounce {
@@ -400,42 +384,22 @@ const STYLES = /* css */ `
 /* ─── Section ─── */
 .section {
   padding: 100px clamp(16px, 4vw, 48px);
-  max-width: 1200px;
+  max-width: 1100px;
   margin: 0 auto;
   opacity: 0;
-  transform: translateY(20px);
+  transform: translateY(24px);
   transition: opacity 0.6s ease, transform 0.6s ease;
 }
 .section.visible {
   opacity: 1;
   transform: translateY(0);
 }
-.section--wide {
-  max-width: 1200px;
-}
-.section--alt {
-  position: relative;
-}
-.section--alt::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: var(--bg-alt);
-  margin-left: -50vw;
-  margin-right: -50vw;
-  left: 50%;
-  right: auto;
-  width: 100vw;
-  z-index: -1;
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
-}
 .section-eyebrow {
   text-align: center;
   font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 1.5px;
+  letter-spacing: 2px;
   color: var(--accent);
   margin-bottom: 12px;
 }
@@ -456,74 +420,185 @@ const STYLES = /* css */ `
   margin-right: auto;
   line-height: 1.6;
 }
+.section-divider {
+  max-width: 1100px;
+  margin: 0 auto;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border), transparent);
+}
 
-/* ─── Features ─── */
-.features-grid {
+/* ─── Quick Start ─── */
+.quickstart {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
+  grid-template-columns: 1fr 1fr;
+  gap: 48px;
+  align-items: center;
 }
-.feature-card {
-  background: var(--surface);
-  border: 1px solid var(--border-glass);
-  border-radius: 12px;
-  padding: 28px;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+.quickstart-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
 }
-.feature-card:hover {
-  border-color: rgba(249,166,2,0.20);
-  transform: translateY(-2px);
-  box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+.qs-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
 }
-.feature-icon {
-  width: 44px;
-  height: 44px;
+.qs-num {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #0a0a0f;
+  font-size: 14px;
+  font-weight: 800;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 10px;
-  background: var(--accent-subtle-2);
-  color: var(--accent);
-  margin-bottom: 16px;
+  flex-shrink: 0;
+  margin-top: 2px;
 }
-.feature-title {
+.qs-text h3 {
   font-size: 16px;
-  font-weight: 600;
-  margin-bottom: 6px;
+  font-weight: 700;
+  margin-bottom: 4px;
 }
-.feature-desc {
+.qs-text p {
   font-size: 14px;
   color: var(--muted);
   line-height: 1.5;
 }
+.quickstart-code {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.code-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--muted);
+}
+.code-header-dots {
+  display: flex;
+  gap: 6px;
+}
+.code-header-dots span {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.08);
+}
+.code-copy {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-family: var(--font);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s;
+}
+.code-copy:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.code-body {
+  padding: 20px;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.8;
+  overflow-x: auto;
+  white-space: pre;
+}
+.code-body .comment { color: #5a5a65; }
+.code-body .cmd { color: var(--accent); }
+.code-body .flag { color: ${GOLDENROD}; }
+.code-body .url { color: var(--muted); }
 
-/* ─── AI Team / Agent Personas ─── */
+/* ─── Difference Blocks ─── */
+.diff-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+.diff-block {
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 32px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 20px;
+  align-items: start;
+  transition: border-color 0.2s, transform 0.2s;
+}
+.diff-block:hover {
+  border-color: rgba(249,166,2,0.18);
+  transform: translateY(-2px);
+}
+.diff-icon {
+  width: 48px; height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: var(--accent-subtle);
+  color: var(--accent);
+  flex-shrink: 0;
+}
+.diff-content h3 {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.diff-content p {
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.6;
+  margin-bottom: 12px;
+}
+.diff-example {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--accent);
+  background: rgba(249,166,2,0.06);
+  border: 1px solid rgba(249,166,2,0.1);
+  border-radius: 6px;
+  padding: 8px 12px;
+  display: inline-block;
+}
+
+/* ─── Agents ─── */
 .agents-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 20px;
+  gap: 16px;
 }
 .agent-card {
   background: var(--surface);
-  border: 1px solid var(--border-glass);
+  border: 1px solid var(--border-subtle);
   border-radius: 12px;
-  padding: 28px 24px;
+  padding: 28px 20px;
   text-align: center;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
   transition: border-color 0.25s, transform 0.25s, box-shadow 0.25s;
 }
 .agent-card:hover {
   border-color: rgba(249,166,2,0.18);
   transform: translateY(-3px);
-  box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
 }
 .agent-avatar {
-  width: 56px;
-  height: 56px;
-  margin: 0 auto 16px;
+  width: 56px; height: 56px;
+  margin: 0 auto 14px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -533,17 +608,15 @@ const STYLES = /* css */ `
 .agent-avatar svg { width: 56px; height: 56px; }
 .agent-status {
   position: absolute;
-  bottom: 2px;
-  right: 2px;
-  width: 12px;
-  height: 12px;
+  bottom: 2px; right: 2px;
+  width: 12px; height: 12px;
   border-radius: 50%;
   background: var(--success);
   border: 2px solid var(--bg);
   animation: dotPulse 2s ease-in-out infinite;
 }
 .agent-name {
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 700;
   margin-bottom: 2px;
 }
@@ -551,345 +624,133 @@ const STYLES = /* css */ `
   font-size: 12px;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.8px;
-  color: var(--accent);
-  margin-bottom: 12px;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+}
+.agent-tagline {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 10px;
+  font-style: italic;
 }
 .agent-desc {
   font-size: 13px;
   color: var(--muted);
-  line-height: 1.5;
+  line-height: 1.55;
 }
 
-/* ─── Social Proof / Metrics ─── */
+/* ─── Metrics Row ─── */
 .metrics-row {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 20px;
-  margin-bottom: 64px;
+  gap: 16px;
+  margin-bottom: 0;
 }
 .metric-card {
   text-align: center;
-  padding: 28px 16px;
+  padding: 24px 16px;
   background: var(--surface);
-  border: 1px solid var(--border-glass);
+  border: 1px solid var(--border-subtle);
   border-radius: 12px;
-  backdrop-filter: blur(8px);
 }
 .metric-value {
-  font-size: 40px;
+  font-size: 36px;
   font-weight: 800;
   color: var(--accent);
   letter-spacing: -1.5px;
   line-height: 1.1;
+  font-family: var(--mono);
 }
 .metric-label {
-  font-size: 14px;
+  font-size: 13px;
   color: var(--muted);
   margin-top: 6px;
 }
-.testimonials-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
-}
-.testimonial-card {
-  background: var(--surface);
-  border: 1px solid var(--border-glass);
-  border-radius: 12px;
-  padding: 28px;
-  backdrop-filter: blur(8px);
-  display: flex;
-  flex-direction: column;
-  transition: border-color 0.2s;
-}
-.testimonial-card:hover {
-  border-color: rgba(249,166,2,0.15);
-}
-.testimonial-quote-icon {
-  color: var(--accent);
-  opacity: 0.4;
-  margin-bottom: 12px;
-  line-height: 1;
-}
-.testimonial-text {
-  font-size: 14px;
-  line-height: 1.65;
-  color: var(--text);
-  flex: 1;
-  margin-bottom: 20px;
-}
-.testimonial-author {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.testimonial-avatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: var(--accent-subtle-2);
-  border: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--accent);
-  flex-shrink: 0;
-}
-.testimonial-meta {
-  font-size: 13px;
-}
-.testimonial-name {
-  font-weight: 600;
-  color: var(--text);
-}
-.testimonial-role {
-  color: var(--muted);
-  font-size: 12px;
-}
 
-/* ─── Integration Story ─── */
-.integration-steps {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 24px;
-  margin-bottom: 48px;
-}
-.integration-step {
-  background: var(--surface);
-  border: 1px solid var(--border-glass);
-  border-radius: 12px;
-  padding: 32px 28px;
-  text-align: center;
-  backdrop-filter: blur(8px);
-  position: relative;
-  transition: border-color 0.2s, transform 0.2s;
-}
-.integration-step:hover {
-  border-color: rgba(249,166,2,0.18);
-  transform: translateY(-2px);
-}
-.integration-step-num {
-  position: absolute;
-  top: -14px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: var(--accent);
-  color: #0d0b07;
-  font-size: 13px;
-  font-weight: 800;
+/* ─── Tech Stack ─── */
+.tech-row {
   display: flex;
   align-items: center;
   justify-content: center;
-}
-.integration-step-icon {
-  color: var(--accent);
-  margin-bottom: 16px;
-  display: flex;
-  justify-content: center;
-}
-.integration-step-title {
-  font-size: 18px;
-  font-weight: 700;
-  margin-bottom: 8px;
-}
-.integration-step-desc {
-  font-size: 14px;
-  color: var(--muted);
-  line-height: 1.55;
-}
-.integration-logos {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 24px;
+  gap: 12px;
   flex-wrap: wrap;
+  margin-top: 48px;
 }
-.integration-logo {
-  width: 80px;
-  height: 48px;
+.tech-badge {
   display: flex;
   align-items: center;
-  justify-content: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 20px;
   background: var(--surface);
-  border: 1px solid var(--border-glass);
-  border-radius: 8px;
-  font-size: 11px;
+  border: 1px solid var(--border-subtle);
+  font-size: 12px;
   font-weight: 600;
   color: var(--muted);
-  letter-spacing: 0.3px;
   transition: border-color 0.2s, color 0.2s;
 }
-.integration-logo:hover {
-  border-color: rgba(249,166,2,0.2);
+.tech-badge:hover {
+  border-color: var(--border);
+  color: var(--text);
+}
+.tech-badge-name {
   color: var(--text);
 }
 
-/* ─── Shared Intelligence ─── */
-.shared-intel {
+/* ─── Open Core ─── */
+.opencore {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 48px;
-  align-items: center;
+  gap: 24px;
+  max-width: 800px;
+  margin: 0 auto;
 }
-.shared-intel-content { }
-.shared-intel-content h3 {
-  font-size: clamp(24px, 3vw, 32px);
+.opencore-card {
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 32px;
+}
+.opencore-card h3 {
+  font-size: 18px;
   font-weight: 700;
-  letter-spacing: -0.5px;
   margin-bottom: 16px;
-  line-height: 1.2;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
-.shared-intel-content p {
-  color: var(--muted);
-  font-size: 15px;
-  line-height: 1.7;
-  margin-bottom: 24px;
-}
-.shared-intel-features {
+.opencore-card h3 svg { color: var(--accent); }
+.opencore-list {
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-}
-.shared-intel-features li {
-  display: flex;
-  align-items: flex-start;
   gap: 10px;
+}
+.opencore-list li {
   font-size: 14px;
-  color: var(--text);
-  line-height: 1.5;
-}
-.shared-intel-features li svg {
-  color: var(--accent);
-  flex-shrink: 0;
-  margin-top: 2px;
-}
-.shared-intel-visual {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.brain-diagram {
-  width: 100%;
-  max-width: 380px;
-  aspect-ratio: 1;
-  position: relative;
-}
-.brain-center {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 120px;
-  height: 120px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(249,166,2,0.15) 0%, rgba(249,166,2,0.02) 70%);
-  border: 1px solid rgba(249,166,2,0.2);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-  gap: 4px;
-}
-.brain-center svg { color: var(--accent); }
-.brain-center-label {
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  color: var(--accent);
-}
-.brain-node {
-  position: absolute;
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-  font-size: 10px;
-  font-weight: 600;
   color: var(--muted);
-  gap: 2px;
-}
-.brain-node svg { color: var(--accent); width: 18px; height: 18px; }
-.brain-node:nth-child(2) { top: 5%; left: 50%; transform: translateX(-50%); }
-.brain-node:nth-child(3) { top: 50%; right: 5%; transform: translateY(-50%); }
-.brain-node:nth-child(4) { bottom: 5%; left: 50%; transform: translateX(-50%); }
-.brain-node:nth-child(5) { top: 50%; left: 5%; transform: translateY(-50%); }
-.brain-line {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 50%;
-  height: 1px;
-  background: linear-gradient(90deg, rgba(249,166,2,0.2), rgba(249,166,2,0.05));
-  transform-origin: left center;
-}
-.brain-line:nth-child(6) { transform: rotate(0deg); }
-.brain-line:nth-child(7) { transform: rotate(90deg); }
-.brain-line:nth-child(8) { transform: rotate(180deg); }
-.brain-line:nth-child(9) { transform: rotate(270deg); }
-
-/* ─── How It Works ─── */
-.steps-row {
   display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  gap: 0;
-  position: relative;
+  align-items: center;
+  gap: 8px;
+  line-height: 1.4;
 }
-.step {
-  flex: 1;
-  max-width: 280px;
+.opencore-list li svg { color: var(--success); flex-shrink: 0; }
+.opencore-cta {
+  margin-top: 32px;
   text-align: center;
-  position: relative;
-  padding: 0 20px;
 }
-.step-icon {
-  width: 64px;
-  height: 64px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 28px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 50%;
-  margin: 0 auto 16px;
-  position: relative;
-  z-index: 1;
+.opencore-cta a {
   color: var(--accent);
-}
-.step-title {
-  font-size: 16px;
-  font-weight: 700;
-  margin-bottom: 6px;
-}
-.step-desc {
+  text-decoration: none;
   font-size: 14px;
-  color: var(--muted);
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: opacity 0.2s;
 }
-.steps-line {
-  position: absolute;
-  top: 32px;
-  left: calc(16.67% + 32px);
-  right: calc(16.67% + 32px);
-  height: 2px;
-  background: linear-gradient(90deg, ${GOLD}, ${AMBER}, ${GOLD});
-  opacity: 0.3;
-  z-index: 0;
-}
+.opencore-cta a:hover { opacity: 0.8; }
 
 /* ─── Plans ─── */
 .plans-row {
@@ -900,14 +761,12 @@ const STYLES = /* css */ `
 }
 .plan-card {
   background: var(--surface);
-  border: 1px solid var(--border-glass);
+  border: 1px solid var(--border-subtle);
   border-radius: 12px;
   padding: 28px 24px;
   text-align: center;
-  backdrop-filter: blur(8px);
   transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
   position: relative;
-  cursor: default;
 }
 .plan-card:hover {
   transform: translateY(-4px);
@@ -915,19 +774,17 @@ const STYLES = /* css */ `
 }
 .plan-card.highlight {
   border-color: var(--accent);
-  transform: scale(1.02);
   box-shadow: 0 0 30px var(--accent-glow), 0 8px 32px rgba(0,0,0,0.3);
 }
 .plan-card.highlight:hover {
-  transform: scale(1.02) translateY(-4px);
+  transform: translateY(-4px);
 }
 .plan-badge {
   position: absolute;
-  top: -12px;
-  left: 50%;
+  top: -12px; left: 50%;
   transform: translateX(-50%);
   background: var(--accent);
-  color: #0d0b07;
+  color: #0a0a0f;
   font-size: 11px;
   font-weight: 700;
   padding: 4px 14px;
@@ -952,21 +809,23 @@ const STYLES = /* css */ `
   font-weight: 800;
   color: var(--accent);
   margin: 8px 0;
+  font-family: var(--mono);
 }
 .plan-price span {
   font-size: 15px;
   font-weight: 400;
   color: var(--muted);
+  font-family: var(--font);
 }
 .plan-subtitle {
   font-size: 13px;
   color: var(--muted);
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 .plan-features {
   list-style: none;
   text-align: left;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 .plan-features li {
   font-size: 13px;
@@ -976,86 +835,13 @@ const STYLES = /* css */ `
   gap: 8px;
 }
 .plan-features li .check { color: var(--success); }
-.plan-features li .cross { color: #555; }
+.plan-features li .cross { color: #444; }
 .plan-features li.excluded {
   color: var(--muted);
   opacity: 0.5;
 }
-
-/* ─── Code Showcase ─── */
-.code-block {
-  background: rgba(26,22,16,0.9);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 24px 28px;
-  max-width: 600px;
-  margin: 0 auto;
-  font-family: 'Geist Mono', 'SF Mono', monospace;
-  font-size: 13px;
-  line-height: 1.7;
-  overflow-x: auto;
-  position: relative;
-}
-.code-label {
-  position: absolute;
-  top: 8px;
-  right: 12px;
-  font-size: 11px;
-  color: var(--muted);
-  font-family: var(--font);
-}
-.code-key { color: ${GOLDENROD}; }
-.code-val { color: var(--text); }
-.code-type { color: ${AMBER}; }
-.code-comment { color: #5a5040; }
-
-/* ─── Changelog ─── */
-.changelog-list {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 16px;
-  max-width: 800px;
-  margin: 0 auto;
-}
-.changelog-item {
-  background: var(--surface);
-  border: 1px solid var(--border-glass);
-  border-radius: 12px;
-  padding: 24px;
-  backdrop-filter: blur(8px);
-  transition: border-color 0.2s;
-}
-.changelog-item:hover {
-  border-color: rgba(249,166,2,0.15);
-}
-.changelog-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 8px;
-}
-.changelog-version {
-  font-size: 11px;
-  font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 4px;
-  background: var(--accent-subtle-2);
-  color: var(--accent);
-  letter-spacing: 0.3px;
-}
-.changelog-date {
-  font-size: 12px;
-  color: var(--muted);
-}
-.changelog-title {
-  font-size: 15px;
-  font-weight: 600;
-  margin-bottom: 4px;
-}
-.changelog-desc {
-  font-size: 13px;
-  color: var(--muted);
-  line-height: 1.5;
+.plan-cta {
+  width: 100%;
 }
 
 /* ─── Final CTA ─── */
@@ -1068,13 +854,11 @@ const STYLES = /* css */ `
 .final-cta::before {
   content: '';
   position: absolute;
-  top: 50%;
-  left: 50%;
+  top: 50%; left: 50%;
   transform: translate(-50%, -50%);
-  width: 500px;
-  height: 500px;
+  width: 500px; height: 500px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(249,166,2,0.08) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(249,166,2,0.06) 0%, transparent 70%);
   pointer-events: none;
 }
 .final-cta h2 {
@@ -1104,7 +888,7 @@ const STYLES = /* css */ `
   display: flex;
   justify-content: space-between;
   align-items: center;
-  max-width: 1200px;
+  max-width: 1100px;
   margin: 0 auto;
   font-size: 13px;
   color: var(--muted);
@@ -1120,33 +904,22 @@ const STYLES = /* css */ `
   gap: 24px;
 }
 
-/* ─── Divider ─── */
-.section-divider {
-  max-width: 1200px;
-  margin: 0 auto;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, var(--border), transparent);
-}
-
 /* ─── Responsive ─── */
 @media (max-width: 1024px) {
-  .features-grid { grid-template-columns: repeat(2, 1fr); }
-  .plans-row { grid-template-columns: repeat(2, 1fr); }
   .agents-grid { grid-template-columns: repeat(2, 1fr); }
+  .plans-row { grid-template-columns: repeat(2, 1fr); }
   .metrics-row { grid-template-columns: repeat(2, 1fr); }
-  .shared-intel { gap: 32px; }
+  .quickstart { gap: 32px; }
 }
 @media (max-width: 768px) {
-  /* ── Mobile Nav: animated slide-down ── */
   .nav-toggle { display: flex; }
   .nav-links {
     display: flex;
     position: absolute;
     top: 56px;
-    left: 0;
-    right: 0;
+    left: 0; right: 0;
     flex-direction: column;
-    background: rgba(13,11,7,0.98);
+    background: rgba(10,10,15,0.98);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     padding: 0 clamp(16px, 4vw, 48px);
@@ -1154,8 +927,8 @@ const STYLES = /* css */ `
     border-bottom: 1px solid transparent;
     max-height: 0;
     overflow: hidden;
-    transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1),
-                padding 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+    transition: max-height 0.4s cubic-bezier(0.4,0,0.2,1),
+                padding 0.4s cubic-bezier(0.4,0,0.2,1),
                 border-color 0.3s ease;
   }
   .nav-links.open {
@@ -1163,8 +936,6 @@ const STYLES = /* css */ `
     padding: 12px clamp(16px, 4vw, 48px) 16px;
     border-bottom-color: var(--border);
   }
-
-  /* ── Mobile Nav: stagger fade-in for items ── */
   .nav-links li {
     opacity: 0;
     transform: translateY(-10px);
@@ -1178,82 +949,62 @@ const STYLES = /* css */ `
   .nav-links.open li:nth-child(2) { transition-delay: 0.10s; }
   .nav-links.open li:nth-child(3) { transition-delay: 0.15s; }
   .nav-links.open li:nth-child(4) { transition-delay: 0.20s; }
-
-  /* ── Mobile Nav: styled links ── */
   .nav-links a {
     display: block;
-    padding: 16px 24px;
+    padding: 14px 20px;
     min-height: 48px;
     background: rgba(249,166,2,0.04);
     border-radius: 8px;
     color: var(--muted);
     font-size: 15px;
-    font-weight: 500;
-    transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+    transition: background 0.2s, color 0.2s;
     border: 1px solid transparent;
   }
-  .nav-links a:hover,
-  .nav-links a:active {
+  .nav-links a:hover {
     background: rgba(249,166,2,0.10);
     color: var(--accent);
     border-color: rgba(249,166,2,0.15);
   }
-
   .nav-actions .btn-ghost { display: none; }
 
-  /* ── Hero: tighter spacing on mobile ── */
   .hero {
     min-height: auto;
     padding: 80px 20px 40px;
   }
-  .hero-logo {
-    width: 88px;
-    height: 88px;
-    margin-bottom: 16px;
-  }
-  .hero-badge { margin-bottom: 16px; }
   .hero h1 {
-    font-size: clamp(28px, 7vw, 42px);
+    font-size: clamp(28px, 8vw, 42px);
     letter-spacing: -1px;
-    line-height: 1.1;
   }
   .hero-sub {
     margin-top: 12px;
     font-size: 15px;
-    padding: 0 16px;
   }
   .hero-cta { margin-top: 24px; }
-  .hero-trust { flex-direction: column; gap: 8px; margin-top: 24px; }
-  .hero-scroll { margin-top: 24px; }
+  .hero-scroll { margin-top: 32px; }
 
-  /* ── Layout: existing mobile grid fixes ── */
-  .features-grid { grid-template-columns: 1fr; }
-  .plans-row { grid-template-columns: 1fr; max-width: 380px; margin: 0 auto; }
+  .quickstart {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+  .diff-block {
+    grid-template-columns: 1fr;
+    text-align: center;
+  }
+  .diff-icon { margin: 0 auto; }
   .agents-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
   .metrics-row { grid-template-columns: 1fr 1fr; gap: 12px; }
-  .testimonials-grid { grid-template-columns: 1fr; }
-  .integration-steps { grid-template-columns: 1fr; max-width: 380px; margin: 0 auto 48px; }
-  .shared-intel { grid-template-columns: 1fr; text-align: center; }
-  .shared-intel-features { align-items: center; }
-  .shared-intel-visual { order: -1; }
-  .brain-diagram { max-width: 280px; }
-  .changelog-list { grid-template-columns: 1fr; }
-  .steps-row { flex-direction: column; align-items: center; gap: 32px; }
-  .steps-line { display: none; }
+  .plans-row { grid-template-columns: 1fr; max-width: 380px; margin: 0 auto; }
+  .opencore { grid-template-columns: 1fr; }
   .footer { flex-direction: column; gap: 16px; text-align: center; }
-  .section { padding: 48px 16px; }
+  .section { padding: 56px 16px; }
   .section-title { font-size: clamp(22px, 5vw, 32px); }
-  .section-divider { margin: 0; }
-  .feature-card, .agent-card, .plan-card {
-    background: rgba(26,22,16,0.95);
-    border: 1px solid rgba(249,166,2,0.15);
-  }
 }
 @media (max-width: 480px) {
   .agents-grid { grid-template-columns: 1fr; max-width: 300px; margin: 0 auto; }
-  .metrics-row { grid-template-columns: 1fr; max-width: 300px; margin: 0 auto 48px; }
+  .metrics-row { grid-template-columns: 1fr 1fr; }
   .hero-cta { flex-direction: column; align-items: center; }
   .hero-cta .btn { width: 100%; max-width: 300px; }
+  .tech-row { gap: 8px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .hero-mesh::before, .hero-mesh::after { animation: none; }
@@ -1264,21 +1015,6 @@ const STYLES = /* css */ `
   .agent-status { animation: none; }
 }
 `;
-
-/* ── SVG Icon Helpers ── */
-
-const ICON = {
-  check: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
-  shield: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg>',
-  zap: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>',
-  clock: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
-  brain: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a4 4 0 0 0-4 4v1a3 3 0 0 0-3 3v1a3 3 0 0 0 0 6v1a3 3 0 0 0 3 3h1a4 4 0 0 0 6 0h1a3 3 0 0 0 3-3v-1a3 3 0 0 0 0-6v-1a3 3 0 0 0-3-3V6a4 4 0 0 0-4-4z"/></svg>',
-  database: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4.03 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/></svg>',
-  share: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>',
-  layers: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>',
-  chevronDown: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>',
-  quote: '<svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M4.583 17.321C3.553 16.227 3 15 3 13.011c0-3.5 2.457-6.637 6.03-8.188l.893 1.378c-3.335 1.804-3.987 4.145-4.247 5.621.537-.278 1.24-.375 1.929-.311 1.804.167 3.226 1.648 3.226 3.489a3.5 3.5 0 01-3.5 3.5c-1.073 0-2.099-.49-2.748-1.179zm10 0C13.553 16.227 13 15 13 13.011c0-3.5 2.457-6.637 6.03-8.188l.893 1.378c-3.335 1.804-3.987 4.145-4.247 5.621.537-.278 1.24-.375 1.929-.311 1.804.167 3.226 1.648 3.226 3.489a3.5 3.5 0 01-3.5 3.5c-1.073 0-2.099-.49-2.748-1.179z"/></svg>',
-};
 
 /* ── Component ── */
 
@@ -1308,29 +1044,21 @@ class ScLanding extends HTMLElement {
   }
 
   _render() {
-    /* ── Features ── */
-    const featuresHtml = FEATURES.map(f => `
-      <div class="feature-card">
-        <div class="feature-icon">${f.icon}</div>
-        <div class="feature-title">${f.title}</div>
-        <div class="feature-desc">${f.desc}</div>
-      </div>
-    `).join('');
-
-    /* ── AI Team ── */
+    /* ── Agents ── */
     const agentsHtml = AGENTS.map(a => `
       <div class="agent-card">
         <div class="agent-avatar">
           ${a.avatar}
-          <div class="agent-status" aria-label="${a.status}"></div>
+          <div class="agent-status"></div>
         </div>
         <div class="agent-name">${a.name}</div>
-        <div class="agent-role">${a.role}</div>
+        <div class="agent-role" style="color:${a.color}">${a.role}</div>
+        <div class="agent-tagline">"${a.tagline}"</div>
         <div class="agent-desc">${a.desc}</div>
       </div>
     `).join('');
 
-    /* ── Social Proof ── */
+    /* ── Metrics ── */
     const metricsHtml = METRICS.map(m => `
       <div class="metric-card">
         <div class="metric-value">${m.value}</div>
@@ -1338,27 +1066,11 @@ class ScLanding extends HTMLElement {
       </div>
     `).join('');
 
-    const testimonialsHtml = TESTIMONIALS.map(t => `
-      <div class="testimonial-card">
-        <div class="testimonial-quote-icon">${ICON.quote}</div>
-        <div class="testimonial-text">${t.quote}</div>
-        <div class="testimonial-author">
-          <div class="testimonial-avatar">${t.author.charAt(0)}</div>
-          <div class="testimonial-meta">
-            <div class="testimonial-name">${t.author}</div>
-            <div class="testimonial-role">${t.role}</div>
-          </div>
-        </div>
-      </div>
-    `).join('');
-
-    /* ── Integration Steps ── */
-    const integrationStepsHtml = INTEGRATION_STEPS.map(s => `
-      <div class="integration-step">
-        <div class="integration-step-num">${s.num}</div>
-        <div class="integration-step-icon">${s.icon}</div>
-        <div class="integration-step-title">${s.title}</div>
-        <div class="integration-step-desc">${s.desc}</div>
+    /* ── Tech Stack ── */
+    const techHtml = TECH_STACK.map(t => `
+      <div class="tech-badge">
+        <span class="tech-badge-name">${t.name}</span>
+        <span>${t.desc}</span>
       </div>
     `).join('');
 
@@ -1373,31 +1085,33 @@ class ScLanding extends HTMLElement {
           <div class="plan-price">&euro;${p.price}<span>${p.period}</span></div>
           <div class="plan-subtitle">${p.subtitle}</div>
           <ul class="plan-features">${included}${excluded}</ul>
-          <button class="btn btn-primary plan-cta" data-plan="${p.id}">${p.cta}</button>
+          <button class="btn ${p.highlight ? 'btn-primary' : 'btn-secondary'} plan-cta" data-plan="${p.id}">${p.cta}</button>
         </div>
       `;
     }).join('');
 
-    /* ── How It Works ── */
-    const stepsHtml = STEPS.map(s => `
-      <div class="step">
-        <div class="step-icon">${s.icon}</div>
-        <div class="step-title">${s.title}</div>
-        <div class="step-desc">${s.desc}</div>
-      </div>
-    `).join('');
+    /* ── Open Core Lists ── */
+    const freeItems = [
+      'Full AI workspace',
+      'All 4 specialist agents',
+      '34 canvas components',
+      'Self-host on your server',
+      'SQLite — no external DB needed',
+      'MCP tool integrations',
+      'Agent memory & context',
+      'Multi-user with quotas',
+    ];
+    const paidItems = [
+      'Managed cloud hosting',
+      'Priority support',
+      'Opus model access',
+      'Higher rate limits',
+      'Team collaboration (5+ seats)',
+      'Usage analytics dashboard',
+    ];
 
-    /* ── Changelog ── */
-    const changelogHtml = CHANGELOG.map(c => `
-      <div class="changelog-item">
-        <div class="changelog-header">
-          <span class="changelog-version">${c.version}</span>
-          <span class="changelog-date">${c.date}</span>
-        </div>
-        <div class="changelog-title">${c.title}</div>
-        <div class="changelog-desc">${c.desc}</div>
-      </div>
-    `).join('');
+    const freeListHtml = freeItems.map(i => `<li>${ICON.check} ${i}</li>`).join('');
+    const paidListHtml = paidItems.map(i => `<li>${ICON.check} ${i}</li>`).join('');
 
     /* ── Assemble ── */
     this.shadowRoot.innerHTML = `
@@ -1406,16 +1120,16 @@ class ScLanding extends HTMLElement {
       <!-- Nav -->
       <nav class="nav" role="navigation" aria-label="Main navigation">
         <div class="nav-brand">
-          <img src="/assets/scratchy-logo.jpg" alt="Scratchy" width="32" height="32" style="border-radius:4px">
+          <img src="/assets/scratchy-logo.jpg" alt="Scratchy" width="32" height="32">
           Scratchy
         </div>
         <button class="nav-toggle" aria-label="Toggle menu" aria-expanded="false">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
         </button>
         <ul class="nav-links">
-          <li><a href="#features">Features</a></li>
-          <li><a href="#team">AI Team</a></li>
-          <li><a href="#integrations">Integrations</a></li>
+          <li><a href="#quickstart">Quick Start</a></li>
+          <li><a href="#team">Agents</a></li>
+          <li><a href="#open-core">Open Source</a></li>
           <li><a href="#pricing">Pricing</a></li>
         </ul>
         <div class="nav-actions">
@@ -1428,154 +1142,154 @@ class ScLanding extends HTMLElement {
       <section class="hero">
         <div class="hero-mesh"></div>
         <div class="hero-content">
-          <img src="/assets/scratchy-logo.jpg" alt="Scratchy" class="hero-logo">
           <div class="hero-badge">
             <span class="hero-badge-dot"></span>
-            Now in public beta
+            v2 — now with agent teams
           </div>
-          <h1>AI agents that actually<br>remember and collaborate</h1>
-          <p class="hero-sub">Self-hosted workspace with specialist agents. Each has its own personality, memory, and expertise. They work in teams, delegate tasks, and build things together.</p>
+          <h1>AI that <span class="gold">renders dashboards</span>,<br>not paragraphs</h1>
+          <p class="hero-sub">Your agents don't just chat — they build UI, collaborate in teams, and run on your server. Not another chatbot wrapper.</p>
           <div class="hero-cta">
-            <button class="btn btn-primary" data-action="get-started">Start Free — No Card Required</button>
-            <button class="btn btn-ghost" data-scroll="features">See how it works</button>
-          </div>
-          <div class="hero-trust">
-            <span class="hero-trust-item">${ICON.shield} Self-hosted &amp; private</span>
-            <span class="hero-trust-item">${ICON.zap} 5-minute deploy</span>
-            <span class="hero-trust-item">${ICON.clock} Free forever tier</span>
+            <button class="btn btn-primary" data-action="get-started">Deploy Free</button>
+            <button class="btn btn-ghost" data-scroll="quickstart">${ICON.terminal} See the setup</button>
           </div>
         </div>
-        <div class="hero-scroll" data-scroll="features">
+        <div class="hero-scroll" data-scroll="quickstart">
           ${ICON.chevronDown}
         </div>
       </section>
 
-      <!-- Features -->
-      <section id="features" class="section">
-        <div class="section-eyebrow">Capabilities</div>
-        <h2 class="section-title">Everything you need, nothing you don't</h2>
-        <p class="section-subtitle">A complete AI workspace built for people who ship. Not another chatbot — a real tool.</p>
-        <div class="features-grid">${featuresHtml}</div>
+      <!-- Quick Start -->
+      <section id="quickstart" class="section">
+        <div class="section-eyebrow">Quick Start</div>
+        <h2 class="section-title">Running in 90 seconds</h2>
+        <p class="section-subtitle">Seriously. One terminal, three commands, your own AI workspace.</p>
+        <div class="quickstart">
+          <div class="quickstart-steps">
+            <div class="qs-step">
+              <div class="qs-num">1</div>
+              <div class="qs-text">
+                <h3>Deploy</h3>
+                <p>One command. Runs on any VPS, home server, or laptop. 678KB binary + SQLite. That's the whole stack.</p>
+              </div>
+            </div>
+            <div class="qs-step">
+              <div class="qs-num">2</div>
+              <div class="qs-text">
+                <h3>Connect</h3>
+                <p>Add your API key — Anthropic, OpenAI, or Google. Bring your own key or use our managed plans.</p>
+              </div>
+            </div>
+            <div class="qs-step">
+              <div class="qs-num">3</div>
+              <div class="qs-text">
+                <h3>Build</h3>
+                <p>Four specialist agents are ready. Ask them to build dashboards, write code, research anything, draft docs.</p>
+              </div>
+            </div>
+          </div>
+          <div class="quickstart-code">
+            <div class="code-header">
+              <div class="code-header-dots"><span></span><span></span><span></span></div>
+              <button class="code-copy" data-copy="docker compose up -d">${ICON.copy} Copy</button>
+            </div>
+            <div class="code-body"><span class="comment"># Clone and launch</span>
+<span class="cmd">git clone</span> <span class="url">https://github.com/nicosql/scratchy.git</span>
+<span class="cmd">cd</span> scratchy
+
+<span class="comment"># That's it. Really.</span>
+<span class="cmd">docker compose up</span> <span class="flag">-d</span>
+
+<span class="comment"># Open http://localhost:3000</span>
+<span class="comment"># Add your API key → start building</span></div>
+          </div>
+        </div>
       </section>
 
       <div class="section-divider"></div>
 
-      <!-- AI Team / Agent Personas -->
+      <!-- What Makes It Different -->
+      <section id="difference" class="section">
+        <div class="section-eyebrow">Why Scratchy</div>
+        <h2 class="section-title">Not another AI chat wrapper</h2>
+        <p class="section-subtitle">Three things that actually matter.</p>
+        <div class="diff-grid">
+
+          <div class="diff-block">
+            <div class="diff-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.37 2.63a2.12 2.12 0 0 1 3 3L14 13l-4 1 1-4Z"/><path d="M20 7v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2V7"/><path d="M2 12h4"/></svg>
+            </div>
+            <div class="diff-content">
+              <h3>Generative UI — agents render things</h3>
+              <p>Ask for a dashboard and you get a dashboard. Charts, forms, stats, data tables — 34 interactive components that agents compose in real-time. Not markdown. Actual UI.</p>
+              <div class="diff-example">"Show me server stats" → live stats card, not a text table</div>
+            </div>
+          </div>
+
+          <div class="diff-block">
+            <div class="diff-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="4"/><circle cx="9" cy="16" r="1"/><circle cx="15" cy="16" r="1"/></svg>
+            </div>
+            <div class="diff-content">
+              <h3>Agent teams — not one model doing everything</h3>
+              <p>An orchestrator splits complex work across specialists. Atlas writes the code, Iris designs the UI, Nova researches, Echo writes the docs. They work in parallel and merge results.</p>
+              <div class="diff-example">"Build me a landing page" → 4 agents collaborate, one result</div>
+            </div>
+          </div>
+
+          <div class="diff-block">
+            <div class="diff-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg>
+            </div>
+            <div class="diff-content">
+              <h3>Self-hosted — your data stays yours</h3>
+              <p>Runs on your infrastructure. SQLite database, no external services needed. Your conversations, your API keys, your server. We never see your data.</p>
+              <div class="diff-example">678KB binary + SQLite = the whole backend</div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <div class="section-divider"></div>
+
+      <!-- Meet The Team -->
       <section id="team" class="section">
-        <div class="section-eyebrow">Built-in Agents</div>
-        <h2 class="section-title">Specialists, not generalists</h2>
-        <p class="section-subtitle">Each agent has a role, a personality, and deep expertise. Switch between them mid-conversation.</p>
+        <div class="section-eyebrow">The Crew</div>
+        <h2 class="section-title">Four agents. Actual personalities.</h2>
+        <p class="section-subtitle">Not generic assistants — specialists with opinions, expertise, and memory.</p>
         <div class="agents-grid">${agentsHtml}</div>
       </section>
 
       <div class="section-divider"></div>
 
-      <!-- Shared Intelligence -->
-      <section id="intelligence" class="section">
-        <div class="section-eyebrow">Shared Context</div>
-        <div class="shared-intel">
-          <div class="shared-intel-content">
-            <h3>Agents that remember</h3>
-            <p>Each agent has persistent memory scoped to your conversations. Context from past sessions gets recalled automatically via semantic search. No repeating yourself.</p>
-            <ul class="shared-intel-features">
-              <li>${ICON.database} <span>Persistent memory across conversations</span></li>
-              <li>${ICON.share} <span>Context flows between agents automatically</span></li>
-              <li>${ICON.layers} <span>Project-scoped knowledge with team isolation</span></li>
-            </ul>
-          </div>
-          <div class="shared-intel-visual">
-            <div class="brain-diagram">
-              <div class="brain-center">
-                ${ICON.brain}
-                <span class="brain-center-label">Context</span>
-              </div>
-              <div class="brain-node">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="4"/><path d="M3 21v-2a7 7 0 0 1 7-7h4a7 7 0 0 1 7 7v2"/></svg>
-                Aria
-              </div>
-              <div class="brain-node">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
-                Atlas
-              </div>
-              <div class="brain-node">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-                Nova
-              </div>
-              <div class="brain-node">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-                Bolt
-              </div>
-              <div class="brain-line"></div>
-              <div class="brain-line"></div>
-              <div class="brain-line"></div>
-              <div class="brain-line"></div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <div class="section-divider"></div>
-
-      <!-- Numbers -->
-      <section id="proof" class="section">
+      <!-- By the Numbers + Tech Stack -->
+      <section id="numbers" class="section">
         <div class="section-eyebrow">By the Numbers</div>
-        <h2 class="section-title">What's inside</h2>
-        <p class="section-subtitle">Real capabilities, shipping today. No roadmap promises.</p>
+        <h2 class="section-title">What's actually inside</h2>
+        <p class="section-subtitle">Real numbers, shipping today. No roadmap promises.</p>
         <div class="metrics-row">${metricsHtml}</div>
-        ${testimonialsHtml ? `<div class="testimonials-grid">${testimonialsHtml}</div>` : ''}
+        <div class="tech-row">${techHtml}</div>
       </section>
 
       <div class="section-divider"></div>
 
-      <!-- Integrations -->
-      <section id="integrations" class="section">
-        <div class="section-eyebrow">Integrations</div>
-        <h2 class="section-title">Connect your tools</h2>
-        <p class="section-subtitle">Your agents work with the tools you already use. Powered by the Model Context Protocol.</p>
-        <div class="integration-steps">${integrationStepsHtml}</div>
-        <div class="integration-logos">
-          <div class="integration-logo">GitHub</div>
-          <div class="integration-logo">Slack</div>
-          <div class="integration-logo">Notion</div>
-          <div class="integration-logo">Postgres</div>
-          <div class="integration-logo">Jira</div>
-          <div class="integration-logo">Stripe</div>
-          <div class="integration-logo">S3</div>
-          <div class="integration-logo">REST</div>
+      <!-- Open Core -->
+      <section id="open-core" class="section">
+        <div class="section-eyebrow">Open Core</div>
+        <h2 class="section-title">Free means free. Paid means more.</h2>
+        <p class="section-subtitle">No gotchas. The free tier is the full product — we charge for scale and convenience.</p>
+        <div class="opencore">
+          <div class="opencore-card">
+            <h3>${ICON.unlock} Free &amp; Open</h3>
+            <ul class="opencore-list">${freeListHtml}</ul>
+          </div>
+          <div class="opencore-card">
+            <h3>${ICON.lock} Paid Plans</h3>
+            <ul class="opencore-list">${paidListHtml}</ul>
+          </div>
         </div>
-      </section>
-
-      <div class="section-divider"></div>
-
-      <!-- How It Works -->
-      <section id="how" class="section">
-        <div class="section-eyebrow">Getting Started</div>
-        <h2 class="section-title">Up and running in minutes</h2>
-        <p class="section-subtitle">Three steps to your own AI workspace.</p>
-        <div class="steps-row">
-          <div class="steps-line"></div>
-          ${stepsHtml}
-        </div>
-      </section>
-
-      <div class="section-divider"></div>
-
-      <!-- Code Showcase -->
-      <section class="section">
-        <div class="section-eyebrow">Generative UI</div>
-        <h2 class="section-title">See it in action</h2>
-        <p class="section-subtitle">Agents generate interactive UI components in real-time — charts, stats, forms, and more.</p>
-        <div class="code-block">
-          <span class="code-label">scratchy-toon</span>
-<span class="code-key">op</span>: <span class="code-val">upsert</span>
-<span class="code-key">id</span>: <span class="code-val">server-stats</span>
-<span class="code-key">type</span>: <span class="code-type">stats</span>
-<span class="code-key">data</span>:
-  <span class="code-key">title</span>: <span class="code-val">Server Status</span>
-  <span class="code-key">items</span><span class="code-comment">[3]{label,value}</span>:
-    <span class="code-val">CPU,73%</span>
-    <span class="code-val">RAM,4.2 GB</span>
-    <span class="code-val">Uptime,14d 3h</span>
+        <div class="opencore-cta">
+          <a href="https://github.com/nicosql/scratchy" target="_blank" rel="noopener">${ICON.github} View on GitHub — star if you like it</a>
         </div>
       </section>
 
@@ -1584,33 +1298,23 @@ class ScLanding extends HTMLElement {
       <!-- Pricing -->
       <section id="pricing" class="section">
         <div class="section-eyebrow">Pricing</div>
-        <h2 class="section-title">Simple, transparent pricing</h2>
-        <p class="section-subtitle">Start free. Upgrade when you need more. No surprises.</p>
+        <h2 class="section-title">Pick your speed</h2>
+        <p class="section-subtitle">Start free. Upgrade when the free tier feels slow. Downgrade whenever.</p>
         <div class="plans-row">${plansHtml}</div>
-      </section>
-
-      <div class="section-divider"></div>
-
-      <!-- Changelog -->
-      <section id="changelog" class="section">
-        <div class="section-eyebrow">What's New</div>
-        <h2 class="section-title">Shipping every week</h2>
-        <p class="section-subtitle">We're building in the open. Here's what landed recently.</p>
-        <div class="changelog-list">${changelogHtml}</div>
       </section>
 
       <!-- Final CTA -->
       <section class="section final-cta">
-        <h2>Ready to meet your AI team?</h2>
-        <p>Deploy your workspace in under 5 minutes. Free forever — no credit card required.</p>
+        <h2>Your AI workspace.<br>Your server. Your rules.</h2>
+        <p>Deploy in under 2 minutes. Free forever — no card, no trial, no "upgrade to continue" walls.</p>
         <button class="btn btn-primary" data-action="get-started">Get Started Free</button>
       </section>
 
       <!-- Footer -->
       <footer class="footer">
-        <div>&copy; 2026 Scratchy. All rights reserved.</div>
+        <div>&copy; 2026 Scratchy. Built with stubbornness and Zig.</div>
         <div class="footer-links">
-          <a href="https://github.com/yassinebkr/scratchy" target="_blank" rel="noopener">GitHub</a>
+          <a href="https://github.com/nicosql/scratchy" target="_blank" rel="noopener">GitHub</a>
           <a href="https://docs.openclaw.ai" target="_blank" rel="noopener">Docs</a>
           <a href="https://discord.com/invite/clawd" target="_blank" rel="noopener">Discord</a>
         </div>
@@ -1621,7 +1325,7 @@ class ScLanding extends HTMLElement {
   _wireEvents() {
     const root = this.shadowRoot;
 
-    // Mobile hamburger toggle
+    /* Mobile hamburger toggle */
     const navToggle = root.querySelector('.nav-toggle');
     const navLinks = root.querySelector('.nav-links');
     if (navToggle && navLinks) {
@@ -1637,12 +1341,12 @@ class ScLanding extends HTMLElement {
       });
     }
 
-    // CTA buttons
+    /* CTA buttons */
     root.querySelectorAll('[data-action]').forEach(btn => {
       btn.addEventListener('click', () => this._emit(btn.dataset.action));
     });
 
-    // Plan CTAs
+    /* Plan CTAs */
     root.querySelectorAll('.plan-cta').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -1650,7 +1354,7 @@ class ScLanding extends HTMLElement {
       });
     });
 
-    // Smooth scroll
+    /* Smooth scroll */
     root.querySelectorAll('[data-scroll]').forEach(el => {
       el.addEventListener('click', () => {
         const target = root.getElementById(el.dataset.scroll);
@@ -1658,13 +1362,25 @@ class ScLanding extends HTMLElement {
       });
     });
 
-    // Nav anchor links
+    /* Nav anchor links */
     root.querySelectorAll('.nav-links a').forEach(a => {
       a.addEventListener('click', (e) => {
         e.preventDefault();
         const id = a.getAttribute('href').slice(1);
         const target = root.getElementById(id);
         if (target) target.scrollIntoView({ behavior: 'smooth' });
+      });
+    });
+
+    /* Copy button */
+    root.querySelectorAll('[data-copy]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const text = btn.dataset.copy;
+        navigator.clipboard.writeText(text).then(() => {
+          const orig = btn.innerHTML;
+          btn.textContent = '✓ Copied';
+          setTimeout(() => { btn.innerHTML = orig; }, 1500);
+        }).catch(() => {});
       });
     });
   }
@@ -1686,7 +1402,7 @@ class ScLanding extends HTMLElement {
       entries.forEach(entry => {
         if (entry.isIntersecting) entry.target.classList.add('visible');
       });
-    }, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' });
+    }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
     sections.forEach(s => this._observer.observe(s));
   }
 }
