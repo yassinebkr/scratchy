@@ -17,6 +17,7 @@ import { NullClawAdapter } from '../lib/nullclaw-adapter.js';
 import { searchContext, searchMemory, formatResultsAsToon } from '../lib/context-search.js';
 import { createBestGeminiProvider, createOpenAIProvider, createMockProvider, createFallbackProvider } from '../lib/embeddings.js';
 import { extractMemories } from '../lib/memory-extraction.js';
+import * as secureKeys from '../lib/secure-keys.js';
 import { maskObservations } from '../lib/observation-masking.js';
 import { MemoryConsolidator } from '../lib/memory-consolidation.js';
 import { MemoryScheduler } from '../lib/memory-scheduler.js';
@@ -25,6 +26,9 @@ import * as memory from '../state/memory.js';
 import * as contextIndex from '../state/context-index.js';
 import { isA2UIMessage, parseA2UIMessage, a2uiToGenUI } from '../protocol/a2ui.js';
 import { parseGenUIResponse } from '../lib/genui-response-parser.js';
+import * as agents from '../state/agents.js';
+import { existsSync, readFileSync, statSync } from 'node:fs';
+import { join as pathJoin } from 'node:path';
 
 /* ------------------------------------------------------------------ */
 /*  Constants                                                         */
@@ -44,6 +48,47 @@ const CONTEXT_TOP_K = 5;
 
 /** Top-K results for memory recall */
 const MEMORY_TOP_K = 5;
+
+/* ------------------------------------------------------------------ */
+/*  Soul loader (per-agent personality injection)                     */
+/* ------------------------------------------------------------------ */
+
+const SOULS_DIR = pathJoin(process.cwd(), '.scratchy-data', 'souls');
+
+/** @type {Map<string, {path: string, content: string, mtimeMs: number}>} */
+const _soulCache = new Map();
+
+/**
+ * Load a soul file for an agent. Cached with mtime invalidation.
+ * @param {string} agentName
+ * @returns {string|null}
+ */
+function loadSoul(agentName) {
+  if (!agentName) return null;
+  const name = agentName.toLowerCase().trim();
+
+  const cached = _soulCache.get(name);
+  if (cached) {
+    try {
+      const stat = statSync(cached.path);
+      if (stat.mtimeMs === cached.mtimeMs) return cached.content;
+    } catch { /* file deleted */ }
+  }
+
+  const soulPath = pathJoin(SOULS_DIR, `${name}.md`);
+  if (existsSync(soulPath)) {
+    try {
+      const content = readFileSync(soulPath, 'utf-8');
+      const stat = statSync(soulPath);
+      _soulCache.set(name, { path: soulPath, content, mtimeMs: stat.mtimeMs });
+      console.log(`[chat] Loaded soul for ${agentName}`);
+      return content;
+    } catch (err) {
+      console.warn(`[chat] Failed to read soul ${soulPath}:`, err.message);
+    }
+  }
+  return null;
+}
 
 /* ------------------------------------------------------------------ */
 /*  Module state                                                      */
@@ -110,7 +155,10 @@ export function init(db) {
   {
     const chain = [];
     const geminiProvider = createBestGeminiProvider();
-    const openaiKey = process.env.OPENAI_API_KEY;
+    // Try secure store for OpenAI key, fall back to env
+    let openaiKey;
+    try { openaiKey = secureKeys.getKey('OPENAI_API_KEY'); }
+    catch { openaiKey = process.env.OPENAI_API_KEY; }
     if (geminiProvider) chain.push({ name: 'Gemini', provider: geminiProvider });
     if (openaiKey) chain.push({ name: 'OpenAI', provider: createOpenAIProvider(openaiKey) });
     chain.push({ name: 'Mock', provider: createMockProvider(chain[0]?.provider.dimensions || 768) });
@@ -515,6 +563,21 @@ export async function handleChat(userId, msg, ws) {
 
   console.log(`[chat] ${userId}: ${text.slice(0, 100)}`);
 
+  // ── Resolve agent soul ──
+  const agentId = msg.agentId || null;
+  let soulBlock = '';
+  if (agentId) {
+    try {
+      const agent = agents.getAgent(agentId);
+      if (agent) {
+        const soul = loadSoul(agent.name);
+        if (soul) soulBlock = `[Soul — ${agent.name}]\n${soul}\n`;
+      }
+    } catch (err) {
+      console.warn(`[chat] Soul lookup failed for ${agentId}:`, err.message);
+    }
+  }
+
   // Save user message to history
   appendHistory(userId, 'user', text);
 
@@ -532,13 +595,15 @@ export async function handleChat(userId, msg, ws) {
     const augmentedPrompt = buildAugmentedPrompt(text, history, contextBlock);
 
     // ── Step 4+5: Send to NullClaw and stream response ──
+    // Prepend soul to the message so NullClaw adopts the agent's personality
+    const messageForNullClaw = soulBlock ? `${soulBlock}\n${text}` : text;
     let response = '';
     let usedAdapter = false;
 
     if (_adapter) {
       try {
-        // Send raw user text — NullClaw manages its own session context
-        response = await sendViaAdapter(userId, text, (chunk) => {
+        // Send message with soul context — NullClaw manages its own session history
+        response = await sendViaAdapter(userId, messageForNullClaw, (chunk) => {
           sendJson(ws, {
             type: 'chat-stream',
             delta: chunk,
@@ -548,13 +613,15 @@ export async function handleChat(userId, msg, ws) {
         usedAdapter = true;
       } catch (adapterErr) {
         console.warn(`[chat] Adapter failed for ${userId}, falling back to direct spawn:`, adapterErr.message);
-        // Fall through to direct spawn
+        // End any partial stream so the client resets _streamDiv before fallback chunks arrive
+        sendJson(ws, { type: 'chat-stream-end', ts: Date.now() });
       }
     }
 
-    // Fallback: direct spawn with streaming
+    // Fallback: direct spawn with streaming (include soul in augmented prompt)
     if (!usedAdapter) {
-      response = await runNullClawDirect(augmentedPrompt, (chunk) => {
+      const fallbackPrompt = soulBlock ? `${soulBlock}\n${augmentedPrompt}` : augmentedPrompt;
+      response = await runNullClawDirect(fallbackPrompt, (chunk) => {
         sendJson(ws, {
           type: 'chat-stream',
           delta: chunk,
@@ -618,6 +685,8 @@ export async function handleChat(userId, msg, ws) {
 
   } catch (err) {
     console.error(`[chat] Error for ${userId}:`, err.message);
+    // Always end the stream first — prevents client _streamDiv from going stale
+    sendJson(ws, { type: 'chat-stream-end', ts: Date.now() });
     sendJson(ws, { type: 'typing', status: 'stop', ts: Date.now() });
     sendJson(ws, {
       type: 'chat',

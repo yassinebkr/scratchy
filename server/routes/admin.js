@@ -18,6 +18,7 @@ import * as users from '../../state/users.js';
 import * as agents from '../../state/agents.js';
 import * as adminConfig from '../../state/admin-config.js';
 import { PLANS, getPlan } from '../../lib/billing/plans.js';
+import * as secureKeys from '../../lib/secure-keys.js';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const PROJECT_ROOT = resolve(__dirname, '..', '..');
@@ -112,6 +113,9 @@ const SENSITIVE_KEYS = new Set([
   'jwt_secret',
   'openai_api_key',
   'anthropic_api_key',
+  'gemini_api_key',
+  'resend_api_key',
+  'google_client_secret',
   'api_secret',
 ]);
 
@@ -736,6 +740,152 @@ export function adminRoutes(deps) {
   }
 
   /* ================================================================ */
+  /*  GET /api/admin/keys — list all API keys (masked)                */
+  /* ================================================================ */
+
+  async function listApiKeys(req, res) {
+    const admin = await requireAdmin(req, res);
+    if (!admin) return;
+
+    try {
+      const keys = secureKeys.listKeys();
+      return json(res, 200, { keys });
+    } catch (err) {
+      return json(res, 500, { error: 'Failed to list keys', detail: err.message });
+    }
+  }
+
+  /* ================================================================ */
+  /*  PUT /api/admin/keys/:name — store/update an API key             */
+  /* ================================================================ */
+
+  async function setApiKey(req, res, keyName) {
+    const admin = await requireAdmin(req, res);
+    if (!admin) return;
+
+    // Validate key name against registry
+    const registry = secureKeys.getRegistry();
+    if (!registry[keyName]) {
+      return json(res, 400, { error: `Unknown key: ${keyName}. Valid keys: ${Object.keys(registry).join(', ')}` });
+    }
+
+    const body = await parseJsonBody(req);
+    const value = body.value;
+
+    if (!value || typeof value !== 'string' || value.trim().length < 4) {
+      return json(res, 400, { error: 'Key value must be a non-empty string (min 4 chars)' });
+    }
+
+    try {
+      secureKeys.setKey(keyName, value.trim());
+      const keys = secureKeys.listKeys();
+      const updated = keys.find(k => k.name === keyName);
+      return json(res, 200, {
+        ok: true,
+        key: updated,
+        message: `${registry[keyName].label} stored securely`,
+      });
+    } catch (err) {
+      return json(res, 500, { error: 'Failed to store key', detail: err.message });
+    }
+  }
+
+  /* ================================================================ */
+  /*  DELETE /api/admin/keys/:name — remove an API key from DB        */
+  /* ================================================================ */
+
+  async function deleteApiKey(req, res, keyName) {
+    const admin = await requireAdmin(req, res);
+    if (!admin) return;
+
+    const registry = secureKeys.getRegistry();
+    if (!registry[keyName]) {
+      return json(res, 400, { error: `Unknown key: ${keyName}` });
+    }
+
+    try {
+      const deleted = secureKeys.deleteKey(keyName);
+      if (!deleted) {
+        return json(res, 404, { error: `Key ${keyName} not found in encrypted store (may still exist in .env)` });
+      }
+      return json(res, 200, {
+        ok: true,
+        message: `${registry[keyName].label} removed from encrypted store`,
+        envFallback: !!process.env[registry[keyName].envVar],
+      });
+    } catch (err) {
+      return json(res, 500, { error: 'Failed to delete key', detail: err.message });
+    }
+  }
+
+  /* ================================================================ */
+  /*  POST /api/admin/keys/migrate — migrate all .env keys to DB      */
+  /* ================================================================ */
+
+  async function migrateKeys(req, res) {
+    const admin = await requireAdmin(req, res);
+    if (!admin) return;
+
+    try {
+      const result = secureKeys.migrateAll();
+      return json(res, 200, {
+        ok: true,
+        ...result,
+        message: `Migrated ${result.migrated.length} keys, skipped ${result.skipped.length}, missing ${result.missing.length}`,
+      });
+    } catch (err) {
+      return json(res, 500, { error: 'Migration failed', detail: err.message });
+    }
+  }
+
+  /* ================================================================ */
+  /*  GET /api/admin/embedding/quota — get embedding quota config     */
+  /* ================================================================ */
+
+  async function getEmbeddingQuota(req, res) {
+    const admin = await requireAdmin(req, res);
+    if (!admin) return;
+
+    const config = {
+      dailyLimitFree: adminConfig.get('embedding_daily_limit_free') ?? 200,
+      dailyLimitPro: adminConfig.get('embedding_daily_limit_pro') ?? 1000,
+      dailyLimitByok: adminConfig.get('embedding_daily_limit_byok') ?? -1, // -1 = unlimited
+      model: 'gemini-embedding-001',
+      dimensions: adminConfig.get('embedding_dimensions') ?? 768,
+    };
+
+    return json(res, 200, config);
+  }
+
+  /* ================================================================ */
+  /*  PATCH /api/admin/embedding/quota — update embedding quota       */
+  /* ================================================================ */
+
+  async function updateEmbeddingQuota(req, res) {
+    const admin = await requireAdmin(req, res);
+    if (!admin) return;
+
+    const body = await parseJsonBody(req);
+    const allowed = ['embedding_daily_limit_free', 'embedding_daily_limit_pro', 'embedding_daily_limit_byok', 'embedding_dimensions'];
+
+    for (const key of allowed) {
+      if (key in body) {
+        const val = parseInt(body[key], 10);
+        if (isNaN(val)) return json(res, 400, { error: `${key} must be a number` });
+        adminConfig.set(key, val);
+      }
+    }
+
+    return json(res, 200, {
+      ok: true,
+      dailyLimitFree: adminConfig.get('embedding_daily_limit_free') ?? 200,
+      dailyLimitPro: adminConfig.get('embedding_daily_limit_pro') ?? 1000,
+      dailyLimitByok: adminConfig.get('embedding_daily_limit_byok') ?? -1,
+      dimensions: adminConfig.get('embedding_dimensions') ?? 768,
+    });
+  }
+
+  /* ================================================================ */
   /*  Route table                                                     */
   /* ================================================================ */
 
@@ -750,6 +900,12 @@ export function adminRoutes(deps) {
     getStats,
     getConfig,
     updateConfig,
+    listApiKeys,
+    setApiKey,
+    deleteApiKey,
+    migrateKeys,
+    getEmbeddingQuota,
+    updateEmbeddingQuota,
     deployStage,
     deployStatus,
     deployPush,
@@ -770,6 +926,12 @@ export function adminRoutes(deps) {
       { method: 'GET',    path: '/api/admin/stats',           handler: getStats },
       { method: 'GET',    path: '/api/admin/config',          handler: getConfig },
       { method: 'PATCH',  path: '/api/admin/config',          handler: updateConfig },
+      { method: 'GET',    path: '/api/admin/keys',            handler: listApiKeys },
+      { method: 'PUT',    path: '/api/admin/keys/:id',        handler: setApiKey },
+      { method: 'DELETE', path: '/api/admin/keys/:id',        handler: deleteApiKey },
+      { method: 'POST',   path: '/api/admin/keys/migrate',    handler: migrateKeys },
+      { method: 'GET',    path: '/api/admin/embedding/quota', handler: getEmbeddingQuota },
+      { method: 'PATCH',  path: '/api/admin/embedding/quota', handler: updateEmbeddingQuota },
       { method: 'POST',   path: '/api/admin/deploy/stage',    handler: deployStage },
       { method: 'GET',    path: '/api/admin/deploy/status',   handler: deployStatus },
       { method: 'POST',   path: '/api/admin/deploy/push',     handler: deployPush },

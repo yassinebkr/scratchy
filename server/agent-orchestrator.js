@@ -47,6 +47,7 @@ import * as memory from '../state/memory.js';
 import * as contextIndex from '../state/context-index.js';
 import { getUsageTracker } from '../lib/usage-tracker.js';
 import { routeTeamMessage } from '../lib/team-router.js';
+import * as secureKeys from '../lib/secure-keys.js';
 import * as teamsState from '../state/teams.js';
 
 /* ------------------------------------------------------------------ */
@@ -352,7 +353,9 @@ export function init(db, mcpRegistry) {
   {
     const chain = [];
     const geminiProvider = createBestGeminiProvider();
-    const openaiKey = process.env.OPENAI_API_KEY;
+    let openaiKey;
+    try { openaiKey = secureKeys.getKey('OPENAI_API_KEY'); }
+    catch { openaiKey = process.env.OPENAI_API_KEY; }
     if (geminiProvider) chain.push({ name: 'Gemini', provider: geminiProvider });
     if (openaiKey) chain.push({ name: 'OpenAI', provider: createOpenAIProvider(openaiKey) });
     chain.push({ name: 'Mock', provider: createMockProvider(chain[0]?.provider.dimensions || 768) });

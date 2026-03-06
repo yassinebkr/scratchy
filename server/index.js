@@ -66,6 +66,28 @@ async function main() {
       console.warn('[server] BYOK manager init failed:', err.message);
     }
 
+    /* -- Secure key store (encrypted API keys in DB) -- */
+    try {
+      const secureKeys = await import('../lib/secure-keys.js');
+      // Auto-migrate .env keys to encrypted store on first run
+      const result = secureKeys.migrateAll();
+      if (result.migrated.length > 0) {
+        console.log(`[server] Secure keys: migrated ${result.migrated.length} keys from .env`);
+      }
+      console.log(`[server] Secure key store initialized (${secureKeys.listKeys().filter(k => k.source !== 'none').length} keys configured)`);
+
+      // Wire secure keys into modules that need them
+      const { setSecureKeys: setEmbeddingKeys } = await import('../lib/embeddings.js');
+      setEmbeddingKeys(secureKeys);
+
+      try {
+        const stripe = await import('../lib/stripe.js');
+        if (stripe.setSecureKeys) stripe.setSecureKeys(secureKeys);
+      } catch { /* stripe may not export setSecureKeys yet */ }
+    } catch (err) {
+      console.warn('[server] Secure key store init failed (falling back to .env):', err.message);
+    }
+
     /* -- Stripe schema -- */
     try {
       const { ensureStripeSchema } = await import('../lib/stripe.js');
@@ -129,15 +151,24 @@ async function main() {
   console.log('[server] Surface event handler initialized');
 
   /* -- Google OAuth (for Gmail + Calendar widgets) -- */
-  if (db && process.env.GOOGLE_CLIENT_ID) {
-    googleAuth.init(db, {
-      clientId: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
-      redirectUri: process.env.GOOGLE_REDIRECT_URI || 'https://v2.clawos.fr/auth/google/callback',
-    });
-    console.log('[server] Google OAuth initialized');
-  } else if (!process.env.GOOGLE_CLIENT_ID) {
-    console.warn('[server] Google OAuth not configured (GOOGLE_CLIENT_ID missing)');
+  {
+    let gClientId, gClientSecret, gRedirectUri;
+    try {
+      const sk = await import('../lib/secure-keys.js');
+      gClientId = sk.getKey('GOOGLE_CLIENT_ID');
+      gClientSecret = sk.getKey('GOOGLE_CLIENT_SECRET') || '';
+      gRedirectUri = sk.getKey('GOOGLE_REDIRECT_URI') || 'https://v2.clawos.fr/auth/google/callback';
+    } catch {
+      gClientId = process.env.GOOGLE_CLIENT_ID;
+      gClientSecret = process.env.GOOGLE_CLIENT_SECRET || '';
+      gRedirectUri = process.env.GOOGLE_REDIRECT_URI || 'https://v2.clawos.fr/auth/google/callback';
+    }
+    if (db && gClientId) {
+      googleAuth.init(db, { clientId: gClientId, clientSecret: gClientSecret, redirectUri: gRedirectUri });
+      console.log('[server] Google OAuth initialized');
+    } else if (!gClientId) {
+      console.warn('[server] Google OAuth not configured (GOOGLE_CLIENT_ID missing)');
+    }
   }
 
   /* -- Widget system -- */
