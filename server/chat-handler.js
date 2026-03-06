@@ -18,6 +18,7 @@ import { searchContext, searchMemory, formatResultsAsToon } from '../lib/context
 import { createBestGeminiProvider, createOpenAIProvider, createMockProvider, createFallbackProvider } from '../lib/embeddings.js';
 import { extractMemories } from '../lib/memory-extraction.js';
 import * as secureKeys from '../lib/secure-keys.js';
+import { checkEmbeddingQuota, recordEmbeddingUsage } from '../lib/embedding-quota.js';
 import { maskObservations } from '../lib/observation-masking.js';
 import { MemoryConsolidator } from '../lib/memory-consolidation.js';
 import { MemoryScheduler } from '../lib/memory-scheduler.js';
@@ -481,15 +482,20 @@ function runNullClawDirect(message, onChunk) {
  * @param {string} assistantResponse
  */
 async function runPostResponsePipeline(userId, userMessage, assistantResponse) {
-  // ── Memory extraction ──
+  // ── Memory extraction (quota-checked) ──
   try {
     if (_embedder) {
-      await extractMemories(userMessage, assistantResponse, {
-        llmCall: cheapLlmCall,
-        embedder: _embedder,
-        memory,
-        userId,
-      });
+      const extractQuota = checkEmbeddingQuota(userId, { planId: 'free' });
+      if (extractQuota.allowed) {
+        const extracted = await extractMemories(userMessage, assistantResponse, {
+          llmCall: cheapLlmCall,
+          embedder: _embedder,
+          memory,
+          userId,
+        });
+        // Each extracted fact = 1 embed call
+        if (extracted?.length > 0) recordEmbeddingUsage(userId, extracted.length);
+      }
     }
   } catch (err) {
     console.warn(`[chat] Memory extraction failed for ${userId}:`, err.message);
@@ -589,7 +595,16 @@ export async function handleChat(userId, msg, ws) {
     const history = getHistory(userId, HISTORY_TURNS);
 
     // ── Step 2: Semantic context retrieval (non-blocking on failure) ──
-    const contextBlock = await retrieveContext(text, userId);
+    // Check embedding quota before making API calls
+    const quota = checkEmbeddingQuota(userId, { planId: 'free', role: msg._userRole });
+    let contextBlock = '';
+    if (quota.allowed) {
+      contextBlock = await retrieveContext(text, userId);
+      // Count: 1 for query embed + ~1 for memory search = 2 embed calls per message
+      recordEmbeddingUsage(userId, 2);
+    } else {
+      console.warn(`[chat] Embedding quota exceeded for ${userId} (${quota.used}/${quota.limit})`);
+    }
 
     // ── Step 3: Build augmented prompt ──
     const augmentedPrompt = buildAugmentedPrompt(text, history, contextBlock);

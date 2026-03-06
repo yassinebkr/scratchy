@@ -48,6 +48,7 @@ import * as contextIndex from '../state/context-index.js';
 import { getUsageTracker } from '../lib/usage-tracker.js';
 import { routeTeamMessage } from '../lib/team-router.js';
 import * as secureKeys from '../lib/secure-keys.js';
+import { checkEmbeddingQuota, recordEmbeddingUsage } from '../lib/embedding-quota.js';
 import * as teamsState from '../state/teams.js';
 
 /* ------------------------------------------------------------------ */
@@ -1104,7 +1105,14 @@ export async function routeMessage(userId, agentId, message, ws) {
     const history = getHistory(userId, effectiveAgentId, HISTORY_TURNS);
 
     // ── Step 4: Semantic context retrieval (with agent-scoped memories) ──
-    const contextBlock = await retrieveContext(text, userId, { agentId: effectiveAgentId });
+    // Check embedding quota before making API calls
+    const embedQuota = checkEmbeddingQuota(userId, { planId: 'free' });
+    let contextBlock = '';
+    if (embedQuota.allowed) {
+      contextBlock = await retrieveContext(text, userId, { agentId: effectiveAgentId });
+      // Count: 1 query + 1 global memory + 1 agent memory = ~3 embed calls
+      recordEmbeddingUsage(userId, 3);
+    }
 
     // ── Step 5: Build augmented prompt (soul + system + context + history) ──
     const augmentedPrompt = buildAugmentedPrompt(text, agent, history, contextBlock, tools);
