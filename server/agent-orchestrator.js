@@ -55,7 +55,7 @@ import {
   createThreatState, activateThreat, clearThreat,
   shouldBlockTool, shouldScanToolResult,
   recordStats, recordBlock, recordSanitize, getStats,
-} from '../lib/clawos-lite.js';
+} from '../lib/proteclaw-lite.js';
 
 /* ------------------------------------------------------------------ */
 /*  Constants                                                         */
@@ -91,7 +91,7 @@ const MAX_CONCURRENT_PER_USER = 3;
 /** @type {Map<string, number>} active request count per userId */
 const _activeRequests = new Map();
 
-/** @type {Map<string, import('../lib/clawos-lite.js').ThreatState>} per-user threat state for ClawOS-Lite */
+/** @type {Map<string, import('../lib/proteclaw-lite.js').ThreatState>} per-user threat state for ProteClaw-Lite */
 const _threatStates = new Map();
 
 /** Adapter port range — offset from chat-handler's 29000-29999 */
@@ -1034,19 +1034,19 @@ export async function routeMessage(userId, agentId, message, ws) {
     console.warn(`[orchestrator] Truncated oversized message from ${userId}`);
   }
 
-  // ── ClawOS-Lite: Clear threat state on new user message ──
+  // ── ProteClaw-Lite: Clear threat state on new user message ──
   const threat = _threatStates.get(userId);
   if (threat?.active) {
     clearThreat(threat);
-    console.log(`[clawos-lite] 🔓 Threat state cleared for ${userId} — new user message`);
+    console.log(`[proteclaw-lite] 🔓 Threat state cleared for ${userId} — new user message`);
   }
 
-  // ── ClawOS-Lite: Input sanitization ──
+  // ── ProteClaw-Lite: Input sanitization ──
   const { sanitized, stripped } = sanitizeInput(text);
   if (stripped.length > 0) {
     text = sanitized;
     recordSanitize();
-    console.log(`[clawos-lite] 🧹 Input sanitized for ${userId}: ${stripped.join(', ')}`);
+    console.log(`[proteclaw-lite] 🧹 Input sanitized for ${userId}: ${stripped.join(', ')}`);
   }
 
   // Concurrent request guard — max 3 per user
@@ -1211,19 +1211,19 @@ export async function routeMessage(userId, agentId, message, ws) {
           // them immediately to the client. The XML-based toolDetector is kept
           // as fallback for NullClaw instances without the event callback patch.
           //
-          // ClawOS-Lite hooks:
+          // ProteClaw-Lite hooks:
           //   tool_call_start  → check threat state, block dangerous tools
           //   tool_call_result → scan output for injection patterns
           (evt) => {
             _resetInact();
             if (evt.type === 'tool_call_start') {
-              // ── ClawOS-Lite: Check if tool should be blocked ──
+              // ── ProteClaw-Lite: Check if tool should be blocked ──
               const userThreat = _threatStates.get(userId);
               if (userThreat) {
                 const block = shouldBlockTool(userThreat, evt.name);
                 if (block.blocked) {
                   recordBlock();
-                  console.warn(`[clawos-lite] 🛑 BLOCKED tool "${evt.name}" for ${userId}: ${block.reason}`);
+                  console.warn(`[proteclaw-lite] 🛑 BLOCKED tool "${evt.name}" for ${userId}: ${block.reason}`);
                   // Forward as a blocked tool event to client
                   sendJson(ws, {
                     type: 'tool_call',
@@ -1252,7 +1252,7 @@ export async function routeMessage(userId, agentId, message, ws) {
                 ts: Date.now(),
               });
             } else if (evt.type === 'tool_call_result') {
-              // ── ClawOS-Lite: Scan tool result for injection ──
+              // ── ProteClaw-Lite: Scan tool result for injection ──
               if (shouldScanToolResult(evt.name) && evt.output) {
                 const signals = scanForSignals(evt.output);
                 if (signals.length > 0) {
@@ -1266,13 +1266,13 @@ export async function routeMessage(userId, agentId, message, ws) {
                     }
                     activateThreat(_threatStates.get(userId), highSeverity, evt.name);
                     console.warn(
-                      `[clawos-lite] 🔒 THREAT confirmed for ${userId} — ` +
+                      `[proteclaw-lite] 🔒 THREAT confirmed for ${userId} — ` +
                       `${highSeverity.length} signal(s) in ${evt.name}: ` +
                       highSeverity.map(s => `${s.pattern}(${s.confidence})`).join(', ')
                     );
                   } else if (highSeverity.length > 0) {
                     console.log(
-                      `[clawos-lite] ℹ️ Advisory for ${userId}: ${highSeverity.length} signal(s) ` +
+                      `[proteclaw-lite] ℹ️ Advisory for ${userId}: ${highSeverity.length} signal(s) ` +
                       `below threshold in ${evt.name}`
                     );
                   }
@@ -1597,7 +1597,7 @@ export function getToolExecutor() {
 }
 
 /**
- * Get ClawOS-Lite security stats (for admin dashboard / monitoring).
+ * Get ProteClaw-Lite security stats (for admin dashboard / monitoring).
  * @returns {Object}
  */
 export function getSecurityStats() {

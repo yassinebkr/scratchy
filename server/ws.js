@@ -526,6 +526,7 @@ export function createWsHandler(server, opts = {}) {
         await Promise.race([handleMessage(ws, currentState, msg, opts), timeout]);
       } catch (err) {
         if (err.message === '__timeout__') {
+          sendJson(ws, { type: 'chat-stream-end', ts: Date.now() });
           sendJson(ws, { type: 'error', message: 'Request timed out (3m limit)' });
         } else {
           throw err;

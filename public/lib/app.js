@@ -853,6 +853,15 @@ function wireWsEvents() {
   });
 
   on('disconnected', () => {
+    // Clear stale streaming state — prevents _streamDiv from surviving reconnects
+    if (_streamDiv) {
+      _streamDiv.classList.remove('streaming');
+      _streamDiv = null;
+    }
+    _streamRaw = '';
+    // Reset history flag so reconnect reloads messages
+    _historyLoadedForAgent = null;
+
     state.reconnectAttempts++;
     if (state.reconnectAttempts >= 5) {
       setConnectionStatus('failed');
@@ -878,6 +887,11 @@ function wireWsEvents() {
     // Remove empty state and typing dots once real content arrives
     removeEmptyState();
     $messages.querySelectorAll('.typing-indicator').forEach(el => el.remove());
+    // Defensive: if _streamDiv is stale from a previous broken stream, finalize it
+    if (_streamDiv && !_streamDiv.classList.contains('streaming')) {
+      _streamDiv = null;
+      _streamRaw = '';
+    }
     if (!_streamDiv) {
       _streamDiv = document.createElement('div');
       _streamDiv.className = 'msg msg-assistant streaming';
