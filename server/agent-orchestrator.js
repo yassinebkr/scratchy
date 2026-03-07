@@ -50,6 +50,12 @@ import { routeTeamMessage } from '../lib/team-router.js';
 import * as secureKeys from '../lib/secure-keys.js';
 import { checkEmbeddingQuota, recordEmbeddingUsage } from '../lib/embedding-quota.js';
 import * as teamsState from '../state/teams.js';
+import {
+  scanForSignals, evaluateThreat, sanitizeInput,
+  createThreatState, activateThreat, clearThreat,
+  shouldBlockTool, shouldScanToolResult,
+  recordStats, recordBlock, recordSanitize, getStats,
+} from '../lib/clawos-lite.js';
 
 /* ------------------------------------------------------------------ */
 /*  Constants                                                         */
@@ -84,6 +90,9 @@ const MAX_CONCURRENT_PER_USER = 3;
 
 /** @type {Map<string, number>} active request count per userId */
 const _activeRequests = new Map();
+
+/** @type {Map<string, import('../lib/clawos-lite.js').ThreatState>} per-user threat state for ClawOS-Lite */
+const _threatStates = new Map();
 
 /** Adapter port range — offset from chat-handler's 29000-29999 */
 const ADAPTER_PORT_MIN = 28_000;
@@ -1025,6 +1034,21 @@ export async function routeMessage(userId, agentId, message, ws) {
     console.warn(`[orchestrator] Truncated oversized message from ${userId}`);
   }
 
+  // ── ClawOS-Lite: Clear threat state on new user message ──
+  const threat = _threatStates.get(userId);
+  if (threat?.active) {
+    clearThreat(threat);
+    console.log(`[clawos-lite] 🔓 Threat state cleared for ${userId} — new user message`);
+  }
+
+  // ── ClawOS-Lite: Input sanitization ──
+  const { sanitized, stripped } = sanitizeInput(text);
+  if (stripped.length > 0) {
+    text = sanitized;
+    recordSanitize();
+    console.log(`[clawos-lite] 🧹 Input sanitized for ${userId}: ${stripped.join(', ')}`);
+  }
+
   // Concurrent request guard — max 3 per user
   const activeCount = _activeRequests.get(userId) || 0;
   if (activeCount >= MAX_CONCURRENT_PER_USER) {
@@ -1186,9 +1210,38 @@ export async function routeMessage(userId, agentId, message, ws) {
           // These are authoritative (directly from the agent loop), so forward
           // them immediately to the client. The XML-based toolDetector is kept
           // as fallback for NullClaw instances without the event callback patch.
+          //
+          // ClawOS-Lite hooks:
+          //   tool_call_start  → check threat state, block dangerous tools
+          //   tool_call_result → scan output for injection patterns
           (evt) => {
             _resetInact();
             if (evt.type === 'tool_call_start') {
+              // ── ClawOS-Lite: Check if tool should be blocked ──
+              const userThreat = _threatStates.get(userId);
+              if (userThreat) {
+                const block = shouldBlockTool(userThreat, evt.name);
+                if (block.blocked) {
+                  recordBlock();
+                  console.warn(`[clawos-lite] 🛑 BLOCKED tool "${evt.name}" for ${userId}: ${block.reason}`);
+                  // Forward as a blocked tool event to client
+                  sendJson(ws, {
+                    type: 'tool_call',
+                    tool: evt.name,
+                    args: safeParseJson(evt.arguments),
+                    requestId: evt.id || `tc-${Date.now()}`,
+                    blocked: true,
+                    blockReason: block.reason,
+                    agentId: effectiveAgentId,
+                    ts: Date.now(),
+                  });
+                  // Don't forward to NullClaw — the tool event already happened
+                  // in NullClaw's loop. We can't retroactively block it there.
+                  // But we CAN flag it for the client and log it.
+                  return;
+                }
+              }
+
               sendJson(ws, {
                 type: 'tool_call',
                 tool: evt.name,
@@ -1199,6 +1252,33 @@ export async function routeMessage(userId, agentId, message, ws) {
                 ts: Date.now(),
               });
             } else if (evt.type === 'tool_call_result') {
+              // ── ClawOS-Lite: Scan tool result for injection ──
+              if (shouldScanToolResult(evt.name) && evt.output) {
+                const signals = scanForSignals(evt.output);
+                if (signals.length > 0) {
+                  const { confirmed, highSeverity } = evaluateThreat(signals);
+                  recordStats(signals, confirmed, userId);
+
+                  if (confirmed) {
+                    // Activate threat state
+                    if (!_threatStates.has(userId)) {
+                      _threatStates.set(userId, createThreatState());
+                    }
+                    activateThreat(_threatStates.get(userId), highSeverity, evt.name);
+                    console.warn(
+                      `[clawos-lite] 🔒 THREAT confirmed for ${userId} — ` +
+                      `${highSeverity.length} signal(s) in ${evt.name}: ` +
+                      highSeverity.map(s => `${s.pattern}(${s.confidence})`).join(', ')
+                    );
+                  } else if (highSeverity.length > 0) {
+                    console.log(
+                      `[clawos-lite] ℹ️ Advisory for ${userId}: ${highSeverity.length} signal(s) ` +
+                      `below threshold in ${evt.name}`
+                    );
+                  }
+                }
+              }
+
               // Build result object — include output for surface rendering
               const toolResult = { success: evt.success, duration_ms: evt.duration_ms };
               if (evt.output) {
@@ -1514,6 +1594,19 @@ export function isReady() {
  */
 export function getToolExecutor() {
   return _toolExecutor;
+}
+
+/**
+ * Get ClawOS-Lite security stats (for admin dashboard / monitoring).
+ * @returns {Object}
+ */
+export function getSecurityStats() {
+  return {
+    ...getStats(),
+    activeThreats: [..._threatStates.entries()]
+      .filter(([, t]) => t.active)
+      .map(([uid, t]) => ({ userId: uid, ...t })),
+  };
 }
 
 /* ------------------------------------------------------------------ */
