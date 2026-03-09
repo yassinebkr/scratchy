@@ -300,9 +300,9 @@ function sendMessage() {
   const text = $msgInput.value.trim();
   if (!text || _sendGuard) return;
 
-  // Debounce: block re-sends for 500ms (prevents double-click/tap)
+  // Debounce: block re-sends for 1500ms (prevents double-click/tap on mobile)
   _sendGuard = true;
-  setTimeout(() => { _sendGuard = false; }, 500);
+  setTimeout(() => { _sendGuard = false; }, 1500);
 
   // Track last user message for team-switch auto-resend
   _lastUserText = text;
@@ -361,12 +361,13 @@ async function uploadFile(file) {
 
     const { file: uploaded } = await res.json();
 
-    // Send a chat message referencing the uploaded file
+    // Send a chat message referencing the uploaded file (respect team mode)
     const activeAgentId = $agentSwitcher?._activeAgentId || null;
+    const teamId = _activeTeamId || sessionStorage.getItem('scratchy_teamId') || undefined;
     const msg = isImage
       ? `[Uploaded image: ${uploaded.filename}](${uploaded.url})`
       : `[Uploaded file: ${uploaded.filename}](${uploaded.url}) (${uploaded.mimeType}, ${(uploaded.size / 1024).toFixed(1)} KB)`;
-    sendChat(msg, activeAgentId);
+    sendChat(msg, activeAgentId, teamId);
   } catch (err) {
     appendMessage('system', `❌ Upload error: ${err.message}`);
   }
@@ -2193,12 +2194,14 @@ async function init() {
         document.dispatchEvent(new CustomEvent('team-chat', {
           detail: { teamId: team.id, teamName: team.name, agentCount: team.agentCount || team.agents?.length || '?' }
         }));
-        // Auto-resend last user message through the team router
-        if (_lastUserText) {
+        // Auto-resend last user message through the team router (one-shot)
+        const resendText = _lastUserText;
+        _lastUserText = null; // clear to prevent duplicate resends
+        if (resendText) {
           setTimeout(() => {
-            appendMessage('user', escapeHtml(_lastUserText));
+            appendMessage('user', escapeHtml(resendText));
             const activeAgentId = $agentSwitcher?._activeAgentId || null;
-            sendChat(_lastUserText, activeAgentId, team.id);
+            sendChat(resendText, activeAgentId, team.id);
           }, 300); // Small delay to let team mode activate + history load
         }
       })
