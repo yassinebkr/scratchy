@@ -23,7 +23,7 @@
  */
 
 import { spawn } from 'node:child_process';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, statSync, readdirSync } from 'node:fs';
 import { join as pathJoin } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
 import { NullClawAdapter } from '../lib/nullclaw-adapter.js';
@@ -47,6 +47,7 @@ import * as memory from '../state/memory.js';
 import * as contextIndex from '../state/context-index.js';
 import { getUsageTracker } from '../lib/usage-tracker.js';
 import { routeTeamMessage } from '../lib/team-router.js';
+import { broadcastToUser } from './ws.js';
 import * as secureKeys from '../lib/secure-keys.js';
 import { checkEmbeddingQuota, recordEmbeddingUsage } from '../lib/embedding-quota.js';
 import * as teamsState from '../state/teams.js';
@@ -56,6 +57,7 @@ import {
   shouldBlockTool, shouldScanToolResult,
   recordStats, recordBlock, recordSanitize, getStats,
 } from '../lib/proteclaw-lite.js';
+import { mapTypedCanvasTool, TYPED_TOOL_NAMES } from '../lib/canvas-typed-tools.js';
 
 /* ------------------------------------------------------------------ */
 /*  Constants                                                         */
@@ -105,8 +107,78 @@ const SOULS_DIR = pathJoin(process.cwd(), '.scratchy-data', 'souls');
 const _soulCache = new Map();
 
 /**
+ * Parse YAML frontmatter from a soul file.
+ * Returns { meta, body } where meta is the parsed frontmatter object
+ * and body is the markdown content after the frontmatter.
+ * If no frontmatter, meta is null and body is the full content.
+ *
+ * @param {string} content — raw file content
+ * @returns {{ meta: Object|null, body: string }}
+ */
+function parseSoulFrontmatter(content) {
+  const match = content.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
+  if (!match) return { meta: null, body: content };
+
+  const yamlBlock = match[1];
+  const body = match[2].trim();
+
+  // Simple YAML parser for flat + array fields (no external deps)
+  const meta = {};
+  let currentKey = null;
+  let currentValue = '';
+  let inArray = false;
+
+  for (const line of yamlBlock.split('\n')) {
+    const trimmed = line.trim();
+
+    // Array item (indented with -)
+    if (inArray && trimmed.startsWith('- ')) {
+      if (!Array.isArray(meta[currentKey])) meta[currentKey] = [];
+      meta[currentKey].push(trimmed.slice(2).trim());
+      continue;
+    }
+
+    // New key-value pair
+    const kvMatch = trimmed.match(/^(\w[\w-]*):\s*(.*)$/);
+    if (kvMatch) {
+      currentKey = kvMatch[1];
+      const val = kvMatch[2].trim();
+
+      if (val === '' || val === '>') {
+        // Multi-line value or array follows
+        inArray = val === '';
+        currentValue = '';
+        meta[currentKey] = '';
+        continue;
+      }
+
+      inArray = false;
+      meta[currentKey] = val;
+      continue;
+    }
+
+    // Continuation of multi-line value (e.g. description: >)
+    if (currentKey && !inArray && typeof meta[currentKey] === 'string') {
+      meta[currentKey] += (meta[currentKey] ? ' ' : '') + trimmed;
+    }
+  }
+
+  return { meta, body };
+}
+
+/**
  * Load the soul file for an agent. Soul files give agents distinct
  * personalities, expertise areas, communication styles, and rules.
+ *
+ * Supports YAML frontmatter (Anthropic Skills-style):
+ *   ---
+ *   name: agent-name
+ *   description: What it does. Use when...
+ *   triggers:
+ *     - keyword1
+ *     - keyword2
+ *   ---
+ *   # Full soul content...
  *
  * Lookup order:
  *   1. .scratchy-data/souls/{agentName}.md  (case-insensitive match)
@@ -116,7 +188,7 @@ const _soulCache = new Map();
  * Results are cached in memory (invalidated on file change via mtime check).
  *
  * @param {Object} agentConfig — agent row from SQLite
- * @returns {string|null} Soul markdown content, or null if no soul file exists
+ * @returns {{ meta: Object|null, body: string, content: string }|null}
  */
 function loadSoul(agentConfig) {
   const name = (agentConfig.name || '').toLowerCase().trim();
@@ -126,8 +198,8 @@ function loadSoul(agentConfig) {
   const cached = _soulCache.get(name);
   if (cached) {
     try {
-      const stat = require('node:fs').statSync(cached.path);
-      if (stat.mtimeMs === cached.mtimeMs) return cached.content;
+      const stat = statSync(cached.path);
+      if (stat.mtimeMs === cached.mtimeMs) return cached.result;
     } catch { /* file deleted — fall through to reload */ }
   }
 
@@ -140,11 +212,14 @@ function loadSoul(agentConfig) {
   for (const soulPath of candidates) {
     if (existsSync(soulPath)) {
       try {
-        const content = readFileSync(soulPath, 'utf-8');
-        const stat = require('node:fs').statSync(soulPath);
-        _soulCache.set(name, { path: soulPath, content, mtimeMs: stat.mtimeMs });
-        console.log(`[orchestrator] Loaded soul for ${agentConfig.name} (${soulPath})`);
-        return content;
+        const raw = readFileSync(soulPath, 'utf-8');
+        const stat = statSync(soulPath);
+        const { meta, body } = parseSoulFrontmatter(raw);
+        const result = { meta, body, content: raw };
+        _soulCache.set(name, { path: soulPath, result, mtimeMs: stat.mtimeMs });
+        const desc = meta?.description ? ` — ${meta.description.slice(0, 60)}...` : '';
+        console.log(`[orchestrator] Loaded soul for ${agentConfig.name}${desc}`);
+        return result;
       } catch (err) {
         console.warn(`[orchestrator] Failed to read soul file ${soulPath}:`, err.message);
       }
@@ -152,6 +227,29 @@ function loadSoul(agentConfig) {
   }
 
   return null;
+}
+
+/**
+ * Get soul summaries for all agents (frontmatter only).
+ * Used for progressive disclosure — the orchestrator can see
+ * what all agents are capable of without loading full soul content.
+ *
+ * @returns {Map<string, Object>} agent name → frontmatter meta
+ */
+function getSoulSummaries() {
+  const summaries = new Map();
+  try {
+    const files = readdirSync(SOULS_DIR).filter(f => f.endsWith('.md'));
+    for (const file of files) {
+      const soulPath = pathJoin(SOULS_DIR, file);
+      const raw = readFileSync(soulPath, 'utf-8');
+      const { meta } = parseSoulFrontmatter(raw);
+      if (meta?.name) {
+        summaries.set(meta.name, meta);
+      }
+    }
+  } catch { /* souls dir missing — fine */ }
+  return summaries;
 }
 
 /* ------------------------------------------------------------------ */
@@ -627,7 +725,9 @@ function buildAugmentedPrompt(userMessage, agentConfig, history, contextBlock, t
   // over the generic system prompt for identity/behavior.
   const soul = loadSoul(agentConfig);
   if (soul) {
-    parts.push(`[Soul]\n${soul}\n`);
+    // Progressive disclosure: inject full body (not frontmatter YAML)
+    // Frontmatter metadata is used for agent routing/matching, not prompt content
+    parts.push(`[Soul]\n${soul.body}\n`);
   }
 
   // ── Agent system prompt (GenUI protocol / technical instructions) ──
@@ -1145,6 +1245,11 @@ export async function routeMessage(userId, agentId, message, ws) {
     let response = '';
     let usedAdapter = false;
 
+    // ── Canvas stream gate: suppress verbose post-canvas-tool text ──
+    let canvasToolFired = false;
+    let canvasGateSentenceCount = 0;
+    let canvasGateBuffer = '';
+
     // ── Tool call detector: parses tool calls from streaming output
     //    and forwards them as WebSocket events so the client-side
     //    surface-manager can auto-activate surfaces (Terminal, Editor, etc.)
@@ -1174,15 +1279,38 @@ export async function routeMessage(userId, agentId, message, ws) {
     // ── Streaming filter: suppress <tool_call>/<tool_result>/<tool_use> XML
     //    from reaching the client. The tool detector still gets the raw chunks.
     const streamFilter = _createStreamFilter((cleanDelta) => {
-      if (cleanDelta) {
-        sendJson(ws, {
-          type: 'chat-stream',
-          delta: cleanDelta,
-          agentId: effectiveAgentId,
-          agentName: agent.name,
-          ts: Date.now(),
-        });
+      if (!cleanDelta) return;
+
+      // After canvas tool fired — allow max 1 sentence, suppress rest
+      if (canvasToolFired) {
+        canvasGateBuffer += cleanDelta;
+        const sentences = canvasGateBuffer.match(/[.!?]\s/g);
+        if (sentences) canvasGateSentenceCount += sentences.length;
+        if (canvasGateSentenceCount >= 1) {
+          const match = canvasGateBuffer.match(/^(.*?[.!?])\s/);
+          if (match) {
+            sendJson(ws, {
+              type: 'chat-stream',
+              delta: match[1],
+              agentId: effectiveAgentId,
+              agentName: agent.name,
+              ts: Date.now(),
+            });
+            canvasGateBuffer = '';
+          }
+          return; // suppress further text
+        }
+        // Haven't finished first sentence yet — hold in buffer
+        return;
       }
+
+      sendJson(ws, {
+        type: 'chat-stream',
+        delta: cleanDelta,
+        agentId: effectiveAgentId,
+        agentName: agent.name,
+        ts: Date.now(),
+      });
     });
 
     if (_adapter) {
@@ -1239,6 +1367,37 @@ export async function routeMessage(userId, agentId, message, ws) {
                   // in NullClaw's loop. We can't retroactively block it there.
                   // But we CAN flag it for the client and log it.
                   return;
+                }
+              }
+
+              // ── Canvas MCP tool interception ──
+              // Intercept mcp_canvas_* tool calls and push as canvas-ops
+              if (evt.name && evt.name.startsWith('mcp_canvas_')) {
+                canvasToolFired = true;
+                canvasGateSentenceCount = 0;
+                canvasGateBuffer = '';
+                const shortName = evt.name.replace('mcp_canvas_', '');
+                let args;
+                try {
+                  args = typeof evt.arguments === 'string' ? JSON.parse(evt.arguments) : (evt.arguments || {});
+                } catch { args = {}; }
+
+                let ops = [];
+                if (shortName === 'render' && args.components) {
+                  ops = args.components.map(c => ({ op: 'upsert', id: c.id || `auto-${Date.now()}`, type: c.type || 'card', data: c.data || {} }));
+                } else if (shortName === 'update') {
+                  ops = [{ op: 'patch', id: args.id, data: args.data || {} }];
+                } else if (shortName === 'remove') {
+                  ops = [{ op: 'remove', id: args.id }];
+                } else if (shortName === 'clear') {
+                  ops = [{ op: 'clear' }];
+                } else if (TYPED_TOOL_NAMES.has(shortName)) {
+                  ops = mapTypedCanvasTool(shortName, args);
+                }
+                if (ops.length > 0) {
+                  sendJson(ws, { type: 'genui-pending', count: ops.length, ts: Date.now() });
+                  sendJson(ws, { type: 'canvas-ops', ops, source: 'genui-tool', ts: Date.now() });
+                  console.log(`[orchestrator] Canvas tool: ${shortName} → ${ops.length} ops for ${userId}`);
                 }
               }
 
@@ -1343,6 +1502,22 @@ export async function routeMessage(userId, agentId, message, ws) {
     toolDetector.flush();
     streamFilter.flush();
 
+    // ── Flush canvas gate buffer (remaining unsent text < 1 sentence) ──
+    if (canvasToolFired && canvasGateBuffer.trim() && canvasGateSentenceCount < 1) {
+      const cleaned = canvasGateBuffer
+        .replace(/<tool_call>[\s\S]*?<\/tool_call>/g, '')
+        .replace(/<tool_result>[\s\S]*?<\/tool_result>/g, '').trim();
+      if (cleaned) {
+        sendJson(ws, {
+          type: 'chat-stream',
+          delta: cleaned,
+          agentId: effectiveAgentId,
+          agentName: agent.name,
+          ts: Date.now(),
+        });
+      }
+    }
+
     // ── End stream ──
     sendJson(ws, { type: 'chat-stream-end', agentId: effectiveAgentId, ts: Date.now() });
     sendJson(ws, { type: 'typing', status: 'stop', agentId: effectiveAgentId, ts: Date.now() });
@@ -1351,7 +1526,17 @@ export async function routeMessage(userId, agentId, message, ws) {
     if (response) {
       const { text: cleanText, ops, hasOps } = parseGenUIResponse(response);
       if (hasOps && ops.length > 0) {
-        // Signal client that GenUI tiles are coming (shows "Rendering UI..." placeholder)
+        // Replace the streamed text with clean (minimal) text — removes verbose prose
+        // that was describing what the canvas shows
+        if (cleanText !== response) {
+          sendJson(ws, {
+            type: 'chat-replace',
+            text: cleanText.trim(),
+            ts: Date.now(),
+          });
+        }
+
+        // Signal client that GenUI tiles are coming (shows skeleton)
         sendJson(ws, { type: 'genui-pending', count: ops.length, ts: Date.now() });
         sendJson(ws, {
           type: 'canvas-ops',
@@ -1359,7 +1544,7 @@ export async function routeMessage(userId, agentId, message, ws) {
           source: 'genui',
           ts: Date.now(),
         });
-        console.log(`[orchestrator] GenUI: ${ops.length} canvas ops extracted for ${userId}`);
+        console.log(`[orchestrator] GenUI: ${ops.length} canvas ops extracted for ${userId}`, JSON.stringify(ops[0]).slice(0, 200));
 
         // Persist canvas ops for restore on reconnect
         try {
@@ -1389,6 +1574,17 @@ export async function routeMessage(userId, agentId, message, ws) {
     }
 
     // ── Step 9: Persist assistant response + usage tracking ──
+    // Clean response if canvas tools were used: strip tool XML, truncate verbose text
+    if (response && canvasToolFired) {
+      response = response
+        .replace(/<tool_call>[\s\S]*?<\/tool_call>/g, '')
+        .replace(/<tool_result>[\s\S]*?<\/tool_result>/g, '')
+        .trim();
+      const sentenceMatch = response.match(/^(.*?[.!?])\s/);
+      if (sentenceMatch && response.length > 150) {
+        response = sentenceMatch[1];
+      }
+    }
     if (response) {
       const modelLabel = usedAdapter
         ? `nullclaw-gateway:${agent.model || 'default'}`
@@ -1486,13 +1682,17 @@ export async function routeTeamChat(userId, teamId, message, ws) {
   }
 
   try {
+    // Use broadcastToUser for team ops — survives WS reconnects during long-running team execution
+    const teamSendJson = (_ws, msg) => {
+      broadcastToUser(userId, msg);
+    };
     const response = await routeTeamMessage({
       userId,
       teamId,
       text,
       ws,
       adapter: _adapter,
-      sendJson,
+      sendJson: teamSendJson,
       getHistory,
       appendHistory,
       retrieveContext,
@@ -1600,6 +1800,14 @@ export function getToolExecutor() {
  * Get ProteClaw-Lite security stats (for admin dashboard / monitoring).
  * @returns {Object}
  */
+/**
+ * Get soul summaries for all agents (frontmatter metadata only).
+ * Progressive disclosure: provides trigger conditions and descriptions
+ * without loading full soul content into memory.
+ * @returns {Map<string, Object>}
+ */
+export { getSoulSummaries };
+
 export function getSecurityStats() {
   return {
     ...getStats(),

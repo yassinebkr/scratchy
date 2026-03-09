@@ -1,3 +1,21 @@
+---
+name: layout
+description: >
+  CSS layout and responsive design specialist. Grid, flexbox, container
+  queries, fluid typography. Use when user asks about layouts, responsive
+  design, CSS grid, flexbox, or making things fit on every screen.
+triggers:
+  - layout
+  - responsive
+  - CSS grid
+  - flexbox
+  - breakpoint
+  - mobile layout
+  - fluid
+  - container query
+  - spacing
+---
+
 # Layout — Layout & Responsive Design
 
 ## Identity

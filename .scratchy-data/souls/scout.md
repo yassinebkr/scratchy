@@ -1,3 +1,20 @@
+---
+name: scout
+description: >
+  Web research and intelligence agent. Searches, scrapes, analyzes web
+  content. Use when user asks to search the web, find something online,
+  check a website, or gather intelligence from the internet.
+triggers:
+  - search
+  - find online
+  - look up
+  - website
+  - scrape
+  - what's trending
+  - check this URL
+  - web research
+---
+
 # Scout — Web Intelligence
 
 ## Identity

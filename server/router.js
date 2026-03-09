@@ -30,6 +30,7 @@ import { createTeamRoutes } from './routes/teams.js';
 import { createWorkspaceRoutes } from './routes/workspaces.js';
 import { listSkills, getSkill, getSkillsForAgent, getToolsForAgent } from '../lib/skills/index.js';
 import { scanSkill, formatReport } from '../lib/skill-scanner.js';
+import { getSoulSummaries } from './agent-orchestrator.js';
 
 /** @type {import('../lib/mcp-registry.js').McpRegistry|null} */
 let _mcpRegistry = null;
@@ -564,8 +565,8 @@ export function createRouter(opts = {}) {
           return json(res, 400, { error: 'New password must be at least 8 characters' });
         }
         try {
-          const { getUser, updateUser } = await import('../state/users.js');
-          const fullUser = getUser(user.id);
+          const { getUserFull, updateUser } = await import('../state/users.js');
+          const fullUser = getUserFull(user.id);
           if (!fullUser) return json(res, 404, { error: 'User not found' });
           const valid = await auth.verifyPassword(currentPassword, fullUser.passwordHash);
           if (!valid) {
@@ -719,10 +720,15 @@ export function createRouter(opts = {}) {
 
       /* ---------- Workspace file serving (agent images, screenshots) ---------- */
       if (method === 'GET' && pathname === '/api/workspace-file') {
+        const user = await requireAuth(req, res);
+        if (!user) return;
         const filePath = url.searchParams?.get('path') || new URL(req.url, 'http://x').searchParams.get('path');
         if (!filePath) return json(res, 400, { error: 'Missing path parameter' });
-        // Security: only allow files from nullclaw workspace or /tmp
-        const allowedPrefixes = ['/home/nonbios/.nullclaw/', '/tmp/'];
+        // Security: only allow files from user's nullclaw workspace or user-scoped /tmp
+        const userHome = `/home/nonbios/.nullclaw/homes/${user.id}/`;
+        const allowedPrefixes = [userHome, '/tmp/'];
+        // Admin can access all nullclaw paths
+        if (user.role === 'admin') allowedPrefixes.push('/home/nonbios/.nullclaw/');
         const normalizedPath = resolve(filePath);
         if (!allowedPrefixes.some(p => normalizedPath.startsWith(p))) {
           return json(res, 403, { error: 'Access denied' });
@@ -733,6 +739,51 @@ export function createRouter(opts = {}) {
           const mimeMap = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml', pdf: 'application/pdf' };
           const mime = mimeMap[ext] || 'application/octet-stream';
           res.writeHead(200, { 'Content-Type': mime, 'Cache-Control': 'public, max-age=3600' });
+          res.end(data);
+        } catch {
+          return json(res, 404, { error: 'File not found' });
+        }
+        return;
+      }
+
+      /* ---------- Team task preview (serve generated files) ---------- */
+      // GET /api/preview/:userId/:taskId/* — serve files from team workspace
+      // Used by webapp surface to preview worker-generated HTML/CSS/JS
+      if (method === 'GET' && pathname.startsWith('/api/preview/')) {
+        const user = await requireAuth(req, res);
+        if (!user) return;
+        const parts = pathname.replace('/api/preview/', '').split('/');
+        const previewUserId = parts[0];
+        const taskId = parts[1];
+        const filePath = parts.slice(2).join('/') || 'index.html';
+        // Security: only own previews (or admin)
+        if (user.id !== previewUserId && user.role !== 'admin') {
+          return json(res, 403, { error: 'Access denied' });
+        }
+        if (!taskId || taskId.includes('..') || filePath.includes('..')) {
+          return json(res, 400, { error: 'Invalid path' });
+        }
+        // Try published first, then sandbox
+        const publishedPath = resolve(__dirname, '..', '.scratchy-data', 'team-workspace', previewUserId, 'published', taskId, filePath);
+        const sandboxPath = resolve(__dirname, '..', '.scratchy-data', 'team-workspace', previewUserId, 'tasks', taskId, filePath);
+        let targetPath = null;
+        try { await stat(publishedPath); targetPath = publishedPath; } catch {}
+        if (!targetPath) { try { await stat(sandboxPath); targetPath = sandboxPath; } catch {} }
+        if (!targetPath) return json(res, 404, { error: 'File not found' });
+        // Verify resolved path stays inside workspace
+        const wsRoot = resolve(__dirname, '..', '.scratchy-data', 'team-workspace', previewUserId);
+        if (!targetPath.startsWith(wsRoot)) return json(res, 403, { error: 'Access denied' });
+        try {
+          const data = await readFile(targetPath);
+          const ext = targetPath.split('.').pop().toLowerCase();
+          const mimeMap = {
+            html: 'text/html', htm: 'text/html', css: 'text/css', js: 'application/javascript',
+            json: 'application/json', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
+            gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml', ico: 'image/x-icon',
+            woff2: 'font/woff2', woff: 'font/woff', ttf: 'font/ttf',
+          };
+          const mime = mimeMap[ext] || 'application/octet-stream';
+          res.writeHead(200, { 'Content-Type': mime, 'Cache-Control': 'no-cache' });
           res.end(data);
         } catch {
           return json(res, 404, { error: 'File not found' });
@@ -903,6 +954,21 @@ export function createRouter(opts = {}) {
             if (!seen.has(b.id)) agentList.push(b);
           }
         }
+
+        // Enrich agents with skill metadata from soul files (frontmatter)
+        try {
+          const summaries = getSoulSummaries();
+          for (const agent of agentList) {
+            const name = (agent.name || '').toLowerCase().trim();
+            const meta = summaries.get(name);
+            if (meta) {
+              agent.skill = {
+                description: meta.description || null,
+                triggers: meta.triggers || [],
+              };
+            }
+          }
+        } catch { /* soul summaries unavailable — fine, agents still work */ }
 
         return json(res, 200, agentList);
       }
@@ -1480,11 +1546,18 @@ export function createRouter(opts = {}) {
         });
       }
 
-      // Serve uploaded files
+      // Serve uploaded files (authenticated, user-scoped)
       if (method === 'GET' && pathname.startsWith('/api/uploads/')) {
+        const user = await requireAuth(req, res);
+        if (!user) return;
         const parts = pathname.split('/').filter(Boolean); // ['api', 'uploads', userId, filename]
         if (parts.length !== 4) return json(res, 404, { error: 'Not found' });
         const [, , fileUserId, filename] = parts;
+
+        // Only the file owner or admins can access uploads
+        if (user.id !== fileUserId && user.role !== 'admin') {
+          return json(res, 403, { error: 'Access denied' });
+        }
 
         // Validate filename to prevent path traversal
         if (filename.includes('..') || filename.includes('/')) {

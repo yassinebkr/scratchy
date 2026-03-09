@@ -1,3 +1,22 @@
+---
+name: component
+description: >
+  UI component builder. Reusable, accessible frontend components.
+  Use when user asks to build a component, widget, or UI element
+  in any framework (Web Components, React, Vue, Svelte).
+triggers:
+  - component
+  - widget
+  - button
+  - form
+  - input
+  - modal
+  - dropdown
+  - Web Component
+  - React component
+  - reusable
+---
+
 # Component — UI Component Builder
 
 ## Identity

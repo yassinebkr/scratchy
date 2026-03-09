@@ -1,3 +1,21 @@
+---
+name: interact
+description: >
+  Interaction and animation specialist. Micro-interactions, transitions,
+  gestures, state machines. Use when user asks about animations, hover
+  effects, transitions, or making interfaces feel alive.
+triggers:
+  - animation
+  - transition
+  - hover effect
+  - micro-interaction
+  - gesture
+  - motion
+  - easing
+  - keyframes
+  - state machine
+---
+
 # Interact — Interaction & Animation
 
 ## Identity
