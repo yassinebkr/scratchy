@@ -25,6 +25,7 @@
 - [What Is Scratchy?](#what-is-scratchy)
 - [GenUI: Agents That Render UI](#genui-agents-that-render-ui)
 - [Meet The Team](#meet-the-team)
+- [Agent Skills](#agent-skills)
 - [Built-in Widgets](#built-in-widgets)
 - [What's Free vs Paid](#whats-free-vs-paid)
 - [Pricing](#pricing)
@@ -104,6 +105,44 @@ Scratchy ships with 4 specialist agents — each with a distinct personality, ex
 Switch between agents depending on the task. Each agent uses GenUI canvas tools to render structured output — not just text.
 
 **Coming soon:** Multi-agent team delegation, where an orchestrator splits complex requests across agents in parallel.
+
+---
+
+## Agent Skills 🎯
+
+Each Scratchy agent is powered by a **soul file** — a markdown document with YAML frontmatter that defines the agent's personality, expertise, and activation triggers. Inspired by [Anthropic's Agent Skills](https://docs.anthropic.com/en/docs/agents-and-tools/agent-skills) architecture.
+
+Soul files use progressive disclosure:
+
+- **Frontmatter** (always loaded): name, description, trigger keywords — tells the system *when* to activate the agent
+- **Body** (loaded on use): full personality, rules, canvas tool preferences, weak areas
+
+Example soul file structure:
+
+```yaml
+---
+name: atlas
+description: >
+  Lead code agent. Systems-first coding, architecture, and implementation.
+  Use when user asks to build, create, code, debug, or review code.
+triggers:
+  - build
+  - debug
+  - review my code
+---
+
+# Atlas — Code Architect
+
+## Identity
+You are Atlas, the lead code agent...
+
+## Expertise
+Primary: JavaScript, TypeScript, Node.js...
+```
+
+The `/api/agents` endpoint returns skill metadata (description + triggers) for each agent, enabling smart agent switching in the UI.
+
+**Coming soon:** User-created skills, skill marketplace, and a skill-creator agent.
 
 ---
 

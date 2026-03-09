@@ -37,7 +37,7 @@ const AGENTS = [
     name: 'Atlas',
     role: 'Code',
     tagline: 'Thinks in systems, ships in PRs.',
-    desc: 'Architecture first, then implementation. Proper error handling, tests, and docs — because "it works on my machine" isn\'t a deployment strategy.',
+    desc: 'Skilled in JavaScript, TypeScript, Node.js, and systems architecture. Proper error handling, tests, and docs — because "it works on my machine" isn\'t a deployment strategy.',
     color: '#DAA520',
     avatar: '<img src="/assets/agents/atlas.png" alt="Atlas">',
   },
@@ -45,7 +45,7 @@ const AGENTS = [
     name: 'Iris',
     role: 'Design',
     tagline: 'Pixels with purpose.',
-    desc: 'Mobile-first, accessible, opinionated. Builds UI systems, not just screens. Will fight you on padding.',
+    desc: 'Skilled in CSS, design systems, and accessibility. Mobile-first, opinionated. Builds UI systems, not just screens. Will fight you on padding.',
     color: '#6366f1',
     avatar: '<img src="/assets/agents/iris.png" alt="Iris">',
   },
@@ -53,7 +53,7 @@ const AGENTS = [
     name: 'Nova',
     role: 'Research',
     tagline: 'Reads everything. Trusts nothing.',
-    desc: 'Cross-references, synthesizes, cites sources. Flags uncertainty instead of hallucinating. Your bullshit detector with a library card.',
+    desc: 'Skilled in web research, data analysis, and source verification. Cross-references, synthesizes, cites sources. Your bullshit detector with a library card.',
     color: '#10b981',
     avatar: '<img src="/assets/agents/nova.png" alt="Nova">',
   },
@@ -61,7 +61,7 @@ const AGENTS = [
     name: 'Echo',
     role: 'Writer',
     tagline: 'Every sentence earns its place.',
-    desc: 'Docs, copy, emails — zero filler, zero AI slop. Matches your voice, not some generic "professional tone."',
+    desc: 'Skilled in technical writing, copywriting, and tone matching. Docs, copy, emails — zero filler, zero AI slop. Matches your voice, not some generic "professional tone."',
     color: '#f47252',
     avatar: '<img src="/assets/agents/echo.png" alt="Echo">',
   },
@@ -2262,7 +2262,7 @@ class ScLanding extends HTMLElement {
     const freeItems = [
       'Single-user personal workspace',
       'Your server, your API keys, your data',
-      'All 4 specialist agents',
+      '4 skilled agents with unique expertise',
       '34 canvas components',
       'Persistent agent memory',
       'Protected by ProteClaw',
@@ -2317,7 +2317,7 @@ class ScLanding extends HTMLElement {
             Open-core AI workspace
           </div>
           <h1>Your AI agents <span class="gold">remember yesterday</span>.</h1>
-          <p class="hero-sub">Every AI chat resets when you close the tab. Scratchy agents have persistent memory, work in teams, and build real UI — on your server.</p>
+          <p class="hero-sub">Every AI chat resets when you close the tab. Scratchy agents have persistent memory, specialized skills, and build real UI — on your server.</p>
           <div class="hero-cta">
             <button class="btn btn-primary" data-action="get-started">Get Started</button>
             <button class="btn btn-ghost" data-scroll="open-core">${ICON.lock} Self-host it</button>
@@ -2347,11 +2347,11 @@ class ScLanding extends HTMLElement {
 
           <div class="diff-block">
             <div class="diff-visual">
-              <div class="diff-visual-placeholder"><div class="diff-visual-emoji">👥</div><span>Screenshot: team delegation</span></div>
+              <div class="diff-visual-placeholder"><div class="diff-visual-emoji">🎯</div><span>Screenshot: agent soul file</span></div>
             </div>
             <div class="diff-text">
-              <h3><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="4"/><circle cx="9" cy="16" r="1"/><circle cx="15" cy="16" r="1"/></svg> Teams, not a single model pretending</h3>
-              <p>An orchestrator splits work across specialists. Atlas writes code, Iris designs UI, Nova researches, Echo writes docs. They work in parallel with isolated workspaces.</p>
+              <h3><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg> Agents with skills, not just prompts</h3>
+              <p>Each agent has a soul file defining its personality, expertise, and trigger conditions. Not a generic chatbot — a specialist that knows its tools, its domain, and when to activate.</p>
             </div>
           </div>
 
@@ -2440,7 +2440,7 @@ class ScLanding extends HTMLElement {
               <div class="demo-form-layout">
                 <div class="demo-form-header">
                   <h4>Create New Project</h4>
-                  <p>Configure and launch a new agent team.</p>
+                  <p>Configure and launch a new agent workspace.</p>
                 </div>
                 <div class="demo-form-group">
                   <label class="demo-form-label">Project Name</label>
@@ -2448,7 +2448,7 @@ class ScLanding extends HTMLElement {
                 </div>
                 </div>
                 <div class="demo-form-group">
-                  <label class="demo-form-label">Agent Team</label>
+                  <label class="demo-form-label">Agent Preset</label>
                   <div class="demo-form-field demo-form-select" data-demo-select>
                     <span class="demo-select-label">SEO &amp; Content</span>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
@@ -2668,8 +2668,8 @@ class ScLanding extends HTMLElement {
       <!-- Meet The Team -->
       <section id="team" class="section">
         <div class="section-eyebrow">The Crew</div>
-        <h2 class="section-title">Four agents. Actual personalities.</h2>
-        <p class="section-subtitle">Not generic assistants — specialists with opinions, expertise, and memory.</p>
+        <h2 class="section-title">Four skilled agents. Actual expertise.</h2>
+        <p class="section-subtitle">Not generic assistants — specialists with defined skills, opinions, and memory.</p>
         <div class="agents-grid">${agentsHtml}</div>
       </section>
 
@@ -2678,8 +2678,8 @@ class ScLanding extends HTMLElement {
       <!-- Showcase -->
       <section id="showcase" class="section">
         <div class="section-eyebrow">Built with Scratchy</div>
-        <h2 class="section-title">Teams made these. In minutes.</h2>
-        <p class="section-subtitle">Real projects built by agent teams working together — not cherry-picked demos.</p>
+        <h2 class="section-title">Agents made these. In minutes.</h2>
+        <p class="section-subtitle">Real projects built by skilled agents — not cherry-picked demos.</p>
         <div class="showcase-grid">
           <div class="showcase-card">
             <div class="showcase-gif" data-placeholder="chat-to-canvas">
@@ -2689,11 +2689,11 @@ class ScLanding extends HTMLElement {
             <p>Ask for stats, get interactive gauges, charts, and tables — not a wall of text.</p>
           </div>
           <div class="showcase-card">
-            <div class="showcase-gif" data-placeholder="team-task">
-              <div class="showcase-placeholder">👥 → 📦<br><span>Team Delegation</span></div>
+            <div class="showcase-gif" data-placeholder="agent-skills">
+              <div class="showcase-placeholder">🎯 → 📦<br><span>Skilled Agents</span></div>
             </div>
-            <h4>Multi-agent portfolio</h4>
-            <p>One prompt, four agents. Atlas writes code, Iris designs, Nova researches, Echo documents.</p>
+            <h4>Right agent, right skill</h4>
+            <p>Each agent knows its domain. Atlas architects systems, Iris crafts interfaces, Nova verifies facts, Echo writes docs.</p>
           </div>
           <div class="showcase-card">
             <div class="showcase-gif" data-placeholder="widgets">
