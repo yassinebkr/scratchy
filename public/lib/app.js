@@ -5,6 +5,69 @@
 
 import { connect, disconnect, on, send, sendChat, emit } from './ws-client.js';
 import { MobileUXManager } from './mobile-ux.js';
+// Lazy-load inline tiles to avoid blocking page load
+/** Inline tile renderer — progressive: tiles appear one by one with staggered timing */
+function renderInlineTiles(messageEl, ops) {
+  // Get or create tile container
+  let container = messageEl.querySelector('.chat-tiles');
+  if (!container) {
+    container = document.createElement('div');
+    container.className = 'chat-tiles';
+    messageEl.appendChild(container);
+  }
+
+  // Separate immediate ops (clear/remove/patch) from upserts
+  const immediateOps = ops.filter(op => op?.op !== 'upsert');
+  const upsertOps = ops.filter(op => op?.op === 'upsert' && op.id);
+
+  // Handle immediate ops synchronously
+  immediateOps.forEach(op => {
+    if (!op) return;
+    if (op.op === 'clear') { container.innerHTML = ''; return; }
+    if (op.op === 'remove') {
+      const el = container.querySelector(`#tile-${CSS.escape(op.id)}`);
+      if (el) el.remove();
+      return;
+    }
+    if (op.op === 'patch') {
+      const el = container.querySelector(`#tile-${CSS.escape(op.id)}`);
+      if (el && op.data) {
+        try {
+          const prev = JSON.parse(el.getAttribute('data') || '{}');
+          el.setAttribute('data', JSON.stringify({ ...prev, ...op.data }));
+        } catch {}
+      }
+    }
+  });
+
+  // Progressive upsert: add tiles one by one with staggered delays
+  upsertOps.forEach((op, i) => {
+    setTimeout(() => {
+      // Remove existing tile with same id
+      const existing = container.querySelector(`#tile-${CSS.escape(op.id)}`);
+      if (existing) existing.remove();
+
+      const tile = document.createElement('sc-tile');
+      tile.id = `tile-${op.id}`;
+      tile.setAttribute('type', op.type || 'card');
+      if (op.data) tile.setAttribute('data', JSON.stringify(op.data));
+      tile.style.opacity = '0';
+      tile.style.transform = 'translateY(12px)';
+      container.appendChild(tile);
+
+      // Trigger entrance animation on next frame
+      requestAnimationFrame(() => {
+        tile.style.transition = 'opacity 250ms ease-out, transform 250ms ease-out';
+        tile.style.opacity = '1';
+        tile.style.transform = 'translateY(0)';
+      });
+
+      // Scroll down as each tile appears
+      scrollToBottom();
+    }, i * 120); // 120ms between each tile
+  });
+}
+// inlineTileRegistry declared at line 74
 
 /* ------------------------------------------------------------------ */
 /*  State                                                             */
@@ -27,6 +90,7 @@ export function getToken() { return state.token; }
 
 let $loadingScreen, $landingScreen, $authScreen, $appScreen, $wizardScreen, $plansScreen;
 let $messages, $msgInput, $sendBtn;
+const inlineTileRegistry = new Map();
 let $statusDot, $statusText, $statusBadge, $topbarUser, $logoutBtn, $userMenuBtn, $userMenu, $settingsBtn, $adminBtn;
 let $agentSwitcher;
 let $mobileAgentBtn;
@@ -35,6 +99,7 @@ let $teamBanner, $teamBannerName, $teamBannerAgents, $teamExitBtn;
 let _skipMenuClose = false;
 let _activeTeamId = sessionStorage.getItem('scratchy_teamId') || null;
 let _activeTeamName = sessionStorage.getItem('scratchy_teamName') || null;
+let _lastUserText = '';  // Track last user message for team-switch auto-resend
 
 function resolveDOM() {
   $loadingScreen = document.getElementById('loading-screen');
@@ -71,7 +136,8 @@ function resolveDOM() {
 function hideAllScreens() {
   // Always hide loading screen once we've routed
   if ($loadingScreen) $loadingScreen.classList.add('hidden');
-  [$landingScreen, $authScreen, $appScreen, $wizardScreen, $plansScreen]
+  const $signupCheckoutScreen = document.getElementById('signup-checkout-screen');
+  [$landingScreen, $authScreen, $appScreen, $wizardScreen, $plansScreen, $signupCheckoutScreen]
     .forEach(el => el?.classList.add('hidden'));
   if ($workspaceBar) $workspaceBar.style.display = 'none';
 }
@@ -85,6 +151,18 @@ function showLanding() {
 function showAuth() {
   hideAllScreens();
   $authScreen.classList.remove('hidden');
+}
+
+function showSignupCheckout(planId) {
+  hideAllScreens();
+  const screen = document.getElementById('signup-checkout-screen');
+  if (screen) {
+    screen.classList.remove('hidden');
+    const el = screen.querySelector('sc-signup-checkout');
+    if (el) el.planId = planId; // component fetches plan details
+  } else {
+    showAuth(); // fallback
+  }
 }
 
 function showPlans() {
@@ -185,6 +263,12 @@ function softScrollToBottom() {
   if (nearBottom) $messages.scrollTop = $messages.scrollHeight;
 }
 
+/** Force scroll to bottom (for new content the user expects) */
+function scrollToBottom() {
+  if (!$messages) return;
+  $messages.scrollTop = $messages.scrollHeight;
+}
+
 /* ------------------------------------------------------------------ */
 /*  Textarea auto-resize                                              */
 /* ------------------------------------------------------------------ */
@@ -219,6 +303,9 @@ function sendMessage() {
   // Debounce: block re-sends for 500ms (prevents double-click/tap)
   _sendGuard = true;
   setTimeout(() => { _sendGuard = false; }, 500);
+
+  // Track last user message for team-switch auto-resend
+  _lastUserText = text;
 
   // Remove empty state if present
   removeEmptyState();
@@ -399,6 +486,9 @@ function stripInternalBlocks(text, opts) {
   const streaming = opts && opts.streaming;
   let s = text;
 
+  // NullClaw debug output
+  s = s.replace(/^Sending to [Aa]nthropic\.{3}\s*\n?/gm, '');
+
   // Tool call XML blocks (closed)
   s = s.replace(/<tool_call[^>]*>[\s\S]*?<\/tool_call>/g, '');
   s = s.replace(/<tool_result[^>]*>[\s\S]*?<\/tool_result>/g, '');
@@ -436,17 +526,80 @@ function stripInternalBlocks(text, opts) {
   return s;
 }
 
-/** Basic markdown → HTML (bold, italic, inline code, code blocks, newlines) */
+/** Markdown → HTML (headers, lists, bold, italic, code, links, images) */
 function formatMarkdown(text) {
   let html = escapeHtml(text);
-  // Code blocks: ```...```
+
+  // Code blocks: ```...``` (must be before line-level processing)
   html = html.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>');
+
+  // Process line-by-line for block-level elements
+  const lines = html.split('\n');
+  const out = [];
+  let inList = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i];
+
+    // Skip lines inside <pre> blocks (already handled)
+    if (line.includes('<pre>') || line.includes('</pre>')) {
+      if (inList) { out.push('</ul>'); inList = false; }
+      out.push(line);
+      continue;
+    }
+
+    // Horizontal rule: --- or *** or ___
+    if (/^(-{3,}|\*{3,}|_{3,})$/.test(line.trim())) {
+      if (inList) { out.push('</ul>'); inList = false; }
+      out.push('<hr>');
+      continue;
+    }
+
+    // Headers: # ## ### ####
+    const hMatch = line.match(/^(#{1,4})\s+(.+)$/);
+    if (hMatch) {
+      if (inList) { out.push('</ul>'); inList = false; }
+      const level = hMatch[1].length;
+      // Render h1-h4 as styled elements (h3/h4 = smaller, within chat bubble context)
+      const tag = level <= 2 ? 'strong' : 'strong';
+      const cls = level === 1 ? 'md-h1' : level === 2 ? 'md-h2' : level === 3 ? 'md-h3' : 'md-h4';
+      out.push(`<div class="${cls}">${hMatch[2]}</div>`);
+      continue;
+    }
+
+    // Unordered list: - item or * item
+    const liMatch = line.match(/^[\s]*[-*]\s+(.+)$/);
+    if (liMatch) {
+      if (!inList) { out.push('<ul>'); inList = true; }
+      out.push(`<li>${liMatch[1]}</li>`);
+      continue;
+    }
+
+    // Ordered list: 1. item
+    const olMatch = line.match(/^[\s]*\d+\.\s+(.+)$/);
+    if (olMatch) {
+      // Treat as unordered for simplicity (avoids ol/ul state tracking)
+      if (!inList) { out.push('<ul class="md-ol">'); inList = true; }
+      out.push(`<li>${olMatch[1]}</li>`);
+      continue;
+    }
+
+    // Not a list item — close list if open
+    if (inList) { out.push('</ul>'); inList = false; }
+    out.push(line);
+  }
+  if (inList) out.push('</ul>');
+
+  html = out.join('\n');
+
   // Inline code: `...`
   html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
   // Bold: **...**
   html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
   // Italic: *...*
   html = html.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em>$1</em>');
+  // Strikethrough: ~~...~~
+  html = html.replace(/~~([^~]+)~~/g, '<s>$1</s>');
   // Images: [IMAGE:path] → inline <img>
   html = html.replace(/\[IMAGE:([^\]]+)\]/g, (_, path) => {
     const safePath = path.trim();
@@ -456,8 +609,14 @@ function formatMarkdown(text) {
   html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" style="max-width:100%;max-height:400px;border-radius:8px;margin:8px 0" loading="lazy">');
   // Markdown links: [text](url)
   html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
-  // Line breaks
+  // Line breaks (but not inside block elements we already created)
   html = html.replace(/\n/g, '<br>');
+  // Clean up excessive <br> after block elements
+  html = html.replace(/(<\/div>)<br>/g, '$1');
+  html = html.replace(/(<\/ul>)<br>/g, '$1');
+  html = html.replace(/(<\/li>)<br>/g, '$1');
+  html = html.replace(/(<hr>)<br>/g, '$1');
+  html = html.replace(/(<br>){3,}/g, '<br><br>');
   return html;
 }
 
@@ -489,7 +648,8 @@ async function loadChatHistory(agentId) {
         return;
     }
 
-    const { messages } = await res.json();
+    const data = await res.json();
+    const { messages, canvasOps } = data;
     if (messages && messages.length > 0 && $messages) {
       // Clear any placeholder content
       $messages.innerHTML = '';
@@ -507,6 +667,15 @@ async function loadChatHistory(agentId) {
         div.className = `msg msg-${msg.role}`;
         div.innerHTML = formatMarkdown(content);
         $messages.appendChild(div);
+      }
+
+      // Restore canvas tiles inline after the last assistant message
+      if (canvasOps && canvasOps.length > 0) {
+        const allMsgs = $messages.querySelectorAll('.msg.msg-assistant');
+        const lastMsg = allMsgs.length > 0 ? allMsgs[allMsgs.length - 1] : null;
+        if (lastMsg) {
+          renderInlineTiles(lastMsg, canvasOps);
+        }
       }
 
       // Scroll to bottom
@@ -915,21 +1084,89 @@ function wireWsEvents() {
       raw = stripInternalBlocks(raw);
       // Convert markdown-ish text to basic HTML (bold, code, newlines)
       _streamDiv.innerHTML = formatMarkdown(raw);
-      if (!raw) _streamDiv.remove(); // remove empty bubble if all content was GenUI ops
+      if (!raw.trim()) _streamDiv.remove(); // remove empty bubble if all content was GenUI ops
       _streamDiv = null;
+    }
+    // Flush any canvas ops that arrived during streaming
+    if (_pendingCanvasOps.length > 0) {
+      const ops = _pendingCanvasOps.splice(0);
+      const canvasOps = ops.filter(op => op.type !== 'webapp' && op.op !== 'webapp' && op.op !== 'trigger');
+      const triggerOps = ops.filter(op => op.op === 'trigger');
+      const webappOps = ops.filter(op => op.type === 'webapp' || op.op === 'webapp');
+
+      // Remove skeleton placeholder (genui-pending shows it before canvas-ops arrive)
+      if ($messages) {
+        const placeholder = $messages.querySelector('.genui-rendering');
+        if (placeholder) placeholder.remove();
+      }
+
+      // Handle triggers
+      for (const op of triggerOps) {
+        const action = op.action || op.data?.action || '';
+        if (action === 'open-notes' || action === 'sn-list') _openWidget('sc-notes', 'notes');
+        else if (action === 'open-calendar' || action === 'cal-month') _openWidget('sc-calendar', 'calendar');
+        else if (action === 'open-email' || action === 'mail-inbox') _openWidget('sc-email', 'email');
+      }
+
+      // Open webapp surfaces
+      for (const op of webappOps) {
+        const data = op.data || op;
+        if (data.url) {
+          import('./surface-manager.js').then(sm => sm.openWebApp(data.url, data.title));
+        }
+      }
+
+      // Render tiles after the last assistant message
+      if (canvasOps.length > 0 && $messages) {
+        const allMsgs = $messages.querySelectorAll('.msg.msg-assistant');
+        const lastAgent = allMsgs.length > 0 ? allMsgs[allMsgs.length - 1] : $messages.lastElementChild;
+        if (lastAgent) {
+          renderInlineTiles(lastAgent, canvasOps);
+          scrollToBottom();
+        }
+      }
+      if (canvasOps.length > 0) {
+        window.dispatchEvent(new CustomEvent('surface-activate', {
+          detail: { type: 'canvas', ops: canvasOps },
+        }));
+      }
     }
     // Safety: clear any typing indicators that survived streaming
     clearAllTypingIndicators();
   });
 
-  // Show "Rendering UI" placeholder when server signals GenUI is coming
-  on('genui-pending', () => {
+  // Replace streamed text with cleaned version (removes verbose prose when canvas ops present)
+  on('chat-replace', (msg) => {
+    if (!$messages || !msg.text && msg.text !== '') return;
+    const allMsgs = $messages.querySelectorAll('.msg.msg-assistant, .msg-assistant');
+    const lastMsg = allMsgs.length > 0 ? allMsgs[allMsgs.length - 1] : null;
+    if (lastMsg) {
+      if (!msg.text.trim()) {
+        // No text left — remove the message bubble entirely (tiles will be standalone)
+        lastMsg.remove();
+      } else {
+        lastMsg.innerHTML = formatMarkdown(msg.text.trim());
+      }
+    }
+  });
+
+  // Show skeleton loader when server signals GenUI tiles are coming
+  on('genui-pending', (msg) => {
     if ($messages && !$messages.querySelector('.genui-rendering')) {
+      const count = Math.min(msg?.count || 3, 6);
       const ph = document.createElement('div');
       ph.className = 'genui-rendering';
-      ph.textContent = 'Rendering UI components…';
+      ph.innerHTML = `
+        <div class="genui-skeleton-header">
+          <span class="genui-skeleton-dot"></span>
+          Rendering ${count} component${count > 1 ? 's' : ''}…
+        </div>
+        <div class="genui-skeleton-grid">
+          ${Array.from({length: Math.min(count, 4)}, () => '<div class="genui-skeleton-tile"></div>').join('')}
+        </div>
+      `;
       $messages.appendChild(ph);
-      $messages.scrollTop = $messages.scrollHeight;
+      scrollToBottom();
       // Safety: auto-remove after 8s if canvas-ops never arrive
       setTimeout(() => ph.remove(), 8000);
     }
@@ -985,12 +1222,44 @@ function wireWsEvents() {
     }
   });
 
+  // Show tool activity in typing indicator — so the user knows what's happening
+  on('tool_call', (msg) => {
+    if (!$messages || !msg.tool) return;
+    const toolName = msg.tool.replace('mcp_canvas_', 'canvas:').replace('mcp_', '');
+    // Skip canvas tools (they render their own feedback)
+    if (toolName.startsWith('canvas:')) return;
+    // Map common tool names to friendly labels
+    const labels = {
+      shell: '🖥️ Running command…',
+      file_read: '📄 Reading file…',
+      file_write: '✏️ Writing file…',
+      web_search: '🔍 Searching…',
+      web_fetch: '🌐 Fetching page…',
+      http_request: '🌐 Making request…',
+      memory_recall: '🧠 Recalling…',
+      memory_store: '🧠 Remembering…',
+    };
+    const label = labels[toolName] || `⚙️ Using ${toolName}…`;
+
+    // Update existing indicator or create new one
+    let indicator = $messages.querySelector('.typing-indicator');
+    if (indicator) {
+      indicator.innerHTML = `<span class="typing-phase">${label}</span><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>`;
+    }
+  });
+
   // Clean up typing indicators when team routing completes or errors
-  on('team-message-end', () => {
+  on('team-message-end', (msg) => {
     clearAllTypingIndicators();
     clearTimeout(_typingSafetyTimer);
     if ($statusText) $statusText.textContent = state.connected ? 'Connected' : 'Disconnected';
-    // Bubble auto-collapses via completeWorker; no forced reset here
+    // Pass preview URLs to bubble so it can show a built-in Preview button
+    if (msg.previewUrls && msg.previewUrls.length > 0) {
+      const bubble = document.getElementById('worker-bubble');
+      if (bubble && bubble.setPreviewUrls) {
+        bubble.setPreviewUrls(msg.previewUrls);
+      }
+    }
   });
   on('team-error', (msg) => {
     clearAllTypingIndicators();
@@ -1075,17 +1344,18 @@ function wireWsEvents() {
   // --- Canvas ops from agent responses (GenUI + A2UI converted) ---
   // Canvas is a FIRST-CLASS spatial surface — it dominates the workspace when active.
   // Chat becomes a compact input strip at the bottom.
+  // Buffer canvas ops during streaming — render after stream ends
+  let _pendingCanvasOps = [];
+
   on('canvas-ops', (msg) => {
     if (!msg.ops || msg.ops.length === 0) return;
 
-    // Restored canvas state: load ops into canvas. Surface activation is handled
-    // separately by surface-manager's _restoreActiveSurfaces() on reconnect.
-    if (msg.restored) {
-      const canvas = document.querySelector('sc-canvas');
-      if (canvas && canvas.applyOps) {
-        canvas.applyOps(msg.ops);
-      }
-      console.log('[canvas] Restored', msg.ops.length, 'ops from server');
+    // Restored canvas state via WS (fallback — primary restore is via history API)
+    if (msg.restored) return;
+
+    // If we're currently streaming, buffer the ops for after stream-end
+    if (_streamDiv) {
+      _pendingCanvasOps.push(...msg.ops);
       return;
     }
 
@@ -1116,7 +1386,20 @@ function wireWsEvents() {
       }
     }
 
-    // Activate canvas surface for regular ops
+    // Render tiles inline in the chat stream
+    if (canvasOps.length > 0 && $messages) {
+      try {
+        // Find the last assistant message bubble
+        const allMsgs = $messages.querySelectorAll('.msg.msg-assistant, .msg-assistant');
+        const lastAgent = allMsgs.length > 0 ? allMsgs[allMsgs.length - 1] : $messages.lastElementChild;
+        if (lastAgent) {
+          renderInlineTiles(lastAgent, canvasOps);
+          scrollToBottom();
+        }
+      } catch (e) { console.warn('[chat-tiles] inline render error:', e); }
+    }
+
+    // Also activate canvas surface for regular ops (panel + inline coexist)
     if (canvasOps.length > 0) {
       window.dispatchEvent(new CustomEvent('surface-activate', {
         detail: { type: 'canvas', ops: canvasOps },
@@ -1139,9 +1422,31 @@ function wireWsEvents() {
     if ($agentSwitcher && msg.agent) {
       $agentSwitcher.activeAgentId = msg.agent.id;
     }
-    // Update mobile agent button icon
+    // Update mobile agent button icon — try persona photo, fall back to emoji
     const iconEl = document.getElementById('mobile-agent-icon');
-    if (iconEl && msg.agent) iconEl.textContent = msg.agent.emoji || '🤖';
+    if (iconEl && msg.agent) {
+      const slug = (msg.agent.name || '').toLowerCase().replace(/[^a-z0-9-]/g, '');
+      const img = new Image();
+      img.src = `/assets/agents/${slug}.png`;
+      img.style.cssText = 'width:22px;height:22px;border-radius:6px;object-fit:cover;vertical-align:middle';
+      img.onload = () => { iconEl.textContent = ''; iconEl.appendChild(img); };
+      img.onerror = () => { iconEl.textContent = msg.agent.emoji || '🤖'; };
+    }
+  });
+
+  // ── Access Gate: block chat when user has no tier ──
+  on('access-denied', () => {
+    const gate = document.querySelector('sc-access-gate');
+    if (gate && gate.show) gate.show();
+  });
+  // Gate "Use API Key" button → open settings
+  document.addEventListener('open-settings', () => {
+    let settings = document.querySelector('sc-settings');
+    if (!settings) {
+      settings = document.createElement('sc-settings');
+      document.body.appendChild(settings);
+    }
+    settings.setAttribute('open', '');
   });
 
   on('error', (msg) => {
@@ -1269,8 +1574,9 @@ function _openMobileAgentSheet() {
   agents.forEach(agent => {
     const card = document.createElement('button');
     card.className = 'mobile-agent-card' + (agent.id === activeId ? ' active' : '');
+    const slug = (agent.name || '').toLowerCase().replace(/[^a-z0-9-]/g, '');
     card.innerHTML = `
-      <span class="mobile-agent-emoji">${agent.emoji || '🤖'}</span>
+      <span class="mobile-agent-emoji"><img src="/assets/agents/${slug}.png" style="width:28px;height:28px;border-radius:8px;object-fit:cover" onerror="this.replaceWith(document.createTextNode('${agent.emoji || '🤖'}'))" /></span>
       <span class="mobile-agent-name">${agent.name || 'Agent'}</span>
       <span class="mobile-agent-role">${agent.role || ''}</span>
     `;
@@ -1278,7 +1584,14 @@ function _openMobileAgentSheet() {
       switcher._switchAgent(agent);
       sheetHandle.dismiss();
       const iconEl = document.getElementById('mobile-agent-icon');
-      if (iconEl) iconEl.textContent = agent.emoji || '🤖';
+      if (iconEl) {
+        const cSlug = (agent.name || '').toLowerCase().replace(/[^a-z0-9-]/g, '');
+        const cImg = new Image();
+        cImg.src = `/assets/agents/${cSlug}.png`;
+        cImg.style.cssText = 'width:22px;height:22px;border-radius:6px;object-fit:cover;vertical-align:middle';
+        cImg.onload = () => { iconEl.textContent = ''; iconEl.appendChild(cImg); };
+        cImg.onerror = () => { iconEl.textContent = agent.emoji || '🤖'; };
+      }
       const mobileBtn = document.getElementById('mobile-agent-btn');
       if (mobileBtn) {
         mobileBtn.classList.remove('pulse');
@@ -1652,7 +1965,9 @@ async function init() {
   // Listen for landing page actions
   document.addEventListener('landing-action', (e) => {
     const { action, planId } = e.detail || {};
-    if (action === 'get-started' || action === 'select-plan') {
+    if (action === 'select-plan' && planId) {
+      showSignupCheckout(planId);
+    } else if (action === 'get-started') {
       showAuth();
     } else if (action === 'sign-in') {
       showAuth();
@@ -1675,6 +1990,22 @@ async function init() {
     setConnectionStatus('reconnecting');
     connect(state.token);
   });
+
+  // Listen for signup-checkout events
+  document.addEventListener('signup-checkout', async (e) => {
+    const { email, password, name, plan } = e.detail;
+    // 1. Create account via POST /api/auth/signup
+    // 2. If paid plan: POST /api/billing/checkout → redirect to Stripe
+    // 3. If free/byok: enter app directly
+  });
+
+  document.addEventListener('signup-social', (e) => {
+    const { provider, plan } = e.detail;
+    localStorage.setItem('scratchy_pending_plan', plan);
+    window.location.href = `/api/auth/oauth/${provider}`;
+  });
+
+  document.addEventListener('signup-back', () => showLanding());
 
   document.addEventListener('wizard-skip', () => {
     showApp();
@@ -1837,6 +2168,63 @@ async function init() {
       loadChatHistory();
     });
   }
+
+  // ── Team-switch buttons (agent suggests, user decides) ──────────────
+  // Handles `switch-team:{teamId}` actions from canvas buttons components.
+  // Logic-gated: only fires on explicit user click, agent can never trigger
+  // team mode programmatically. Auto-resends last user message to the team.
+  document.addEventListener('tile-action', (e) => {
+    const action = e.detail?.action || '';
+    if (!action.startsWith('switch-team:')) return;
+    const teamId = action.replace('switch-team:', '').trim();
+    if (!teamId) return;
+
+    // Fetch team info to populate banner
+    const token = localStorage.getItem('scratchy_token') || '';
+    fetch('/api/teams', { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json())
+      .then(teams => {
+        const team = (teams || []).find(t => t.id === teamId || t.name === teamId);
+        if (!team) {
+          appendMessage('system', `Team not found: ${teamId}`);
+          return;
+        }
+        // Dispatch the standard team-chat event (reuses existing team-mode activation)
+        document.dispatchEvent(new CustomEvent('team-chat', {
+          detail: { teamId: team.id, teamName: team.name, agentCount: team.agentCount || team.agents?.length || '?' }
+        }));
+        // Auto-resend last user message through the team router
+        if (_lastUserText) {
+          setTimeout(() => {
+            appendMessage('user', escapeHtml(_lastUserText));
+            const activeAgentId = $agentSwitcher?._activeAgentId || null;
+            sendChat(_lastUserText, activeAgentId, team.id);
+          }, 300); // Small delay to let team mode activate + history load
+        }
+      })
+      .catch(err => {
+        console.error('[app] Team switch failed:', err);
+        appendMessage('system', 'Failed to switch to team. Please try again.');
+      });
+  });
+  // ── Preview buttons (open generated files in webapp surface) ────────
+  // Handles `open-preview:/api/preview/...` actions from team task results.
+  // Logic-gated: only fires on explicit user click.
+  document.addEventListener('tile-action', (e) => {
+    const action = e.detail?.action || '';
+    if (!action.startsWith('open-preview:')) return;
+    const url = action.replace('open-preview:', '').trim();
+    if (!url || !url.startsWith('/api/preview/')) return; // Security: only allow preview routes
+    import('./surface-manager.js').then(sm => sm.openWebApp(url, 'Preview'));
+  });
+
+  // Also catch canvas-action (from sc-canvas panel, same logic)
+  document.addEventListener('canvas-action', (e) => {
+    const action = e.detail?.action || '';
+    if (action.startsWith('switch-team:') || action.startsWith('open-preview:')) {
+      document.dispatchEvent(new CustomEvent('tile-action', { detail: e.detail }));
+    }
+  });
 
   // Workspaces panel events
   document.addEventListener('workspaces-close', () => {
