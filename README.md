@@ -128,10 +128,10 @@ The open-core version includes everything you need to run a personal AI workspac
 | ✅ Free (self-hosted) | 💰 Paid (managed hosting) |
 |------------------------|---------------------------|
 | GenUI canvas (all 34 components) | Managed hosting (zero setup) |
-| 4 specialist agents (Atlas, Iris, Nova, Echo) | Opus model access |
-| Notes, Calendar, Email widgets | Priority support |
-| Streaming chat with TOON encoding | Advanced quotas + analytics |
-| Auth + multi-user | — |
+| 4 specialist agents (Atlas, Iris, Nova, Echo) | Multi-user + seat management |
+| Notes, Calendar, Email widgets | Opus model access |
+| Streaming chat with TOON encoding | Priority support |
+| Single-user workspace | Advanced quotas + analytics |
 | BYOK (bring your own API keys) | — |
 | Self-hosted, your data stays yours | — |
 
@@ -147,10 +147,10 @@ Self-hosted is free forever. Managed hosting plans:
 
 | Plan | Price | Highlights |
 |------|-------|-----------|
-| **Free** | €0 | Self-hosted, BYOK, all features, unlimited |
+| **Free** | €0 | Self-hosted, single-user, BYOK, all features |
 | **Pro** | €29.99/mo | Managed hosting, Sonnet, 200 msg/day, 1 seat |
 | **Max** | €59.99/mo | Managed hosting, Sonnet + Opus, 500 msg/day, 3 seats |
-| **Business** | Custom | On-prem or managed, SLA, dedicated support |
+| **Business** | Custom | On-prem or managed, unlimited seats, SLA |
 
 ---
 
