@@ -135,7 +135,7 @@ The open-core version includes everything you need to run a personal AI workspac
 | BYOK (bring your own API keys) | — |
 | Self-hosted, your data stays yours | — |
 
-**Coming soon:** MCP tool integration, widget marketplace, i18n.
+**Coming soon:** MCP tool integration, widget marketplace, i18n (language translations).
 
 **The free version is real.** Not a demo, not a 14-day trial. Fork it, self-host it, build on it.
 
