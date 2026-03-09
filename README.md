@@ -72,7 +72,7 @@ When you ask an agent to show you server metrics, it renders gauges. When you as
 
 This is **Generative UI (GenUI)**: a protocol where agents describe UI declaratively, and the client renders it in real-time as tokens stream in. 34 component types — charts, forms, timelines, checklists, code blocks, cards, and more.
 
-And it's not one agent. It's a **team**.
+And it's not one agent — you choose from specialized agents, each with their own personality and expertise.
 
 ---
 
@@ -90,9 +90,9 @@ The agent writes declarative ops. The client renders components. No iframe hacks
 
 ---
 
-## Meet The Team 👥
+## Meet The Agents 👥
 
-Scratchy ships with 4 specialist agents that collaborate through an orchestrator:
+Scratchy ships with 4 specialist agents — each with a distinct personality, expertise, and soul file:
 
 | Agent | Role | What It Does |
 |-------|------|-------------|
@@ -101,9 +101,9 @@ Scratchy ships with 4 specialist agents that collaborate through an orchestrator
 | **Nova** | Researcher | Finds, cross-references, and synthesizes information. Always cites sources, always flags uncertainty. |
 | **Echo** | Writer | Clear, sharp writing. Docs, marketing copy, emails — no AI slop. Every sentence earns its place. |
 
-When you send a complex request, the **orchestrator** splits it into tasks and dispatches them to the right agents in parallel. Workers execute independently, results merge, and you get a clean response. The orchestrator coordinates — it never writes code or content itself.
+Switch between agents depending on the task. Each agent uses GenUI canvas tools to render structured output — not just text.
 
-Powered by [NullClaw](https://github.com/nullclaw/nullclaw) — a 678KB Zig binary that runs per-user agent instances at ~1MB RAM each.
+**Coming soon:** Multi-agent team delegation, where an orchestrator splits complex requests across agents in parallel.
 
 ---
 
@@ -125,17 +125,17 @@ All widget data is per-user, stored in SQLite, and never leaves your server.
 
 The open-core version includes everything you need to run a personal AI workspace:
 
-| ✅ Free | ❌ Paid |
-|---------|---------|
-| GenUI canvas (all 34 components) | Opus model access |
-| 2 custom agents | Team collaboration (multi-agent parallel) |
+| ✅ Free (self-hosted) | 💰 Paid (managed hosting) |
+|------------------------|---------------------------|
+| GenUI canvas (all 34 components) | Managed hosting (zero setup) |
+| 4 specialist agents (Atlas, Iris, Nova, Echo) | Opus model access |
 | Notes, Calendar, Email widgets | Priority support |
-| Streaming chat | Marketplace / Widget Store |
-| Self-hosted deployment | Managed hosting |
-| Auth + multi-user (basic) | Advanced quotas + analytics |
-| MCP tool integration | — |
-| TOON encoding | — |
-| i18n (EN, FR) | — |
+| Streaming chat with TOON encoding | Advanced quotas + analytics |
+| Auth + multi-user | — |
+| BYOK (bring your own API keys) | — |
+| Self-hosted, your data stays yours | — |
+
+**Coming soon (free):** MCP tool integration, multi-agent team delegation, widget marketplace, i18n.
 
 **The free version is real.** Not a demo, not a 14-day trial. Fork it, self-host it, build on it.
 
@@ -143,12 +143,14 @@ The open-core version includes everything you need to run a personal AI workspac
 
 ## Pricing 💰
 
+Self-hosted is free forever. Managed hosting plans:
+
 | Plan | Price | Highlights |
 |------|-------|-----------|
-| **Free** | €0 | 50 msg/day, Sonnet model, 1 seat, all widgets |
-| **Pro** | €15/mo | 500 msg/day, Sonnet + Opus, priority support |
-| **Team** | €39/mo | 2K msg/day, 5 seats, parallel workers |
-| **BYOK** | €5/mo | Bring your own API key, unlimited messages |
+| **Free** | €0 | Self-hosted, BYOK, all features, unlimited |
+| **Pro** | €29.99/mo | Managed hosting, Sonnet, 200 msg/day, 1 seat |
+| **Max** | €59.99/mo | Managed hosting, Sonnet + Opus, 500 msg/day, 3 seats |
+| **Business** | Custom | On-prem or managed, SLA, dedicated support |
 
 ---
 
@@ -156,7 +158,7 @@ The open-core version includes everything you need to run a personal AI workspac
 
 ### Requirements
 - Node.js ≥ 22 (or Docker)
-- 1 CPU, 512MB RAM minimum (2 CPU / 2GB recommended for teams)
+- 1 CPU, 512MB RAM minimum (2 CPU / 2GB recommended)
 - SQLite (included, no external DB needed)
 
 ### Docker Compose (recommended)
@@ -227,12 +229,11 @@ Server (Node.js)
   ├── Protocol         GenUI parser, TOON codec, surfaces, A2UI bridge
   ├── State            SQLite WAL (users, agents, canvas, memory, prefs)
   ├── Widgets          Notes, Calendar, Email backends
-  └── Libraries        Embeddings, Crawler, MCP, Billing, Indexer
+  └── Libraries        Embeddings, Crawler, Billing, Indexer
        │
-       │ Per-user instances
+       │ LLM API calls
        ▼
-NullClaw (Zig)
-  └── 678KB binary, ~1MB RAM per user, tool execution, streaming SSE
+Anthropic / OpenAI / Google APIs
 ```
 
 ### Tech Stack
@@ -243,14 +244,14 @@ NullClaw (Zig)
 | Backend | Node.js 22, native HTTP server, `ws` package |
 | Database | SQLite with WAL mode |
 | Auth | Argon2id, AES-256-GCM, WebAuthn |
-| Agent Runtime | [NullClaw](https://github.com/nullclaw/nullclaw) (Zig) |
+| Agent Runtime | Direct API (Anthropic, OpenAI, Google) |
 | Encoding | TOON (Token-Oriented Object Notation, ~30% token savings) |
 
 ---
 
 ## Security 🔒
 
-An open-core AI workspace where agents don't just chat — they render dashboards, fill out forms, build charts, and show you live data. Self-hosted. Multi-agent. 34 interactive canvas components. Your data never leaves your server.
+Self-hosted means your data never leaves your server. Auth uses Argon2id password hashing and AES-256-GCM encryption for stored API keys. WebAuthn passkeys supported.
 
 ### Email Security Model
 
@@ -365,7 +366,7 @@ scratchy/
 ├── server/              # HTTP server, WS handler, auth, routes
 ├── protocol/            # GenUI, TOON, surfaces, A2UI bridge
 ├── state/               # SQLite state managers (users, agents, canvas, memory)
-├── lib/                 # Google OAuth, embeddings, crawler, MCP, billing, widgets
+├── lib/                 # Google OAuth, embeddings, crawler, billing, widgets
 ├── public/              # Web Components client (sc-chat, sc-canvas, etc.)
 │   ├── components/      # 20+ Web Components
 │   ├── lib/             # App bootstrap, WS client
