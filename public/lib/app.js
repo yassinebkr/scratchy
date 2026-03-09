@@ -1966,11 +1966,9 @@ async function init() {
   // Listen for landing page actions
   document.addEventListener('landing-action', (e) => {
     const { action, planId } = e.detail || {};
-    if (action === 'select-plan' && planId) {
-      showSignupCheckout(planId);
-    } else if (action === 'get-started') {
-      showAuth();
-    } else if (action === 'sign-in') {
+    // All paths lead to auth — plan selection happens after signup (in settings/billing)
+    if (action === 'select-plan' || action === 'get-started' || action === 'sign-in') {
+      if (planId) localStorage.setItem('scratchy_pending_plan', planId);
       showAuth();
     }
   });
