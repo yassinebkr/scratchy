@@ -288,7 +288,7 @@ export function openWebApp(url, title) {
   const key = `webapp-${++_webappCounter}`;
   const el = document.createElement('sc-webapp');
   el.setAttribute('url', url);
-  el.setAttribute('title', title || new URL(url).hostname);
+  el.setAttribute('title', title || (() => { try { return new URL(url, location.origin).hostname; } catch { return 'Preview'; } })());
   el.classList.add('surface', `${key}-surface`);
 
   // Listen for close event

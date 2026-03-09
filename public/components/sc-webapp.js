@@ -216,10 +216,10 @@ export class ScWebapp extends HTMLElement {
 
     if (!url) return;
 
-    // Validate URL
+    // Validate URL (resolve relative paths against current origin)
     let parsed;
     try {
-      parsed = new URL(url);
+      parsed = new URL(url, location.origin);
     } catch {
       container.innerHTML = '<div class="error">Invalid URL. <a href="#" class="retry">Try again</a></div>';
       return;
