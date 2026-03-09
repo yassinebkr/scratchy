@@ -1,322 +1,392 @@
-# Scratchy
+<p align="center"><img src="public/assets/scratchy-logo.png" width="180" alt="Scratchy"></p>
 
-A generative UI client for [OpenClaw](https://github.com/openclaw/openclaw) AI agents — built on **A2UI** and **AG-UI** principles.
+<h1 align="center">Scratchy</h1>
 
-Real-time streaming. 39 interactive components. Standalone widget apps. Zero frameworks.
+<p align="center"><em>AI that shows you things, not just tells you.</em></p>
 
-![License](https://img.shields.io/badge/license-MIT-blue)
-![Node](https://img.shields.io/badge/node-22%2B-green)
-![Docker](https://img.shields.io/badge/docker-ready-blue)
-![A2UI](https://img.shields.io/badge/protocol-A2UI-6366f1)
-![AG-UI](https://img.shields.io/badge/lifecycle-AG--UI-22c55e)
+<p align="center">
+  <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT" />
+  <img src="https://img.shields.io/badge/node-%E2%89%A5%2022-green.svg" alt="Node.js ≥ 22" />
+  <img src="https://img.shields.io/badge/docker-compose-blue.svg" alt="Docker" />
+</p>
+
+<p align="center">
+  <a href="https://v2.clawos.fr">Live Demo</a> ·
+  <a href="#quick-start">Quick Start</a> ·
+  <a href="#self-hosting">Self-Host</a> ·
+  <a href="https://discord.gg/clawd">Discord</a>
+</p>
 
 ---
 
-## What is Scratchy?
+## Table of Contents
 
-Scratchy replaces generic messaging apps with an interface designed for AI. Instead of plain text replies, your agent renders **interactive dashboards, charts, forms, timelines, and full widget apps** — all in real-time as it thinks.
+- [Quick Start](#quick-start)
+- [What Is Scratchy?](#what-is-scratchy)
+- [GenUI: Agents That Render UI](#genui-agents-that-render-ui)
+- [Meet The Team](#meet-the-team)
+- [Built-in Widgets](#built-in-widgets)
+- [What's Free vs Paid](#whats-free-vs-paid)
+- [Pricing](#pricing)
+- [Self-Hosting Guide](#self-hosting-guide)
+- [Architecture](#architecture)
+- [Security](#security)
+- [API Reference](#api-reference)
+- [Configuration](#configuration)
+- [Testing](#testing)
+- [Contributing](#contributing)
 
-Think of it as a frontend that makes your AI agent actually useful beyond chat.
+---
 
-**Built for [OpenClaw](https://github.com/openclaw/openclaw)** — the open-source AI agent gateway. Uses a [custom OpenClaw fork](https://github.com/yassinebkr/openclaw) with [ClawOS](https://github.com/yassinebkr/clawos) — a defense-in-depth security stack for AI agents (session integrity, content tagging, signal detection, privilege separation, canary tokens).
+## Quick Start
 
-### A2UI + AG-UI Architecture
+```bash
+git clone https://github.com/yassinebkr/scratchy.git
+cd scratchy
+cp .env.example .env         # Add your API keys
+docker compose up -d         # That's it
+```
 
-Scratchy implements two complementary protocols that define how AI agents communicate with frontends:
+Open `http://localhost:3002`. First signup = admin.
 
-**🔗 [A2UI](https://github.com/google/A2UI) (Agent-to-UI Protocol)** — A structured envelope protocol for agent → client communication, [created by Google](https://a2ui.org). Instead of agents dumping raw text, they emit typed operations (`upsert`, `patch`, `remove`, `clear`, `move`, `layout`, `toast`, `overlay`) that the client renders as interactive components. The protocol includes:
-- **Envelope routing** — messages are parsed, validated (JSON Schema), and routed to surface handlers by type
-- **Surface state management** — server tracks which components are on which surface (main grid, toasts, overlays, sidebar)
-- **v1 backward compatibility** — legacy flat ops are auto-translated to v2 envelopes
-- **UserAction protocol** — client → agent actions are structured with `surfaceId`, `componentId`, and typed payloads
+<details>
+<summary>No Docker? Manual setup</summary>
 
-**⚡ [AG-UI](https://github.com/ag-ui-protocol/ag-ui) (Agent-User Interaction Protocol)** — A real-time event system, [created by CopilotKit](https://docs.ag-ui.com), that maps agent activity to 10 UI lifecycle events:
+Node.js ≥ 22:
 
-| Event | When |
+```bash
+npm ci --legacy-peer-deps
+export ENCRYPTION_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
+npm start
+```
+
+</details>
+
+---
+
+## What Is Scratchy?
+
+Most AI chat apps give you a text box and a stream of paragraphs. Scratchy gives you a **canvas**.
+
+When you ask an agent to show you server metrics, it renders gauges. When you ask for a comparison, it builds a table. When you ask it to help you write an email, it shows a compose form. The agent decides what to show — you see interactive components, not walls of text.
+
+This is **Generative UI (GenUI)**: a protocol where agents describe UI declaratively, and the client renders it in real-time as tokens stream in. 34 component types — charts, forms, timelines, checklists, code blocks, cards, and more.
+
+And it's not one agent. It's a **team**.
+
+---
+
+## GenUI: Agents That Render UI 🎨
+
+Traditional AI chat:
+> "Here's a table showing your server stats: CPU is at 73%, RAM is 4.2GB..."
+
+Scratchy:
+> *Three gauges appear showing CPU (73%, orange), RAM (4.2/8 GB, blue), Disk (52%, green). A stats grid shows uptime, request count, and error rate. All rendered live as the agent streams.*
+
+The agent writes declarative ops. The client renders components. No iframe hacks, no markdown tables pretending to be UI. Real interactive elements with hover states, click handlers, and live updates.
+
+**34 component types:** `hero`, `card`, `stats`, `gauge`, `progress`, `sparkline`, `chart-bar`, `chart-line`, `chart-pie`, `table`, `checklist`, `timeline`, `form`, `buttons`, `tabs`, `accordion`, `code`, `image`, `video`, and more.
+
+---
+
+## Meet The Team 👥
+
+Scratchy ships with 4 specialist agents that collaborate through an orchestrator:
+
+| Agent | Role | What It Does |
+|-------|------|-------------|
+| **Atlas** | Code Architect | Systems-first coding. Plans architecture, then implements. Production-ready with proper error handling. |
+| **Iris** | Design Engineer | UI/UX that works beautifully. Mobile-first, accessible, with proper design tokens. |
+| **Nova** | Researcher | Finds, cross-references, and synthesizes information. Always cites sources, always flags uncertainty. |
+| **Echo** | Writer | Clear, sharp writing. Docs, marketing copy, emails — no AI slop. Every sentence earns its place. |
+
+When you send a complex request, the **orchestrator** splits it into tasks and dispatches them to the right agents in parallel. Workers execute independently, results merge, and you get a clean response. The orchestrator coordinates — it never writes code or content itself.
+
+Powered by [NullClaw](https://github.com/nullclaw/nullclaw) — a 678KB Zig binary that runs per-user agent instances at ~1MB RAM each.
+
+---
+
+## Built-in Widgets 🧩
+
+Three open-core widgets ship with every Scratchy instance:
+
+| Widget | What It Does |
+|--------|-------------|
+| **Notes** | Create, edit, search notes. Agents can read and write to your notes contextually. |
+| **Calendar** | Events with colors, date ranges, and reminders. Agents can check your schedule. |
+| **Email** | Gmail integration via OAuth. Agents can read your inbox and pre-fill compose forms — but [only you can hit Send](#security). |
+
+All widget data is per-user, stored in SQLite, and never leaves your server.
+
+---
+
+## What's Free vs Paid
+
+The open-core version includes everything you need to run a personal AI workspace:
+
+| ✅ Free | ❌ Paid |
+|---------|---------|
+| GenUI canvas (all 34 components) | Opus model access |
+| 2 custom agents | Team collaboration (multi-agent parallel) |
+| Notes, Calendar, Email widgets | Priority support |
+| Streaming chat | Marketplace / Widget Store |
+| Self-hosted deployment | Managed hosting |
+| Auth + multi-user (basic) | Advanced quotas + analytics |
+| MCP tool integration | — |
+| TOON encoding | — |
+| i18n (EN, FR) | — |
+
+**The free version is real.** Not a demo, not a 14-day trial. Fork it, self-host it, build on it.
+
+---
+
+## Pricing 💰
+
+| Plan | Price | Highlights |
+|------|-------|-----------|
+| **Free** | €0 | 50 msg/day, Sonnet model, 1 seat, all widgets |
+| **Pro** | €15/mo | 500 msg/day, Sonnet + Opus, priority support |
+| **Team** | €39/mo | 2K msg/day, 5 seats, parallel workers |
+| **BYOK** | €5/mo | Bring your own API key, unlimited messages |
+
+---
+
+## Self-Hosting Guide 🚀
+
+### Requirements
+- Node.js ≥ 22 (or Docker)
+- 1 CPU, 512MB RAM minimum (2 CPU / 2GB recommended for teams)
+- SQLite (included, no external DB needed)
+
+### Docker Compose (recommended)
+
+```bash
+git clone https://github.com/yassinebkr/scratchy.git
+cd scratchy
+cp .env.example .env
+```
+
+Edit `.env`:
+
+```env
+ENCRYPTION_KEY=<generate with: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))">
+OPENAI_API_KEY=sk-...
+# Optional:
+ANTHROPIC_API_KEY=sk-ant-...
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+```
+
+```bash
+docker compose up -d
+```
+
+### Manual (Node.js)
+
+```bash
+npm ci --legacy-peer-deps
+export ENCRYPTION_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
+export OPENAI_API_KEY=sk-...
+npm start
+```
+
+Server starts on port 3002. Override with `PORT=8080 npm start`.
+
+### Reverse Proxy
+
+Scratchy uses WebSocket — make sure your proxy passes `Upgrade` headers. Nginx example:
+
+```nginx
+location / {
+    proxy_pass http://127.0.0.1:3002;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+}
+```
+
+---
+
+## Architecture 🏗️
+
+```
+Browser (Web Components)
+  ├── sc-chat          Chat interface + streaming
+  ├── sc-canvas        GenUI component renderer (34 types)
+  ├── sc-terminal      Terminal surface
+  └── sc-editor        Code editor surface
+       │
+       │ WebSocket
+       ▼
+Server (Node.js)
+  ├── Router           HTTP API + static serving
+  ├── WS Handler       Per-client state, broadcast
+  ├── Auth             Argon2id + sessions + WebAuthn passkeys
+  ├── Protocol         GenUI parser, TOON codec, surfaces, A2UI bridge
+  ├── State            SQLite WAL (users, agents, canvas, memory, prefs)
+  ├── Widgets          Notes, Calendar, Email backends
+  └── Libraries        Embeddings, Crawler, MCP, Billing, Indexer
+       │
+       │ Per-user instances
+       ▼
+NullClaw (Zig)
+  └── 678KB binary, ~1MB RAM per user, tool execution, streaming SSE
+```
+
+### Tech Stack
+
+| Layer | Tech |
 |-------|------|
-| `RUN_STARTED` | Agent begins processing |
-| `RUN_FINISHED` | Agent completes |
-| `RUN_ERROR` | Agent errors |
-| `STEP_STARTED` | Tool call begins |
-| `STEP_FINISHED` | Tool call completes |
-| `TEXT_DELTA` | Streaming text chunk |
-| `STATE_DELTA` | Incremental state update |
-| `STATE_SNAPSHOT` | Full state replace |
-| `TOOL_CALL_START` | Named tool invocation |
-| `TOOL_CALL_END` | Tool result received |
+| Frontend | Web Components (no framework), Shadow DOM, ES modules |
+| Backend | Node.js 22, native HTTP server, `ws` package |
+| Database | SQLite with WAL mode |
+| Auth | Argon2id, AES-256-GCM, WebAuthn |
+| Agent Runtime | [NullClaw](https://github.com/nullclaw/nullclaw) (Zig) |
+| Encoding | TOON (Token-Oriented Object Notation, ~30% token savings) |
 
-This powers the live activity indicator (📄 Reading file, ⚡ Running command, 🔍 Searching web), the streaming progress bar, context meter, and compaction tracking — the user always knows exactly what the agent is doing and why.
-
-**Why this matters:** Most AI chat interfaces are glorified text boxes. A2UI + AG-UI turns the agent into a first-class UI participant — it can build dashboards, update gauges in real-time, show progress on long operations, and render interactive forms, all through a structured protocol instead of prompt hacking.
-
-## Features
-
-### 💬 Chat
-- **Real-time streaming** — two-phase rendering: lightweight during stream, full markdown on finalize
-- **Markdown rendering** — tables, code blocks with syntax highlighting, lists, headers
-- **Collapsible thinking blocks** — see agent reasoning
-- **Full chat history** across session compactions
-- **Offline message queue** — send while disconnected, auto-delivers on reconnect
-- **Duplicate detection** — hash-based dedup on render
-
-### 🎨 Generative UI (39 Components)
-
-Agents respond with `scratchy-toon` (default) or `scratchy-canvas` (JSON) code blocks. Scratchy renders them as interactive components:
-
-| Category | Components |
-|----------|-----------|
-| **Layout** | card, hero, alert, accordion, kv, tags, link-card |
-| **Data** | stats, table, checklist, timeline, status, progress, weather |
-| **Charts** | chart-bar, chart-pie, chart-line, sparkline, gauge, stacked-bar, month-calendar |
-| **Interactive** | buttons, toggle, rating, chips, input, slider, tabs, form |
-| **Sports** | form-strip, streak |
-| **Media** | video, image, code, email-view |
-| **Music** | player, media-list, carousel |
-
-Components are **LiveComponents** — DOM-based with create/update lifecycle, rAF animations, zero innerHTML.
-
-### 🖼️ Unified Conversation Stream
-
-Components render **inline in the chat timeline** — no separate canvas view. Widgets, dashboards, and interactive elements flow naturally alongside messages.
-
-- JSON ops protocol: `upsert`, `patch`, `remove`, `clear`, `move`, `layout`, `toast`, `overlay`, `dismiss`, `trigger`
-- Tile entrance choreography — staggered spring animations
-- View Transitions API — smooth crossfade on widget navigation
-- FLIP animation system — batch read/write, adaptive stagger
-- Canvas state persistence — localStorage with 24h expiry
-- **Streaming render** — ops fire live as the agent streams (no waiting for block close)
-
-### 🔌 Widget Architecture
-
-Widgets are **standalone apps** that run inside the conversation. They handle their own logic — no forwarding to the agent.
-
-```
-User clicks button → widget-action frame → serve.js routes by prefix → Widget processes locally → Canvas updates
-```
-
-- **No agent hooks** — widget actions never reach the gateway
-- **Secure by default** — credentials in secure context, never logged
-- **Optimistic UI** — mutations update instantly, background processing
-- **Session persistence** — widget state saved to file, auto-restores on reconnect
-- **Inter-widget communication** — EventBus + SharedContextStore
-- **Agent trigger ops** — agents can invoke widget actions programmatically via `{"op":"trigger","action":"...","context":{...}}`, enabling agent CRUD (read, edit, append) on widget data while keeping widget state in sync
-
-### 🔊 Voice & TTS
-- Text-to-speech on any message (ElevenLabs v3)
-- **Streaming TTS** — audio starts playing immediately via MediaSource
-- Auto-speech mode for short replies
-- Voice notes with Whisper transcription
-- Language-aware STT — retains original language
-
-### ⚡ Connection Reliability
-- Auto-reconnect with exponential backoff (1s → 15s cap)
-- Zombie socket detection (server-side pong timeout)
-- Streaming staleness watchdog (10s gap detection)
-- Offline message queue preserved across reconnects
-- WebSocket session continuity with 30s grace period
-- Event buffering with sequence numbers — no missed messages
-
-### 🎯 Design System
-- **Geist font**, indigo accent (#6366f1)
-- Layered surfaces, 8px radius, borders over shadows
-- Light/dark mode with CSS overlay variables
-- Command palette (⌘K) — fuzzy search across widgets and actions
-- ARIA roles, `aria-live` regions, keyboard navigation
-- Responsive — 1→2→3→4 columns by viewport width
-
-### 📊 Live Activity Indicator
-- Real-time tool event streaming from the gateway
-- Dynamic labels: 📄 Reading file, ⚡ Running command, 🔍 Searching the web
-- Elapsed timer + expandable tool call log
-- Context meter — real-time context window usage (color-coded)
-
-### 🗜️ TOON Format (Default)
-- `scratchy-toon` code blocks — default canvas format, preferred over JSON
-- [TOON](https://github.com/toon-format/toon) (Token-Oriented Object Notation) — ~18-40% token savings on structured data
-- Streaming parser with hash-based dedup
-- JSON fallback (`scratchy-canvas`) for deeply nested structures
-- Both formats coexist in the same response
-
-### 📎 File Attachments
-- Images (paste, drag & drop, compression, lightbox)
-- Documents (PDF, text, markdown, CSV)
-- Code files (Python, JS, JSON, Rust, YAML)
-- Voice notes with transcription
-- Strict MIME + extension validation
-
-## Getting Started
-
-> ⚠️ Scratchy requires the [OpenClaw fork](https://github.com/yassinebkr/openclaw) with [ClawOS](https://github.com/yassinebkr/clawos). The official OpenClaw repo may work partially, but some features depend on fork-specific APIs and the ClawOS security plugin. For the full experience, install the fork.
-
-### 1. Install OpenClaw (fork)
-
-```bash
-git clone https://github.com/yassinebkr/openclaw.git
-cd openclaw
-npm install --legacy-peer-deps
-openclaw setup        # follow the wizard
-openclaw gateway start
-```
-
-### 2. Install Scratchy
-
-**Docker (recommended):**
-
-```bash
-git clone https://github.com/yassinebkr/scratchy.git
-cd scratchy
-SCRATCHY_TOKEN=your-gateway-token docker compose up -d
-```
-
-**Manual:**
-
-```bash
-git clone https://github.com/yassinebkr/scratchy.git
-cd scratchy
-npm install
-node serve.js
-```
-
-Open `http://localhost:3001` and enter your OpenClaw gateway token.
-
-### Remote Access
-
-```bash
-# SSH tunnel
-ssh -L 3001:localhost:3001 user@your-server
-
-# Or Cloudflare tunnel
-cloudflared tunnel --url http://localhost:3001
-```
-
-> ⚠️ **Security note:** Scratchy connects to an OpenClaw gateway with access to agent tools (shell, filesystem, messaging). Run it on an **isolated server** (VPS, VM), not your personal machine. Access it remotely via SSH tunnel or Cloudflare tunnel.
-
-## Architecture
-
-```
-Browser / PWA
-  │
-  │  WebSocket + HTTPS
-  ▼
-serve.js (Node.js)
-  ├─ Static files + session management
-  ├─ WebSocket proxy → OpenClaw Gateway
-  ├─ A2UI envelope router + surface state
-  ├─ AG-UI run tracker (10 lifecycle events)
-  ├─ Widget-action handler (local routing)
-  ├─ REST API (history, search, attachments)
-  ├─ TTS (ElevenLabs) + STT (Whisper)
-  │
-  ▼
-Widget Classes (local, never forwarded to agent)
-```
-
-## Security Model
-
-The gateway token **never reaches the browser**. Scratchy proxies all communication server-side.
-
-- POST-only login (token never in URL)
-- CSRF protection with one-time tokens
-- Brute force protection (3 attempts/window, 1h lockout)
-- HttpOnly + SameSite cookies (HMAC-derived)
-- Timing-safe token comparison
-- CSP headers (`script-src 'self'`)
-- WebSocket token-bucket rate limiter
-- File upload MIME + extension validation
-- Gateway metadata stripping — system-injected timestamps, internal tags, and metadata are automatically stripped from message history (3-layer defense: server, client data, client render)
-
-## GenUI Protocol (A2UI in Practice)
-
-Agents control the UI by emitting structured A2UI operations in code blocks.
-
-**TOON (default):**
-
-````markdown
-```scratchy-toon
-op: upsert
-id: cpu-gauge
-type: gauge
-data:
-  label: CPU
-  value: 73
-  max: 100
-  unit: %
-  color: orange
 ---
-op: upsert
-id: srv-stats
-type: stats
-data:
-  title: Status
-  items[2]{label,value}:
-    Uptime,14d
-    Requests,1.2M
-```
-````
 
-**JSON fallback:**
+## Security 🔒
 
-````markdown
-```scratchy-canvas
-{"op":"upsert","id":"cpu-gauge","type":"gauge","data":{"label":"CPU","value":73,"max":100,"unit":"%","color":"orange"}}
-{"op":"upsert","id":"srv-stats","type":"stats","data":{"title":"Status","items":[{"label":"Uptime","value":"14d"},{"label":"Requests","value":"1.2M"}]}}
-```
-````
+An open-core AI workspace where agents don't just chat — they render dashboards, fill out forms, build charts, and show you live data. Self-hosted. Multi-agent. 34 interactive canvas components. Your data never leaves your server.
 
-Operations: `upsert`, `patch`, `remove`, `clear`, `move`, `layout`, `toast`, `overlay`, `dismiss`, `trigger`
+### Email Security Model
 
-Components persist until removed. Use `patch` for small updates, `upsert` for new components or full replacement.
+Scratchy enforces a **structural security boundary** on email sending. This is not a config flag — it's an architectural constraint.
 
-These operations are the A2UI protocol in action — the agent emits structured intents, not raw HTML. The client decides how to render them based on viewport, theme, and surface state.
+<details>
+<summary>Email Security Details</summary>
+
+| Action | Agent (WS) | Human (REST) |
+|--------|-----------|-------------|
+| Read inbox | ✅ `mail-inbox` | ✅ `GET /api/emails` |
+| Search | ✅ `mail-search` | — |
+| View email | ✅ `mail-read` | ✅ `GET /api/emails/:id` |
+| Pre-fill compose | ✅ `mail-compose` | ✅ `POST /api/emails` |
+| Save draft | ✅ `mail-save-draft` | ✅ `POST /api/emails` |
+| **Send** | **❌ No action exists** | **✅ `POST /api/emails/:id/send`** |
+
+The email widget module has no send function. The send endpoint lives in a REST-only handler unreachable from the WebSocket path. Gmail OAuth scopes are `gmail.readonly` + `gmail.compose` — no `gmail.send`.
+
+**Why structural enforcement?** A config flag is an attack surface. A prompt instruction is ignorable. Code separation survives prompt injection, config bugs, and future changes.
+
+</details>
+
+---
+
+## API Reference
+
+<details>
+<summary>Core API Endpoints</summary>
+
+### Core
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/api/health` | No | Health check |
+| POST | `/api/auth/signup` | No | Create account |
+| POST | `/api/auth/login` | No | Login |
+| GET | `/api/auth/me` | Yes | Current user |
+| POST | `/api/auth/logout` | Yes | End session |
+
+### Agents
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/api/agents` | Yes | List agents |
+| POST | `/api/agents` | Yes | Create agent |
+| GET/PUT/DELETE | `/api/agents/:id` | Yes | Agent CRUD |
+
+### Widgets
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET/POST | `/api/notes` | Yes | List / create notes |
+| GET/PUT/DELETE | `/api/notes/:id` | Yes | Note CRUD |
+| GET/POST | `/api/calendar` | Yes | List / create events |
+| GET/PUT/DELETE | `/api/calendar/:id` | Yes | Event CRUD |
+| GET/POST | `/api/emails` | Yes | List / create drafts |
+| GET/DELETE | `/api/emails/:id` | Yes | Draft CRUD |
+| POST | `/api/emails/:id/send` | Yes | Send via Gmail (human-only) |
+
+### Admin
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET/PUT | `/api/admin/config` | Admin | System configuration |
+| GET | `/api/admin/users` | Admin | User management |
+| GET/PUT | `/api/admin/users/:id/quotas` | Admin | Quota management |
+
+### WebSocket
+
+Connect to `ws://HOST:3002/ws?token=<session-token>`. See [PROTOCOL.md](./PROTOCOL.md) for the full message spec.
+
+</details>
+
+---
 
 ## Configuration
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `SCRATCHY_TOKEN` | OpenClaw gateway auth token | Auto-detected from ~/.openclaw |
-| `ELEVENLABS_API_KEY` | ElevenLabs API key for TTS | — |
-| `ELEVENLABS_VOICE_ID` | Voice ID | SAz9YHcvj6GT2YYXdXww |
-| `OPENAI_API_KEY` | OpenAI key for Whisper STT | — |
-| Port (arg) | `node serve.js [port]` | 3001 |
+<details>
+<summary>Environment Variables</summary>
 
-## Tech Stack
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `ENCRYPTION_KEY` | **Yes** | 32-byte hex key for AES-256-GCM |
+| `OPENAI_API_KEY` | **Yes** | OpenAI API key (embeddings + chat) |
+| `PORT` | No | Server port (default: 3002) |
+| `DATABASE_PATH` | No | SQLite path (default: `./data/scratchy.db`) |
+| `ANTHROPIC_API_KEY` | No | For Claude models |
+| `GOOGLE_CLIENT_ID` | No | Gmail + Calendar OAuth |
+| `GOOGLE_CLIENT_SECRET` | No | OAuth client secret |
+| `GOOGLE_REDIRECT_URI` | No | OAuth callback URL |
+| `STRIPE_SECRET_KEY` | No | Billing |
+| `STRIPE_WEBHOOK_SECRET` | No | Stripe webhooks |
 
-- **Frontend:** Vanilla HTML/CSS/JavaScript — zero frameworks, zero build step
-- **Server:** Node.js — static files, WebSocket proxy, REST APIs, widget routing
-- **Protocol:** OpenClaw gateway API (WebSocket, JSON frames)
-- **TTS:** ElevenLabs v3 with streaming audio
-- **STT:** OpenAI Whisper
+</details>
 
-## Docker Security
+---
 
-- Non-root user
-- Read-only filesystem
-- All capabilities dropped
-- no-new-privileges
-- 256MB memory limit
-- Health checks
+## Testing 🧪
 
-## Roadmap
+```bash
+npm test              # Run all tests
+npm run test:verbose  # Verbose output
+```
 
-- [x] Unified conversation stream (widgets inline in chat)
-- [x] TOON format as default (18-40% token savings)
-- [x] Streaming render (ops fire live during agent stream)
-- [x] Light/dark mode
-- [x] Command palette (⌘K)
-- [x] Gateway metadata stripping (clean message history)
-- [x] Agent ↔ widget interaction (agents can read/write widget data via trigger ops)
-- [x] Widget region auto-relocate (triggered widgets always appear at bottom of chat)
-- [ ] A2UI compatibility layer (render Google A2UI payloads as Scratchy components)
-- [ ] More widgets (weather, home automation, GitHub, 3D printer)
-- [ ] Message virtualization (500+ messages)
-- [ ] Push notifications (Service Worker)
-- [ ] Plugin system for custom components
-- [ ] Tauri desktop app (Rust backend)
+Uses Node.js built-in test runner. No external framework.
+
+### Project Structure
+
+```
+scratchy/
+├── server/              # HTTP server, WS handler, auth, routes
+├── protocol/            # GenUI, TOON, surfaces, A2UI bridge
+├── state/               # SQLite state managers (users, agents, canvas, memory)
+├── lib/                 # Google OAuth, embeddings, crawler, MCP, billing, widgets
+├── public/              # Web Components client (sc-chat, sc-canvas, etc.)
+│   ├── components/      # 20+ Web Components
+│   ├── lib/             # App bootstrap, WS client
+│   ├── styles/          # CSS
+│   └── i18n/            # Locale files (en, fr)
+├── test/                # Node.js test runner tests
+├── docker-compose.yml   # Full stack deployment
+├── PROTOCOL.md          # GenUI protocol spec
+└── COMPONENTS.md        # Component type reference
+```
+
+---
 
 ## Contributing
 
-Contributions welcome! Please open an issue first to discuss what you'd like to change.
+1. Fork → feature branch → PR
+2. `node -c` all JS files (syntax check before commit)
+3. `npm test` passes
+4. ESM imports only (no CommonJS)
+5. Components are declarative — agents describe, clients render
 
-## License
+---
 
-[MIT](LICENSE)
+Built by [Yassine](https://github.com/yassinebkr) • [Discord](https://discord.gg/clawd) • [MIT License](LICENSE)

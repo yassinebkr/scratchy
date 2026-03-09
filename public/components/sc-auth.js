@@ -84,7 +84,7 @@ class ScAuth extends HTMLElement {
 <div class="wrap">
   <div class="card">
     <div class="logo">
-      <img src="/assets/logo.png" alt="Scratchy" onerror="this.style.display='none'">
+      <img src="/assets/scratchy-logo.png" alt="Scratchy" onerror="this.style.display='none'">
       <span>Scratchy</span>
     </div>
     <div class="tabs">
