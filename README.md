@@ -231,9 +231,10 @@ Server (Node.js)
   ├── Widgets          Notes, Calendar, Email backends
   └── Libraries        Embeddings, Crawler, Billing, Indexer
        │
-       │ LLM API calls
+       │ Per-user instances
        ▼
-Anthropic / OpenAI / Google APIs
+NullClaw (Zig)
+  └── 678KB binary, ~1MB RAM per user, tool execution, streaming SSE
 ```
 
 ### Tech Stack
@@ -244,7 +245,7 @@ Anthropic / OpenAI / Google APIs
 | Backend | Node.js 22, native HTTP server, `ws` package |
 | Database | SQLite with WAL mode |
 | Auth | Argon2id, AES-256-GCM, WebAuthn |
-| Agent Runtime | Direct API (Anthropic, OpenAI, Google) |
+| Agent Runtime | [NullClaw](https://github.com/nullclaw/nullclaw) (Zig, ~1MB per instance) |
 | Encoding | TOON (Token-Oriented Object Notation, ~30% token savings) |
 
 ---
