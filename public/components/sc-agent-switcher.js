@@ -2092,8 +2092,8 @@ export class ScAgentSwitcher extends HTMLElement {
       this._gridEl.appendChild(card);
     }
 
-    /* 2) Render team groups */
-    if (teams.length > 0) {
+    /* 2) Render team groups — HIDDEN for launch (teams need reliability work) */
+    if (false && teams.length > 0) {
       if (mainAgents.length > 0) {
         const sep = document.createElement('div');
         sep.className = 'team-separator';
@@ -2194,9 +2194,20 @@ export class ScAgentSwitcher extends HTMLElement {
     card.setAttribute('aria-label', `${agent.name || 'Agent'}${role ? ' \u2014 ' + role : ''}${isActive ? ', active' : ''}`);
     card.style.setProperty('animation-delay', `${index * 0.04}s`);
 
-    const avatarContent = agent.avatar
-      ? `<img src="${this._esc(agent.avatar)}" alt="" loading="lazy" />`
-      : `<span>${this._esc(initials)}</span>`;
+    /* Avatar resolution: persona photo > URL avatar > emoji > initials */
+    const agentSlug = (agent.name || '').toLowerCase().replace(/[^a-z0-9-]/g, '');
+    const isUrl = agent.avatar && (agent.avatar.startsWith('http') || agent.avatar.startsWith('/') || agent.avatar.startsWith('data:'));
+    const isEmoji = agent.avatar && !isUrl;
+    const fallbackText = this._esc(isEmoji ? agent.avatar : initials);
+
+    let avatarContent;
+    if (isUrl) {
+      /* Explicit URL avatar — use it, fall back to initials on error */
+      avatarContent = `<img src="${this._esc(agent.avatar)}" alt="" loading="lazy" onerror="this.style.display='none';this.nextSibling.style.display=''" /><span style="display:none">${fallbackText}</span>`;
+    } else {
+      /* Try persona photo at /assets/agents/{name}.png, fall back to emoji or initials */
+      avatarContent = `<img src="/assets/agents/${agentSlug}.png" alt="" loading="lazy" onerror="this.style.display='none';this.nextSibling.style.display=''" /><span style="display:none">${fallbackText}</span>`;
+    }
 
     /* Tooltip: "Name — Role" for CSS tooltip */
     const tooltipText = role

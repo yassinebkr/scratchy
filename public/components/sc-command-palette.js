@@ -66,7 +66,8 @@ function defaultGetSearchItems() {
     { type: 'action', id: 'open-email', title: 'Open Email', subtitle: 'Check your inbox', action: 'open-email', icon: 'email' },
     { type: 'action', id: 'billing', title: 'Billing & Plans', subtitle: 'Manage subscription and API keys', action: 'open-billing', icon: 'billing' },
     { type: 'action', id: 'widget-store', title: 'Widget Store', subtitle: 'Browse and install widgets', action: 'open-widget-store', icon: 'widget-store' },
-    { type: 'action', id: 'teams', title: 'Teams', subtitle: 'Manage agent teams and collaboration', action: 'open-teams', icon: 'teams' },
+    // Teams hidden for launch — needs reliability work before shipping
+    // { type: 'action', id: 'teams', title: 'Teams', subtitle: 'Manage agent teams and collaboration', action: 'open-teams', icon: 'teams' },
     { type: 'action', id: 'workspaces', title: 'Workspaces', subtitle: 'Save, load, and manage canvas layouts', action: 'open-workspaces', icon: 'workspaces' },
   );
 
