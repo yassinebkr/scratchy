@@ -1652,6 +1652,7 @@ export async function routeMessage(userId, agentId, message, ws) {
     // ── Step 9: Persist assistant response + usage tracking ──
     // Clean response if canvas tools were used: strip tool XML, truncate verbose text
     if (response && canvasToolFired) {
+      const originalLen = response.length;
       response = response
         .replace(/<tool_call>[\s\S]*?<\/tool_call>/g, '')
         .replace(/<tool_result>[\s\S]*?<\/tool_result>/g, '')
@@ -1659,6 +1660,11 @@ export async function routeMessage(userId, agentId, message, ws) {
       const sentenceMatch = response.match(/^(.*?[.!?])\s/);
       if (sentenceMatch && response.length > 150) {
         response = sentenceMatch[1];
+      }
+      // If we truncated, update the client's displayed text
+      // (the verbose version was already streamed during generation)
+      if (response.length < originalLen) {
+        sendJson(ws, { type: 'chat-replace', text: response.trim(), ts: Date.now() });
       }
     }
     if (response) {

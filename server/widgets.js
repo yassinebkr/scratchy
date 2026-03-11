@@ -25,6 +25,18 @@ import * as users from '../state/users.js';
 /** @type {WidgetRegistry|null} */
 let registry = null;
 
+/** Callback for routing live widget actions to the chat pipeline */
+let _onLiveWidgetAction = null;
+
+/**
+ * Register a callback for routing live widget actions to the chat pipeline.
+ * Called from index.js after both widget system and WS handler are initialized.
+ * @param {(userId: string, msg: object, ws: WebSocket) => Promise<void>} fn
+ */
+export function setLiveWidgetActionHandler(fn) {
+  _onLiveWidgetAction = fn;
+}
+
 /**
  * Initialize the widget system.
  *
@@ -82,6 +94,36 @@ export async function initWidgets(db, wsBroadcast, config = {}) {
     }
 
     const context = msg.context && typeof msg.context === 'object' ? msg.context : {};
+
+    // Live widget actions — check if widget has client-side handler
+    if (context.isLiveWidget) {
+      // If the widget has a js handler, actions should be handled client-side.
+      // Reaching the server means the client has a stale cache — drop silently
+      // instead of burning an LLM call on a UI interaction.
+      try {
+        const canvasState = await import('../state/canvas.js');
+        const ops = canvasState.getCanvasState(userId);
+        const widgetDef = ops.find(o => o.op === 'define' && o.id === context.widgetId);
+        if (widgetDef?.component?.js) {
+          console.log(`[widgets] Dropping widget action "${action}" for "${context.widgetId}" — has js handler (client cache stale?)`);
+          return;
+        }
+      } catch { /* canvas state unavailable — fall through to agent */ }
+
+      const agentHint = context.createdBy ? ` (from ${context.createdBy}'s widget)` : '';
+      const actionMsg = `[Widget Action${agentHint}] action="${action}" widgetId="${context.widgetId || '?'}" payload=${JSON.stringify(context)}`;
+      // Emit a synthetic chat event for the WS handler to pick up
+      if (typeof _onLiveWidgetAction === 'function') {
+        try {
+          await _onLiveWidgetAction(userId, { type: 'chat', text: actionMsg, agentId: context.createdBy || null }, ws);
+        } catch (e) {
+          console.warn(`[widgets] Live widget action routing failed:`, e.message);
+          sendJson(ws, { type: 'error', message: 'Failed to route widget action to agent' });
+        }
+      }
+      return;
+    }
+
     const ops = await registry.handleAction(userId, action, context);
 
     // Send the resulting GenUI ops back to the client

@@ -232,6 +232,11 @@ async function serveStatic(req, res, pathname) {
     } else if (ext === '.html') {
       headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0';
       headers['Pragma'] = 'no-cache';
+    } else if (ext === '.js' || ext === '.mjs') {
+      // JS without ?v= must always revalidate — ESM imports don't carry
+      // query strings, so the browser would serve stale modules for up to
+      // max-age. no-cache forces a conditional request (304 if unchanged).
+      headers['Cache-Control'] = 'no-cache, must-revalidate';
     } else {
       headers['Cache-Control'] = 'public, max-age=3600';
     }
