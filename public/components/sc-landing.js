@@ -90,7 +90,7 @@ const STYLES = /* css */ `
   --border: rgba(249,166,2,0.10);
   --border-subtle: rgba(255,255,255,0.06);
   --text: #e8e6e3;
-  --muted: #7a7a85;
+  --muted: #9494a0;
   --accent: ${GOLD};
   --accent-hover: ${GOLDENROD};
   --accent-glow: rgba(249,166,2,0.20);
@@ -154,7 +154,8 @@ const STYLES = /* css */ `
   object-fit: cover;
 }
 .hero-logo {
-  width: 200px; height: 200px;
+  width: clamp(120px, 20vw, 280px);
+  height: auto;
   border-radius: 20px;
   margin-bottom: 28px;
   object-fit: contain;
@@ -325,11 +326,7 @@ const STYLES = /* css */ `
   color: var(--text);
 }
 .hero h1 .gold {
-  color: var(--accent); /* fallback for browsers without background-clip support */
-  background: linear-gradient(135deg, var(--accent) 0%, ${AMBER} 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--accent);
 }
 .hero-sub {
   margin-top: 20px;
@@ -796,7 +793,7 @@ const STYLES = /* css */ `
   margin-bottom: 8px;
 }
 .widget-demo-animated {
-  aspect-ratio: 3 / 2.8;
+  aspect-ratio: 4 / 3;
   background: #0D0B08;
   border: 1px solid var(--border-subtle);
   border-radius: 12px;
@@ -969,12 +966,13 @@ const STYLES = /* css */ `
 .demo-chart-grid-container {
   position: absolute;
   left: 24px;
-  right: 0;
+  right: 16px;
   top: 40px;  /* below the title */
   bottom: 30px; /* above x-axis */
   display: flex;
   align-items: flex-end;
   gap: 0.6rem;
+  padding: 0 8px;
 }
 .demo-chart-y-axis {
   position: absolute;
@@ -1024,12 +1022,12 @@ const STYLES = /* css */ `
   transform: scaleY(0);
 }
 .demo-chart.active .demo-chart-bar { animation: grow-bar 0.8s cubic-bezier(0.65, 0, 0.35, 1) forwards; }
-.demo-chart-bar:nth-child(1) { --bar-h: 40%; animation-delay: 0.1s; --bar-color: #F9A602; }
-.demo-chart-bar:nth-child(2) { --bar-h: 75%; animation-delay: 0.2s; --bar-color: #6366f1; }
-.demo-chart-bar:nth-child(3) { --bar-h: 55%; animation-delay: 0.3s; --bar-color: #22c55e; }
-.demo-chart-bar:nth-child(4) { --bar-h: 90%; animation-delay: 0.4s; --bar-color: #ef4444; }
-.demo-chart-bar:nth-child(5) { --bar-h: 48%; animation-delay: 0.5s; --bar-color: #3b82f6; }
-.demo-chart-bar:nth-child(6) { --bar-h: 30%; animation-delay: 0.6s; --bar-color: #F9A602; }
+.demo-chart-bar:nth-child(3) { --bar-h: 30%; animation-delay: 0.1s; --bar-color: #F9A602; }
+.demo-chart-bar:nth-child(4) { --bar-h: 58%; animation-delay: 0.2s; --bar-color: #6366f1; }
+.demo-chart-bar:nth-child(5) { --bar-h: 42%; animation-delay: 0.3s; --bar-color: #22c55e; }
+.demo-chart-bar:nth-child(6) { --bar-h: 70%; animation-delay: 0.4s; --bar-color: #ef4444; }
+.demo-chart-bar:nth-child(7) { --bar-h: 36%; animation-delay: 0.5s; --bar-color: #3b82f6; }
+.demo-chart-bar:nth-child(8) { --bar-h: 22%; animation-delay: 0.6s; --bar-color: #F9A602; }
 .demo-chart:not(.active) .demo-chart-bar { animation: none; transform: scaleY(0); }
 
 .demo-chart-x-axis {
@@ -1282,7 +1280,7 @@ const STYLES = /* css */ `
 .demo-timeline-layout {
   display: flex;
   flex-direction: column;
-  justify-content: flex-end; /* Align items to bottom */
+  justify-content: center;
   gap: 1.25rem;
   height: 100%;
   padding: 1.5rem 2rem;
@@ -1385,7 +1383,7 @@ const STYLES = /* css */ `
   border-radius: 20px;
   padding: 8px 16px;
   font-size: 13px;
-  color: var(--text-secondary);
+  color: var(--muted);
   transition: border-color 0.2s, transform 0.15s;
   cursor: default;
 }
@@ -1807,7 +1805,7 @@ const STYLES = /* css */ `
     color: var(--accent);
     border-color: rgba(249,166,2,0.15);
   }
-  .nav-actions .btn-ghost { display: none; }
+  .nav-actions .btn-ghost { font-size: 13px; padding: 6px 14px; min-height: 36px; }
   .demo-nav { display: none; } /* Hide dots on mobile */
   .demo-nav-arrows { display: flex; }
 
@@ -1829,7 +1827,7 @@ const STYLES = /* css */ `
   .widget-showcase { grid-template-columns: 1fr; }
   .widget-info { text-align: center; padding: 0 16px; }
   .widget-info-title, .widget-info-desc { text-align: center; }
-  .widget-demo-animated { aspect-ratio: 4 / 3; }
+  .widget-demo-animated { aspect-ratio: 4 / 3.5; min-height: 280px; }
   .demo-gauge { width: clamp(70px, 20vw, 100px); }
   .demo-gauges-grid { gap: 1rem; }
   .demo-form-layout { gap: 0.5rem; padding: 0.75rem; }
@@ -1850,7 +1848,7 @@ const STYLES = /* css */ `
   .byok-strip { flex-direction: column; text-align: center; }
 }
 @media (max-width: 480px) {
-  .agents-grid { grid-template-columns: 1fr; max-width: 300px; margin: 0 auto; }
+  .agents-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
   .hero-cta { flex-direction: column; align-items: center; }
   .hero-cta .btn { width: 100%; max-width: 300px; }
 }
@@ -2098,15 +2096,15 @@ class ScLanding extends HTMLElement {
 
         pauseDemo(6000);
         button.classList.add('deploying');
-        span.textContent = 'Building...';
+        span.textContent = 'Setting up...';
 
-        setTimeout(() => { span.textContent = 'Testing...'; }, 700);
-        setTimeout(() => { span.textContent = 'Deploying...'; }, 1400);
+        setTimeout(() => { span.textContent = 'Configuring agents...'; }, 700);
+        setTimeout(() => { span.textContent = 'Creating workspace...'; }, 1400);
 
         setTimeout(() => {
           button.classList.remove('deploying');
           button.classList.add('deployed');
-          span.textContent = '✓ Deployed!';
+          span.textContent = '✓ Created!';
 
           // Rocket
           const rocket = document.createElement('div');
@@ -2133,7 +2131,7 @@ class ScLanding extends HTMLElement {
           // Reset button
           setTimeout(() => {
             button.classList.remove('deployed');
-            span.textContent = 'Deploy Project';
+            span.textContent = 'Create Project';
           }, 2500);
         }, 2000);
       });
@@ -2152,7 +2150,7 @@ class ScLanding extends HTMLElement {
       { el: null, val: 75, min: 30, max: 95, step: 8, unit: '%', decimals: 0, mode: 'fluctuate' },   // CPU
       { el: null, val: 4.8, min: 4.2, max: 7.5, step: 0.3, unit: 'G', decimals: 1, mode: 'creep' }, // Memory — slowly climbs
       { el: null, val: 91, min: 40, max: 99, step: 6, unit: '%', decimals: 0, mode: 'fluctuate' },   // Disk IO
-      { el: null, val: 62, min: 62, max: 999, step: 4, unit: 'k', decimals: 0, mode: 'increment' },  // Requests — only goes up
+      { el: null, val: 62, min: 40, max: 95, step: 5, unit: '%', decimals: 0, mode: 'fluctuate' },  // Network
     ];
     const gaugeEls = root.querySelectorAll('.demo-gauge');
     const fillEls = root.querySelectorAll('.demo-gauge .fill');
@@ -2177,7 +2175,7 @@ class ScLanding extends HTMLElement {
         cfg.val = val;
         cfg.el.textContent = val.toFixed(cfg.decimals) + cfg.unit;
         if (fillEls[i]) {
-          const pct = cfg.unit === 'G' ? val / 8 : cfg.unit === 'k' ? Math.min(val / 200, 1) : val / 100;
+          const pct = cfg.unit === 'G' ? val / 8 : val / 100;
           fillEls[i].style.strokeDashoffset = String(283 - (283 * Math.min(pct, 1)));
         }
       });
@@ -2411,8 +2409,8 @@ class ScLanding extends HTMLElement {
                 </div>
                 <div class="demo-gauge" style="--gauge-color: #3b82f6;">
                   <svg viewBox="0 0 100 100"><circle class="track" cx="50" cy="50" r="45"></circle><circle class="fill fill-4" cx="50" cy="50" r="45"></circle></svg>
-                  <div class="value">62k</div>
-                  <div class="label">Requests</div>
+                  <div class="value">62%</div>
+                  <div class="label">Network</div>
                 </div>
               </div>
             </div>
@@ -2446,7 +2444,6 @@ class ScLanding extends HTMLElement {
                   <label class="demo-form-label">Project Name</label>
                   <input type="text" class="demo-form-field" value="Landing Page Redesign">
                 </div>
-                </div>
                 <div class="demo-form-group">
                   <label class="demo-form-label">Agent Preset</label>
                   <div class="demo-form-field demo-form-select" data-demo-select>
@@ -2460,7 +2457,7 @@ class ScLanding extends HTMLElement {
                   </div>
                 </div>
                 <div class="demo-form-group">
-                  <button class="demo-form-field demo-form-button" data-demo-deploy><span>Deploy Project</span></button>
+                  <button class="demo-form-field demo-form-button" data-demo-deploy><span>Create Project</span></button>
                 </div>
               </div>
             </div>
@@ -2589,7 +2586,7 @@ class ScLanding extends HTMLElement {
                     <h5>Input</h5>
                     <div class="widget-all-item"><span class="emoji">📋</span> <span>Forms:</span> Full-featured input forms</div>
                     <div class="widget-all-item"><span class="emoji">🔘</span> <span>Buttons:</span> Clickable actions</div>
-                    <div class="widget-all-item"><span class="emoji">칩</span> <span>Chips:</span> Selectable toggles</div>
+                    <div class="widget-all-item"><span class="emoji">🏷️</span> <span>Chips:</span> Selectable toggles</div>
                     <div class="widget-all-item"><span class="emoji">🎚️</span> <span>Toggle:</span> On/off switch</div>
                     <div class="widget-all-item"><span class="emoji">🎛️</span> <span>Slider:</span> Range selection</div>
                     <div class="widget-all-item"><span class="emoji">⭐</span> <span>Rating:</span> Star-based rating input</div>
@@ -2754,10 +2751,10 @@ class ScLanding extends HTMLElement {
 
       <!-- Footer -->
       <footer class="footer">
-        <div>&copy; 2026 Scratchy. Built with stubbornness and Zig.</div>
+        <div>&copy; 2026 Scratchy. Built by <a href="https://github.com/yassinebkr" target="_blank" rel="noopener">Yassine</a>.</div>
         <div class="footer-links">
           <a href="https://github.com/yassinebkr/scratchy" target="_blank" rel="noopener">GitHub</a>
-          <a href="https://docs.openclaw.ai" target="_blank" rel="noopener">Docs</a>
+          <a href="https://scratchy-docs.clawos.fr" target="_blank" rel="noopener">Docs</a>
           <a href="https://discord.com/invite/clawd" target="_blank" rel="noopener">Discord</a>
         </div>
         <div class="footer-security">🛡️ Protected by <a href="https://github.com/yassinebkr/proteclaw" target="_blank" rel="noopener">ProteClaw</a></div>

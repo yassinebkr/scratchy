@@ -3,8 +3,9 @@
  * Manages auth state, WS connection, and UI routing.
  */
 
-import { connect, disconnect, on, send, sendChat, emit } from './ws-client.js';
+import { connect, disconnect, on, send, sendChat, emit, sendWidgetAction } from './ws-client.js';
 import { MobileUXManager } from './mobile-ux.js';
+import { LiveWidgetRegistry } from '../components/sc-live-registry.js';
 // Lazy-load inline tiles to avoid blocking page load
 /** Inline tile renderer — progressive: tiles appear one by one with staggered timing */
 function renderInlineTiles(messageEl, ops) {
@@ -16,8 +17,18 @@ function renderInlineTiles(messageEl, ops) {
     messageEl.appendChild(container);
   }
 
+  // Handle live widget define/undefine ops first (must register before upsert)
+  ops.filter(op => op?.op === 'define' && op.id && op.component).forEach(op => {
+    LiveWidgetRegistry.define(op.id, op.component);
+    console.log(`[app] Live widget defined: ${op.id}`);
+  });
+  ops.filter(op => op?.op === 'undefine' && op.id).forEach(op => {
+    LiveWidgetRegistry.undefine(op.id);
+    console.log(`[app] Live widget undefined: ${op.id}`);
+  });
+
   // Separate immediate ops (clear/remove/patch) from upserts
-  const immediateOps = ops.filter(op => op?.op !== 'upsert');
+  const immediateOps = ops.filter(op => op?.op !== 'upsert' && op?.op !== 'define' && op?.op !== 'undefine');
   const upsertOps = ops.filter(op => op?.op === 'upsert' && op.id);
 
   // Handle immediate ops synchronously
@@ -32,10 +43,15 @@ function renderInlineTiles(messageEl, ops) {
     if (op.op === 'patch') {
       const el = container.querySelector(`#tile-${CSS.escape(op.id)}`);
       if (el && op.data) {
-        try {
-          const prev = JSON.parse(el.getAttribute('data') || '{}');
-          el.setAttribute('data', JSON.stringify({ ...prev, ...op.data }));
-        } catch {}
+        // Live widgets have an update() method; sc-tile uses attributes
+        if (typeof el.update === 'function') {
+          el.update(op.data);
+        } else {
+          try {
+            const prev = JSON.parse(el.getAttribute('data') || '{}');
+            el.setAttribute('data', JSON.stringify({ ...prev, ...op.data }));
+          } catch {}
+        }
       }
     }
   });
@@ -47,10 +63,23 @@ function renderInlineTiles(messageEl, ops) {
       const existing = container.querySelector(`#tile-${CSS.escape(op.id)}`);
       if (existing) existing.remove();
 
-      const tile = document.createElement('sc-tile');
-      tile.id = `tile-${op.id}`;
-      tile.setAttribute('type', op.type || 'card');
-      if (op.data) tile.setAttribute('data', JSON.stringify(op.data));
+      let tile;
+      // Check if this is a live widget type
+      if (op.type && LiveWidgetRegistry.has(op.type)) {
+        tile = LiveWidgetRegistry.createInstance(op.type, op.data || {}, op.id);
+        if (tile) {
+          tile.id = `tile-${op.id}`;
+          // Expand parent message to full width for live widgets
+          messageEl.classList.add('msg-has-live-widget');
+        }
+      }
+      // Fall back to built-in sc-tile
+      if (!tile) {
+        tile = document.createElement('sc-tile');
+        tile.id = `tile-${op.id}`;
+        tile.setAttribute('type', op.type || 'card');
+        if (op.data) tile.setAttribute('data', JSON.stringify(op.data));
+      }
       tile.style.opacity = '0';
       tile.style.transform = 'translateY(12px)';
       container.appendChild(tile);
@@ -1043,6 +1072,7 @@ function wireWsEvents() {
   on('chat', (msg) => {
     // msg: { type:'chat', text, html?, from? }
     removeEmptyState();
+    clearAllTypingIndicators();
     const content = msg.html || escapeHtml(msg.text || '');
     appendMessage(msg.from || 'assistant', content);
   });
@@ -1549,11 +1579,8 @@ export function logout() {
   localStorage.removeItem('scratchy_token');
   disconnect();
 
-  // Reset auth component
-  const authEl = document.querySelector('sc-auth');
-  if (authEl) authEl.reset();
-
-  showAuth();
+  // Full reload to landing page — cleanest way to reset all state
+  window.location.href = '/';
 }
 
 /* ------------------------------------------------------------------ */
@@ -1970,6 +1997,10 @@ async function init() {
     if (action === 'select-plan' || action === 'get-started' || action === 'sign-in') {
       if (planId) localStorage.setItem('scratchy_pending_plan', planId);
       showAuth();
+      if (action === 'sign-in') {
+        const authEl = document.querySelector('sc-auth');
+        if (authEl) authEl.mode = 'login';
+      }
     }
   });
 
@@ -2288,6 +2319,21 @@ async function init() {
       window.dispatchEvent(new CustomEvent('surface-activate', { detail: { surface: 'webapp', url: widget.url, title: widget.name } }));
     }
   });
+  // Live widget actions — forward to server via WS
+  document.addEventListener('widget-action', (e) => {
+    const { action, payload, widgetId, instanceId } = e.detail || {};
+    if (!action || !widgetId) return;
+    // Look up the creator agent from the registry
+    const def = LiveWidgetRegistry.get(widgetId);
+    sendWidgetAction(action, {
+      ...payload,
+      widgetId,
+      instanceId,
+      createdBy: def?.createdBy || null,
+      isLiveWidget: true,
+    });
+  });
+
   if ($logoutBtn) {
     $logoutBtn.addEventListener('click', () => { $userMenu.classList.add('hidden'); logout(); });
   }
@@ -2310,11 +2356,13 @@ async function init() {
     });
   }
 
-  // Drag & drop on chat area
+  // Drag & drop on chat area (file uploads only — skip widget DnD)
   const $chatSurface = document.getElementById('chat-surface');
   if ($chatSurface) {
     let dragCounter = 0;
+    const _isFileDrag = (e) => e.dataTransfer && e.dataTransfer.types.includes('Files');
     $chatSurface.addEventListener('dragenter', (e) => {
+      if (!_isFileDrag(e)) return; // Widget DnD (text/plain) — don't interfere
       e.preventDefault();
       dragCounter++;
       if (dragCounter === 1) {
@@ -2329,6 +2377,7 @@ async function init() {
       }
     });
     $chatSurface.addEventListener('dragleave', (e) => {
+      if (!_isFileDrag(e)) return;
       e.preventDefault();
       dragCounter--;
       if (dragCounter === 0) {
@@ -2336,8 +2385,11 @@ async function init() {
         if (overlay) overlay.remove();
       }
     });
-    $chatSurface.addEventListener('dragover', (e) => e.preventDefault());
+    $chatSurface.addEventListener('dragover', (e) => {
+      if (_isFileDrag(e)) e.preventDefault();
+    });
     $chatSurface.addEventListener('drop', (e) => {
+      if (!_isFileDrag(e)) return; // Widget DnD — let it pass through
       e.preventDefault();
       dragCounter = 0;
       const overlay = $chatSurface.querySelector('.drag-overlay');

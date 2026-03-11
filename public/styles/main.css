@@ -425,6 +425,98 @@ sc-workspace-bar {
   border-radius: 0;
 }
 
+/* Markdown headings in chat */
+.msg .md-h1 { font-size: 1.25em; font-weight: 700; margin: 12px 0 6px; }
+.msg .md-h2 { font-size: 1.1em; font-weight: 700; margin: 10px 0 4px; color: var(--text-primary, #fff); }
+.msg .md-h3 { font-size: 1em; font-weight: 600; margin: 8px 0 4px; }
+.msg .md-h4 { font-size: 0.95em; font-weight: 600; margin: 6px 0 2px; color: var(--text-secondary, #aaa); }
+
+/* Markdown lists in chat */
+.msg ul { margin: 4px 0 4px 16px; padding: 0; list-style: disc; }
+.msg ul.md-ol { list-style: decimal; }
+.msg li { margin: 2px 0; line-height: 1.5; }
+
+/* Horizontal rules in chat */
+.msg hr { border: none; border-top: 1px solid var(--border, rgba(255,255,255,0.1)); margin: 8px 0; }
+
+/* Inline canvas tiles in chat */
+.chat-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+  width: 100%;
+}
+.chat-tiles sc-tile {
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 8px;
+  overflow: hidden;
+  animation: genui-fade-in 200ms ease-out both;
+}
+/* Live widget tiles — expand to full available width */
+.msg.msg-has-live-widget {
+  max-width: min(98%, 1200px);
+}
+.chat-tiles [id^="tile-"] {
+  /* Live widget instances fill the grid */
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+@media (max-width: 600px) {
+  .chat-tiles { grid-template-columns: 1fr; }
+  .msg.msg-has-live-widget { max-width: 100%; padding: 8px; }
+}
+
+/* GenUI skeleton loader */
+.genui-rendering {
+  padding: 12px 16px;
+  margin: 8px 0;
+  animation: genui-fade-in 200ms ease-out;
+}
+.genui-skeleton-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-muted, #888);
+  margin-bottom: 10px;
+}
+.genui-skeleton-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--accent, #6366f1);
+  animation: genui-pulse 1s ease-in-out infinite;
+}
+.genui-skeleton-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px;
+}
+.genui-skeleton-tile {
+  height: 80px;
+  border-radius: 8px;
+  background: linear-gradient(90deg,
+    rgba(255,255,255,0.03) 25%,
+    rgba(255,255,255,0.06) 50%,
+    rgba(255,255,255,0.03) 75%);
+  background-size: 200% 100%;
+  animation: genui-shimmer 1.5s ease-in-out infinite;
+  border: 1px solid rgba(255,255,255,0.04);
+}
+@keyframes genui-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+@keyframes genui-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+@keyframes genui-fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 .msg-system {
   background: transparent;
   color: var(--text-muted);

@@ -302,6 +302,14 @@ export function initSchema(db) {
   if (!agentCols.some(c => c.name === 'tokensPerDay')) {
     db.exec(`ALTER TABLE agents ADD COLUMN tokensPerDay INTEGER DEFAULT NULL`);
   }
+
+  // Migrate users table: add accessTier column
+  const userCols = db.pragma('table_info(users)');
+  if (!userCols.some(c => c.name === 'accessTier')) {
+    db.exec(`ALTER TABLE users ADD COLUMN accessTier TEXT NOT NULL DEFAULT 'none'`);
+    // Set existing admin users to 'admin' tier
+    db.exec(`UPDATE users SET accessTier = 'admin' WHERE role = 'admin'`);
+  }
 }
 
 /**

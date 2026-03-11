@@ -18,6 +18,8 @@ import { searchContext, searchMemory, formatResultsAsToon } from '../lib/context
 import { createBestGeminiProvider, createOpenAIProvider, createMockProvider, createFallbackProvider } from '../lib/embeddings.js';
 import { extractMemories } from '../lib/memory-extraction.js';
 import * as secureKeys from '../lib/secure-keys.js';
+import { mapTypedCanvasTool, TYPED_TOOL_NAMES } from '../lib/canvas-typed-tools.js';
+import * as canvasState from '../state/canvas.js';
 import { checkEmbeddingQuota, recordEmbeddingUsage } from '../lib/embedding-quota.js';
 import { maskObservations } from '../lib/observation-masking.js';
 import { MemoryConsolidator } from '../lib/memory-consolidation.js';
@@ -382,9 +384,9 @@ function buildAugmentedPrompt(userMessage, history, contextBlock) {
  * @param {(chunk: string) => void} onChunk — called for each streaming delta
  * @returns {Promise<string>} — full response text
  */
-async function sendViaAdapter(userId, augmentedPrompt, onChunk) {
+async function sendViaAdapter(userId, augmentedPrompt, onChunk, onToolEvent) {
   if (!_adapter) throw new Error('Adapter not initialized');
-  return _adapter.routeMessageStreaming(userId, augmentedPrompt, onChunk);
+  return _adapter.routeMessageStreaming(userId, augmentedPrompt, onChunk, undefined, onToolEvent);
 }
 
 /**
@@ -610,21 +612,185 @@ export async function handleChat(userId, msg, ws) {
     const augmentedPrompt = buildAugmentedPrompt(text, history, contextBlock);
 
     // ── Step 4+5: Send to NullClaw and stream response ──
-    // Prepend soul to the message so NullClaw adopts the agent's personality
-    const messageForNullClaw = soulBlock ? `${soulBlock}\n${text}` : text;
+    // Prepend soul + GenUI protocol to the message so NullClaw adopts personality + knows canvas syntax
+    const GENUI_BLOCK = `[Canvas] You have canvas tools: mcp_canvas_render_dashboard, mcp_canvas_render_comparison, mcp_canvas_render_code, mcp_canvas_render_project, mcp_canvas_render_data, mcp_canvas_render_custom, mcp_canvas_create_live_widget, mcp_canvas_destroy_live_widget. Call them to render visuals. 1 sentence of chat text max. Never describe components in text. Never use scratchy-canvas or scratchy-toon code blocks.`;
+
+    const messageForNullClaw = soulBlock
+      ? `${soulBlock}\n${GENUI_BLOCK}\n\n${text}`
+      : `${GENUI_BLOCK}\n\n${text}`;
     let response = '';
     let usedAdapter = false;
+
+    // ── Stream gate: suppress tool XML and verbose post-tool text ──
+    let canvasToolFired = false;   // true once any mcp_canvas_* tool event fires
+    let streamBuffer = '';         // accumulates text to detect <tool_call> blocks
+    let insideToolBlock = false;   // true while inside <tool_call>...</tool_result>
+    let sentenceCount = 0;         // counts sentences after canvas tool
+
+    // Length of the longest tag we need to detect across chunk boundaries
+    const TAG_LOOKBACK = '<tool_call>'.length; // 11 chars
+
+    /**
+     * Stream gate: filters text deltas before sending to client.
+     * - Suppresses <tool_call>...<tool_result>...</tool_result> XML blocks
+     * - After canvas tool fires, allows max 1 sentence of text
+     * - Keeps a look-back window in streamBuffer to catch tags split across chunks
+     */
+    function gatedChunk(chunk) {
+      streamBuffer += chunk;
+
+      // Detect <tool_call> opening — start suppressing
+      if (!insideToolBlock && streamBuffer.includes('<tool_call>')) {
+        const idx = streamBuffer.indexOf('<tool_call>');
+        const before = streamBuffer.slice(0, idx).trim();
+        if (before) {
+          sendJson(ws, { type: 'chat-stream', delta: before, ts: Date.now() });
+        }
+        insideToolBlock = true;
+        streamBuffer = streamBuffer.slice(idx);
+        return;
+      }
+
+      // Inside tool block — suppress everything until </tool_result>
+      if (insideToolBlock) {
+        if (streamBuffer.includes('</tool_result>')) {
+          const endIdx = streamBuffer.indexOf('</tool_result>') + '</tool_result>'.length;
+          streamBuffer = streamBuffer.slice(endIdx);
+          insideToolBlock = false;
+        }
+        return;
+      }
+
+      // After canvas tool fired — limit to 1 sentence
+      if (canvasToolFired) {
+        const sentences = streamBuffer.match(/[.!?]\s/g);
+        if (sentences) sentenceCount += sentences.length;
+        if (sentenceCount >= 1) {
+          const match = streamBuffer.match(/^(.*?[.!?])\s/);
+          if (match) {
+            sendJson(ws, { type: 'chat-stream', delta: match[1], ts: Date.now() });
+            streamBuffer = '';
+          }
+          return;
+        }
+        return;
+      }
+
+      // Normal text — send with look-back window to catch <tool_call> split across chunks
+      if (streamBuffer.length > TAG_LOOKBACK) {
+        const safe = streamBuffer.slice(0, streamBuffer.length - TAG_LOOKBACK);
+        sendJson(ws, { type: 'chat-stream', delta: safe, ts: Date.now() });
+        streamBuffer = streamBuffer.slice(safe.length); // keep tail as look-back
+      }
+      // else: buffer too short, hold until next chunk arrives
+    }
+
+    // ── Canvas tool interceptor ──
+    // Intercepts mcp_canvas_* tool calls from NullClaw SSE events
+    // and pushes them as canvas-ops to the client via WebSocket.
+    const canvasToolHandler = (event) => {
+      console.log(`[chat] Tool event: type=${event.type} name=${event.name || '?'}`);
+      if (event.type !== 'tool_call_start') return;
+      const toolName = event.name || '';
+      if (!toolName.startsWith('mcp_canvas_')) return;
+
+      canvasToolFired = true;
+      sentenceCount = 0;
+      streamBuffer = ''; // reset buffer — anything accumulated during tool block is discarded
+
+      const shortName = toolName.replace('mcp_canvas_', '');
+      let args;
+      try {
+        args = typeof event.arguments === 'string' ? JSON.parse(event.arguments) : (event.arguments || {});
+      } catch {
+        console.warn(`[chat] Canvas tool: failed to parse args for ${toolName}`);
+        return;
+      }
+
+      let ops = [];
+      switch (shortName) {
+        case 'render': {
+          const components = args.components || [];
+          ops = components.map(c => ({
+            op: 'upsert',
+            id: c.id || `auto-${Date.now()}`,
+            type: c.type || 'card',
+            data: c.data || {},
+          }));
+          break;
+        }
+        case 'update':
+          ops = [{ op: 'patch', id: args.id, data: args.data || {} }];
+          break;
+        case 'remove':
+          ops = [{ op: 'remove', id: args.id }];
+          break;
+        case 'clear':
+          ops = [{ op: 'clear' }];
+          break;
+        default:
+          if (TYPED_TOOL_NAMES.has(shortName)) {
+            ops = mapTypedCanvasTool(shortName, args);
+            break;
+          }
+          return;
+      }
+
+      if (ops.length > 0) {
+        sendJson(ws, { type: 'genui-pending', count: ops.length, ts: Date.now() });
+        sendJson(ws, {
+          type: 'canvas-ops',
+          ops,
+          source: 'genui-tool',
+          ts: Date.now(),
+        });
+        console.log(`[chat] Canvas tool: ${shortName} → ${ops.length} ops for ${userId}`);
+
+        // Persist canvas ops for reconnect replay (defines first, then upserts/patches)
+        try {
+          const existing = canvasState.getCanvasState(userId);
+          // Merge new ops into existing state
+          let merged = [...existing];
+          for (const op of ops) {
+            if (op.op === 'define' || op.op === 'undefine') {
+              // Replace any existing define/undefine for same widget id
+              merged = merged.filter(o => !(o.op === 'define' && o.id === op.id) && !(o.op === 'undefine' && o.id === op.id));
+              merged.push(op);
+            } else if (op.op === 'upsert') {
+              // Replace any existing upsert with same id
+              merged = merged.filter(o => !(o.op === 'upsert' && o.id === op.id));
+              merged.push(op);
+            } else if (op.op === 'patch') {
+              // Merge patch into existing upsert if present
+              const idx = merged.findIndex(o => o.op === 'upsert' && o.id === op.id);
+              if (idx >= 0) {
+                merged[idx] = { ...merged[idx], data: { ...merged[idx].data, ...op.data } };
+              } else {
+                merged.push(op);
+              }
+            } else if (op.op === 'remove') {
+              merged = merged.filter(o => o.id !== op.id);
+            } else if (op.op === 'clear') {
+              merged = [];
+            }
+          }
+          // Sort: defines first, then everything else (ordering guarantee for replay)
+          merged.sort((a, b) => {
+            const aDefine = a.op === 'define' ? 0 : 1;
+            const bDefine = b.op === 'define' ? 0 : 1;
+            return aDefine - bDefine;
+          });
+          canvasState.setCanvasState(userId, merged);
+        } catch (e) {
+          console.warn(`[chat] Failed to persist canvas state for ${userId}:`, e.message);
+        }
+      }
+    };
 
     if (_adapter) {
       try {
         // Send message with soul context — NullClaw manages its own session history
-        response = await sendViaAdapter(userId, messageForNullClaw, (chunk) => {
-          sendJson(ws, {
-            type: 'chat-stream',
-            delta: chunk,
-            ts: Date.now(),
-          });
-        });
+        response = await sendViaAdapter(userId, messageForNullClaw, gatedChunk, canvasToolHandler);
         usedAdapter = true;
       } catch (adapterErr) {
         console.warn(`[chat] Adapter failed for ${userId}, falling back to direct spawn:`, adapterErr.message);
@@ -644,6 +810,16 @@ export async function handleChat(userId, msg, ws) {
         });
       });
     }
+
+    // ── Flush gated buffer (any remaining look-back or incomplete sentence) ──
+    if (streamBuffer.trim() && !insideToolBlock) {
+      const cleaned = streamBuffer.replace(/<tool_call>[\s\S]*?<\/tool_call>/g, '')
+        .replace(/<tool_result>[\s\S]*?<\/tool_result>/g, '').trim();
+      if (cleaned && !(canvasToolFired && sentenceCount >= 1)) {
+        sendJson(ws, { type: 'chat-stream', delta: cleaned, ts: Date.now() });
+      }
+    }
+    streamBuffer = '';
 
     // ── End stream ──
     sendJson(ws, { type: 'chat-stream-end', ts: Date.now() });
@@ -687,6 +863,18 @@ export async function handleChat(userId, msg, ws) {
     }
 
     // ── Step 6: Persist assistant response ──
+    // If canvas tools were used, clean the response: strip tool XML and verbose descriptions
+    if (response && canvasToolFired) {
+      response = response
+        .replace(/<tool_call>[\s\S]*?<\/tool_call>/g, '')
+        .replace(/<tool_result>[\s\S]*?<\/tool_result>/g, '')
+        .trim();
+      // Keep only first sentence if there's verbose post-tool text
+      const sentenceMatch = response.match(/^(.*?[.!?])\s/);
+      if (sentenceMatch && response.length > 150) {
+        response = sentenceMatch[1];
+      }
+    }
     if (response) {
       appendHistory(userId, 'assistant', response, usedAdapter ? 'nullclaw-gateway' : 'nullclaw');
     }

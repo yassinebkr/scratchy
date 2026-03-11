@@ -137,9 +137,21 @@ function _updateChatHeader(agent) {
   const $model = document.getElementById('chat-header-model');
 
   if ($avatar) {
-    $avatar.textContent = _getInitials(agent.name);
-    $avatar.style.background = agent.color.bg;
-    $avatar.style.color = agent.color.fg;
+    /* Try persona photo first, fall back to initials */
+    const slug = (agent.name || '').toLowerCase().replace(/[^a-z0-9-]/g, '');
+    const img = new Image();
+    img.src = `/assets/agents/${slug}.png`;
+    img.onload = () => {
+      $avatar.textContent = '';
+      $avatar.style.background = 'transparent';
+      img.style.cssText = 'width:100%;height:100%;border-radius:inherit;object-fit:cover';
+      $avatar.appendChild(img);
+    };
+    img.onerror = () => {
+      $avatar.textContent = _getInitials(agent.name);
+      $avatar.style.background = agent.color.bg;
+      $avatar.style.color = agent.color.fg;
+    };
   }
 
   if ($name) {

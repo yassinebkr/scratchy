@@ -7,6 +7,15 @@
 import crypto from 'node:crypto';
 import { getDb } from './db.js';
 
+/** Safe column list — excludes passwordHash and apiKey from public queries */
+const SAFE_COLS = 'id, username, displayName, role, plan, accessTier, capabilities, createdAt, updatedAt';
+/** All columns — only for auth-internal queries (login, password verify) */
+const ALL_COLS = '*';
+/** Username constraints */
+const USERNAME_MIN = 2;
+const USERNAME_MAX = 64;
+const USERNAME_RE = /^[a-zA-Z0-9_.-]+$/;
+
 /** @type {import('better-sqlite3').Database} */
 let db;
 
@@ -33,6 +42,7 @@ function d() {
  * @property {string|null} displayName
  * @property {'admin'|'user'} role
  * @property {'free'|'pro'|'team'|'byok'|'enterprise'} plan
+ * @property {'none'|'trial'|'byok'|'managed'|'admin'} accessTier
  * @property {string|null} apiKey
  * @property {string} capabilities - JSON string
  * @property {string} createdAt
@@ -52,20 +62,35 @@ function d() {
  * @returns {User}
  */
 export function createUser(username, passwordHash, opts = {}) {
+  if (typeof username !== 'string' || !username.trim()) {
+    throw new Error('Username must be a non-empty string');
+  }
+  username = username.trim();
+  if (username.length < USERNAME_MIN || username.length > USERNAME_MAX) {
+    throw new Error(`Username must be between ${USERNAME_MIN} and ${USERNAME_MAX} characters`);
+  }
+  if (!USERNAME_RE.test(username)) {
+    throw new Error('Username may only contain letters, numbers, underscores, dots, and hyphens');
+  }
+  if (typeof passwordHash !== 'string' || !passwordHash) {
+    throw new Error('passwordHash must be a non-empty string');
+  }
+
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
   const {
     displayName = null,
     role = 'user',
     plan = 'free',
+    accessTier = 'none',
     apiKey = null,
     capabilities = [],
   } = opts;
 
   d().prepare(`
-    INSERT INTO users (id, username, passwordHash, displayName, role, plan, apiKey, capabilities, createdAt, updatedAt)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(id, username, passwordHash, displayName, role, plan, apiKey, JSON.stringify(capabilities), now, now);
+    INSERT INTO users (id, username, passwordHash, displayName, role, plan, accessTier, apiKey, capabilities, createdAt, updatedAt)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, username, passwordHash, displayName, role, plan, accessTier, apiKey, JSON.stringify(capabilities), now, now);
 
   return getUser(id);
 }
@@ -76,7 +101,17 @@ export function createUser(username, passwordHash, opts = {}) {
  * @returns {User|undefined}
  */
 export function getUser(userId) {
-  return d().prepare('SELECT * FROM users WHERE id = ?').get(userId);
+  return d().prepare(`SELECT ${SAFE_COLS} FROM users WHERE id = ?`).get(userId);
+}
+
+/**
+ * Get a user by ID with ALL columns (including passwordHash).
+ * Only for auth-internal use (login, password verification).
+ * @param {string} userId
+ * @returns {User|undefined}
+ */
+export function getUserFull(userId) {
+  return d().prepare(`SELECT ${ALL_COLS} FROM users WHERE id = ?`).get(userId);
 }
 
 /**
@@ -85,7 +120,17 @@ export function getUser(userId) {
  * @returns {User|undefined}
  */
 export function getUserByUsername(username) {
-  return d().prepare('SELECT * FROM users WHERE username = ? COLLATE NOCASE').get(username);
+  return d().prepare(`SELECT ${SAFE_COLS} FROM users WHERE username = ? COLLATE NOCASE`).get(username);
+}
+
+/**
+ * Get a user by username with ALL columns (including passwordHash).
+ * Only for auth-internal use (login, password verification).
+ * @param {string} username
+ * @returns {User|undefined}
+ */
+export function getUserByUsernameFull(username) {
+  return d().prepare(`SELECT ${ALL_COLS} FROM users WHERE username = ? COLLATE NOCASE`).get(username);
 }
 
 /**
@@ -96,7 +141,7 @@ export function getUserByUsername(username) {
  * @returns {User|undefined} The updated user, or undefined if not found
  */
 export function updateUser(userId, patch) {
-  const allowed = ['username', 'passwordHash', 'displayName', 'role', 'plan', 'apiKey', 'capabilities'];
+  const allowed = ['username', 'passwordHash', 'displayName', 'role', 'plan', 'accessTier', 'apiKey', 'capabilities'];
   const sets = [];
   const values = [];
 
@@ -122,7 +167,7 @@ export function updateUser(userId, patch) {
  * @returns {User[]}
  */
 export function listUsers() {
-  return d().prepare('SELECT * FROM users ORDER BY createdAt ASC').all();
+  return d().prepare(`SELECT ${SAFE_COLS} FROM users ORDER BY createdAt ASC`).all();
 }
 
 /**

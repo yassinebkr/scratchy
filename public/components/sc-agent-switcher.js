@@ -1997,8 +1997,27 @@ export class ScAgentSwitcher extends HTMLElement {
     } catch {
       this._teams = [];
     }
+    // Restore last active agent from localStorage (works for both API and template agents)
+    const prevActive = this._activeAgentId;
+    if (!this._activeAgentId || !this._agents.find(a => a.id === this._activeAgentId)) {
+      const saved = localStorage.getItem('scratchy_active_agent');
+      const match = saved && this._agents.find(a => a.id === saved);
+      this._activeAgentId = match ? match.id : (this._agents[0]?.id || null);
+    }
+
     this._applyFilter();
     this._renderList();
+
+    // If the active agent changed (restored from localStorage), notify the app
+    if (this._activeAgentId && this._activeAgentId !== prevActive) {
+      const agent = this._agents.find(a => a.id === this._activeAgentId);
+      if (agent) {
+        this.dispatchEvent(new CustomEvent('agent-switch', {
+          bubbles: true, composed: true,
+          detail: { agentId: agent.id, agent },
+        }));
+      }
+    }
   }
 
   /* ═══ Filtering ═══════════════════════════════════════════ */
@@ -2066,7 +2085,10 @@ export class ScAgentSwitcher extends HTMLElement {
       this._filtered = [...this._agents];
       // Keep _filteredTeams — don't clear teams just because agents are empty
       if (!this._activeAgentId) {
-        this._activeAgentId = this._agents[0].id;
+        // Restore last active agent from localStorage, fallback to first agent
+        const saved = localStorage.getItem('scratchy_active_agent');
+        const match = saved && this._agents.find(a => a.id === saved);
+        this._activeAgentId = match ? match.id : this._agents[0].id;
       }
       // Fall through to render the cards normally
     }
@@ -2342,6 +2364,7 @@ export class ScAgentSwitcher extends HTMLElement {
 
   _switchAgent(agent) {
     this._activeAgentId = agent.id;
+    try { localStorage.setItem('scratchy_active_agent', agent.id); } catch {}
     this._focusedIndex = this._filtered.findIndex(a => a.id === agent.id);
     this._renderList();
 

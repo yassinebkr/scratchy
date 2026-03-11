@@ -10,7 +10,7 @@ import 'dotenv/config';
 import { createServer } from 'node:http';
 import { createRouter } from './router.js';
 import { createWsHandler, broadcastToUser } from './ws.js';
-import { initWidgets, destroyWidgets } from './widgets.js';
+import { initWidgets, destroyWidgets, setLiveWidgetActionHandler } from './widgets.js';
 import { McpRegistry } from '../lib/mcp-registry.js';
 import { init as initChat, handleChat, shutdown as shutdownChat } from './chat-handler.js';
 import * as googleAuth from '../lib/google-auth.js';
@@ -21,6 +21,7 @@ import { seedTeams } from './seed-teams.js';
 import * as canvasState from '../state/canvas.js';
 import * as teamsState from '../state/teams.js';
 import * as workspacesState from '../state/workspaces.js';
+import * as usersState from '../state/users.js';
 
 /** Default port — v2 runs on 3002 (v1 is on 3001) */
 const PORT = parseInt(process.env.PORT ?? '3002', 10);
@@ -199,8 +200,22 @@ async function main() {
     getAgents: agentsModule,
     mcpRegistry,
     onChat: async (userId, msg, ws) => {
+      // ── Access Gate: block users without access tier ──
+      const user = usersState.getUser(userId);
+      if (!user || user.accessTier === 'none') {
+        const { sendJson } = await import('./ws.js');
+        sendJson(ws, {
+          type: 'chat', from: 'system',
+          text: '🔒 Your account doesn\'t have chat access yet. Enter your own API key in Settings, or contact the admin for access.',
+          ts: Date.now(),
+        });
+        sendJson(ws, { type: 'access-denied', reason: 'no-tier', ts: Date.now() });
+        console.log(`[chat] ACCESS DENIED: userId=${userId} accessTier=${user?.accessTier || 'missing'}`);
+        return;
+      }
+
       // Team routing: if msg has teamId, route through team pipeline
-      console.log(`[chat] userId=${userId} teamId=${msg.teamId || 'none'} agentId=${msg.agentId || 'default'} keys=${Object.keys(msg).join(',')} text=${(msg.text || '').slice(0, 40)}`);
+      console.log(`[chat] userId=${userId} tier=${user.accessTier} teamId=${msg.teamId || 'none'} agentId=${msg.agentId || 'default'} text=${(msg.text || '').slice(0, 40)}`);
       if (msg.teamId) {
         await routeTeamChat(userId, msg.teamId, msg, ws);
       } else {
@@ -227,6 +242,13 @@ async function main() {
         sendJson(ws, { type: 'workspace-active', workspace: activeWs, ts: Date.now() });
       }
     },
+  });
+
+  // Wire live widget actions → chat pipeline (must be after both widget system and WS handler init)
+  setLiveWidgetActionHandler(async (userId, msg, ws) => {
+    const user = usersState.getUser(userId);
+    if (!user || user.accessTier === 'none') return;
+    await routeMessage(userId, msg.agentId || null, msg, ws);
   });
 
   /* -- Start listening -- */

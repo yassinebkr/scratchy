@@ -158,6 +158,14 @@ class ScWorkerBubble extends HTMLElement {
   setPreviewUrls(urls) {
     if (!urls || !Array.isArray(urls) || urls.length === 0) return;
     this._previewUrls = urls;
+    // Cancel any pending auto-collapse — preview button needs to be visible
+    if (this._autoCollapseTimer) {
+      clearTimeout(this._autoCollapseTimer);
+      this._autoCollapseTimer = null;
+    }
+    // Re-expand so the user sees the preview button
+    this._expanded = true;
+    this._show();
     this._update();
     this._saveState();
   }

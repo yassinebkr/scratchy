@@ -108,7 +108,8 @@ class ScNotes extends HTMLElement {
 
   addEventListeners() {
     this.shadowRoot.addEventListener('click', (e) => {
-      if (e.target.closest('.close-btn') || e.target.classList.contains('container')) this.close();
+      if (e.target.closest('.close-btn')) this.close();
+      if (e.target === this.shadowRoot.querySelector('.container') && !window.getSelection()?.toString()) this.close();
       if (e.target.closest('.new-note-btn')) this.createNote();
       if (e.target.closest('.back-btn')) this.closeEditor();
       if (e.target.closest('.delete-btn')) this.deleteNote(this.activeNoteId);

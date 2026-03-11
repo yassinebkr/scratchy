@@ -738,6 +738,9 @@ ${datasets.map((ds, i) => `<div class="stacked__legend-item"><span class="pie__d
   }
 }
 
-customElements.define('sc-tile', ScTile);
+// Guard against double registration (URL mismatch between <script> tag with ?v= and bare import)
+if (!customElements.get('sc-tile')) {
+  customElements.define('sc-tile', ScTile);
+}
 
 export default ScTile;

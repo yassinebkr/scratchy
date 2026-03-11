@@ -185,7 +185,7 @@ export function adminRoutes(deps) {
     if (search) {
       const pattern = `%${search}%`;
       rows = db.prepare(`
-        SELECT id, username, displayName, role, plan, capabilities, createdAt, updatedAt
+        SELECT id, username, displayName, role, plan, accessTier, capabilities, createdAt, updatedAt
         FROM users
         WHERE username LIKE ? COLLATE NOCASE OR displayName LIKE ? COLLATE NOCASE
         ORDER BY createdAt DESC
@@ -193,7 +193,7 @@ export function adminRoutes(deps) {
       `).all(pattern, pattern, limit, offset);
     } else {
       rows = db.prepare(`
-        SELECT id, username, displayName, role, plan, capabilities, createdAt, updatedAt
+        SELECT id, username, displayName, role, plan, accessTier, capabilities, createdAt, updatedAt
         FROM users
         ORDER BY createdAt DESC
         LIMIT ? OFFSET ?
@@ -351,6 +351,13 @@ export function adminRoutes(deps) {
     }
     if (body.displayName !== undefined) {
       patch.displayName = body.displayName ? String(body.displayName) : null;
+    }
+    if (body.accessTier !== undefined) {
+      const validTiers = ['none', 'trial', 'byok', 'managed', 'admin'];
+      if (!validTiers.includes(body.accessTier)) {
+        return json(res, 400, { error: `Invalid accessTier: ${body.accessTier}. Must be one of: ${validTiers.join(', ')}` });
+      }
+      patch.accessTier = body.accessTier;
     }
     if (body.enabled !== undefined) {
       // "enabled" is not a native field — store in admin_config

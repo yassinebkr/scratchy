@@ -208,6 +208,13 @@ const STYLES = `
   .badge-enabled  { background: rgba(34,197,94,0.15); color: #22c55e; }
   .badge-disabled { background: rgba(239,68,68,0.15); color: #ef4444; }
 
+  /* Access Tier Badges */
+  .badge-tier-none    { background: rgba(138,126,106,0.15); color: #8a7e6a; } /* gray */
+  .badge-tier-trial   { background: rgba(59,130,246,0.15); color: #3b82f6; } /* blue */
+  .badge-tier-byok    { background: rgba(34,197,94,0.15); color: #22c55e; } /* green */
+  .badge-tier-managed { background: rgba(249,166,2,0.12); color: #F9A602; } /* amber */
+  .badge-tier-admin   { background: rgba(168,85,247,0.15); color: #a855f7; } /* purple */
+
   /* ---- Search ---- */
   .search-bar {
     display: flex;
@@ -1042,6 +1049,8 @@ export class ScAdmin extends HTMLElement {
       const plan = u.plan || 'free';
       const planQuotas = u.planDetails?.quotas || { messagesPerDay: 50, tokensPerDay: 100000 };
       const msgPct = Math.min((u.usage?.messages || 0) / planQuotas.messagesPerDay * 100, 100);
+      const accessTier = u.accessTier || 'none';
+      const accessTierLabels = { none: 'No Access', trial: 'Trial', byok: 'BYOK', managed: 'Managed', admin: 'Admin' };
 
       return `
         <tr data-user-id="${this.#esc(u.id)}">
@@ -1050,6 +1059,16 @@ export class ScAdmin extends HTMLElement {
             <div style="font-size:11px;color:#8a7e6a">@${this.#esc(u.username)}</div>
           </td>
           <td><span class="badge badge-${this.#esc(u.role)}">${this.#esc(u.role)}</span></td>
+          <td>
+             <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="badge badge-tier-${this.#esc(accessTier)}">${this.#esc(accessTierLabels[accessTier])}</span>
+              <select class="inline-select" data-field="accessTier" data-user-id="${this.#esc(u.id)}" aria-label="Access tier for ${this.#esc(u.displayName || u.username)}">
+                ${['none', 'trial', 'byok', 'managed', 'admin'].map(t =>
+                  `<option value="${t}" ${t === accessTier ? 'selected' : ''}>${accessTierLabels[t]}</option>`
+                ).join('')}
+              </select>
+            </div>
+          </td>
           <td>
             <select class="inline-select" data-field="plan" data-user-id="${this.#esc(u.id)}" aria-label="Plan for ${this.#esc(u.displayName || u.username)}">
               ${['free','pro','team','byok','enterprise'].map(p =>
@@ -1082,6 +1101,7 @@ export class ScAdmin extends HTMLElement {
             <tr>
               <th scope="col">User</th>
               <th scope="col">Role</th>
+              <th scope="col">Access Tier</th>
               <th scope="col">Plan</th>
               <th scope="col">Usage Today</th>
               <th scope="col">Last Active</th>
@@ -1089,7 +1109,7 @@ export class ScAdmin extends HTMLElement {
             </tr>
           </thead>
           <tbody>
-            ${userRows || '<tr><td colspan="6" class="empty">No users found</td></tr>'}
+            ${userRows || '<tr><td colspan="7" class="empty">No users found</td></tr>'}
           </tbody>
         </table>
       </div>
@@ -1103,6 +1123,23 @@ export class ScAdmin extends HTMLElement {
       debounce = setTimeout(() => {
         this.#loadUsers(panel, searchInput.value.trim());
       }, 300);
+    });
+    
+    // Tier change handler
+    panel.querySelectorAll('select[data-field="accessTier"]').forEach((sel) => {
+      sel.addEventListener('change', async () => {
+        const userId = sel.dataset.userId;
+        try {
+          await this.#apiFetch(`/api/admin/users/${userId}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ accessTier: sel.value }),
+          });
+          this.#loadUsers(panel, searchInput?.value?.trim()); // Refresh to show updated badge
+        } catch (err) {
+          alert('Failed to update access tier: ' + err.message);
+          this.#loadUsers(panel, searchInput?.value?.trim());
+        }
+      });
     });
 
     // Plan change handler

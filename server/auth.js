@@ -6,7 +6,7 @@
 
 import crypto from 'node:crypto';
 import { getSession, createSession, deleteSession } from '../state/sessions.js';
-import { getUser, getUserByUsername, createUser } from '../state/users.js';
+import { getUser, getUserFull, getUserByUsername, getUserByUsernameFull, createUser } from '../state/users.js';
 
 /** scrypt parameters */
 const SCRYPT_KEYLEN = 64;
@@ -91,7 +91,7 @@ export async function validateSession(token) {
  * @throws {Error} If credentials are invalid
  */
 export async function login(username, password) {
-  const user = getUserByUsername(username);
+  const user = getUserByUsernameFull(username);
   if (!user) {
     throw Object.assign(new Error('Invalid credentials'), { status: 401 });
   }
