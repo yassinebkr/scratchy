@@ -772,7 +772,14 @@ function buildAugmentedPrompt(userMessage, agentConfig, history, contextBlock, t
   // ── GenUI canvas instructions ──
   // Tell agents how to use canvas tools and limit verbosity after tool calls
   if (tools.some(t => t.name && t.name.startsWith('mcp_canvas_'))) {
-    parts.push(`[Canvas] You have canvas tools for rendering visual UI. After calling ANY canvas tool, reply with max 1 sentence of chat text. Never describe or list what the component shows — the UI speaks for itself. create_live_widget automatically defines AND renders the widget in one step — do NOT call render_custom after it. To update a live widget later, use the update tool with id "lw-{widgetId}". IMPORTANT: In create_live_widget HTML templates, NEVER use inline event handlers (onclick, ondragover, etc.) — they are stripped. Use data-action="actionName" for clicks, data-action="dragstart" for draggable items, and data-action="drop" for drop zones. The runtime handles drag-and-drop natively.\n`);
+    parts.push(`[Canvas] You have canvas tools for rendering visual UI. After calling ANY canvas tool, reply with max 1 sentence of chat text. Never describe or list what the component shows — the UI speaks for itself. create_live_widget automatically defines AND renders the widget in one step — do NOT call render_custom after it. To update widget data later, use the update tool with id "lw-{widgetId}".
+
+[create_live_widget rules]
+- Widgets are STANDALONE APPS. All interactivity (drag-drop, sort, filter, toggle, delete) MUST use the "js" field for client-side logic. NEVER rely on the agent for UI interactions — that would mean every click waits for an LLM response.
+- The "js" field is a function body with params: action, payload, data, render, root. Modify data directly, call render() to update the UI, return true to handle locally.
+- HTML: NEVER use inline event handlers (onclick, ondragover) — stripped for security. Use data-action="name" on interactive elements. For DnD: data-action="dragstart" + data-card-id on draggable items, data-action="drop" + data-column on drop zones. The runtime adds dragover/drop listeners automatically.
+- CSS: Always include .dragging and .drag-over classes for DnD visual feedback.
+- Think of the widget like a mini React app: data is state, render() is setState, the js handler is your event reducer.\n`);
   }
 
   // ── MCP tool bridge ──

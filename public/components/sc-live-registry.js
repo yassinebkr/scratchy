@@ -216,18 +216,33 @@ h1,h2,h3,h4{font-weight:600;line-height:1.3}
 function createWidgetClass(definition, widgetId) {
   const renderFn = compileTemplate(definition.html);
   const widgetCss = BASE_WIDGET_CSS + '\n' + (definition.css || '');
-  const defaults = definition.defaults || {};
+  const defaults = structuredClone(definition.defaults || {});
   const actions = new Map(
     (definition.actions || []).map(a => [a.name, a.emits || a.name])
   );
+
+  // ── Compile optional client-side action handler ──
+  // The js field is a function body: (action, payload, data, render, el) => { ... }
+  // Return true to handle locally (no LLM round-trip).
+  // Return false/undefined to propagate to agent via widget-action event.
+  let compiledHandler = null;
+  if (definition.js && typeof definition.js === 'string') {
+    try {
+      // Parameters: action name, payload object, mutable data, render callback, shadow root
+      compiledHandler = new Function('action', 'payload', 'data', 'render', 'root', definition.js);
+    } catch (err) {
+      console.warn(`[LiveWidget:${widgetId}] Failed to compile onAction handler:`, err);
+    }
+  }
 
   return class LiveWidget extends HTMLElement {
     constructor() {
       super();
       this._shadow = this.attachShadow({ mode: 'closed' });
-      this._data = { ...defaults };
+      this._data = structuredClone(defaults);
       this._widgetId = widgetId;
       this._instanceId = '';
+      this._onAction = compiledHandler;
 
       this._styleEl = document.createElement('style');
       this._styleEl.textContent = widgetCss;
@@ -239,7 +254,7 @@ function createWidgetClass(definition, widgetId) {
     }
 
     set data(val) {
-      this._data = { ...defaults, ...val };
+      this._data = structuredClone({ ...defaults, ...val });
       this._render();
     }
     get data() { return this._data; }
@@ -264,29 +279,60 @@ function createWidgetClass(definition, widgetId) {
       }
     }
 
+    /**
+     * Route an action through the local handler first. If the handler
+     * returns true, the action is handled locally (no LLM round-trip).
+     * Otherwise, propagate to the agent via widget-action custom event.
+     */
+    _handleAction(actionName, payload) {
+      const emitName = actions.get(actionName) || actionName;
+
+      // Try local handler first — widget acts as standalone app
+      if (this._onAction) {
+        try {
+          const handled = this._onAction(
+            emitName,
+            payload,
+            this._data,
+            () => this._render(),
+            this._shadow,
+          );
+          if (handled === true) return; // Handled locally, done
+        } catch (err) {
+          console.warn(`[LiveWidget:${this._widgetId}] onAction error for "${emitName}":`, err);
+        }
+      }
+
+      // Fall through: propagate to agent via WS
+      this.dispatchEvent(new CustomEvent('widget-action', {
+        bubbles: true,
+        composed: true,
+        detail: {
+          action: emitName,
+          payload,
+          widgetId: this._widgetId,
+          instanceId: this._instanceId,
+        },
+      }));
+    }
+
     _bindActions() {
       for (const el of this._content.querySelectorAll('[data-action]')) {
         if (el._lw_bound) continue;
         el._lw_bound = true;
 
         const actionName = el.dataset.action;
-        const emitName = actions.get(actionName) || actionName;
 
         // ── Native drag-and-drop support ──
-        // Elements with data-action="dragstart" become draggable sources
         if (actionName === 'dragstart') {
           el.setAttribute('draggable', 'true');
           el.addEventListener('dragstart', (e) => {
             e.stopPropagation();
             el.classList.add('dragging');
-            // Store card/item identifier for drop target
             const id = el.dataset.cardId || el.dataset.itemId || el.dataset.id || '';
             e.dataTransfer.setData('text/plain', id);
             e.dataTransfer.effectAllowed = 'move';
-            this.dispatchEvent(new CustomEvent('widget-action', {
-              bubbles: true, composed: true,
-              detail: { action: emitName, payload: { ...el.dataset, action: undefined, dragId: id }, widgetId: this._widgetId, instanceId: this._instanceId },
-            }));
+            this._handleAction(actionName, { ...el.dataset, action: undefined, dragId: id });
           });
           el.addEventListener('dragend', () => {
             el.classList.remove('dragging');
@@ -294,7 +340,6 @@ function createWidgetClass(definition, widgetId) {
           continue;
         }
 
-        // Elements with data-action="drop" become drop zones
         if (actionName === 'drop') {
           el.addEventListener('dragover', (e) => {
             e.preventDefault();
@@ -311,30 +356,17 @@ function createWidgetClass(definition, widgetId) {
             e.stopPropagation();
             el.classList.remove('drag-over');
             const dragId = e.dataTransfer.getData('text/plain');
-            const payload = { ...el.dataset, action: undefined, dragId };
-            this.dispatchEvent(new CustomEvent('widget-action', {
-              bubbles: true, composed: true,
-              detail: { action: emitName, payload, widgetId: this._widgetId, instanceId: this._instanceId },
-            }));
+            this._handleAction(actionName, { ...el.dataset, action: undefined, dragId });
           });
           continue;
         }
 
-        // ── Standard click action (default) ──
+        // ── Standard click ──
         el.addEventListener('click', (e) => {
           e.stopPropagation();
           const payload = { ...el.dataset };
           delete payload.action;
-          this.dispatchEvent(new CustomEvent('widget-action', {
-            bubbles: true,
-            composed: true,
-            detail: {
-              action: emitName,
-              payload,
-              widgetId: this._widgetId,
-              instanceId: this._instanceId,
-            },
-          }));
+          this._handleAction(actionName, payload);
         });
       }
     }
