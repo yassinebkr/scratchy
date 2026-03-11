@@ -98,7 +98,7 @@ function persistCanvasOps(userId, ops) {
 /* ------------------------------------------------------------------ */
 
 const NULLCLAW_BIN = '/home/nonbios/nullclaw-gateway-streaming/zig-out/bin/nullclaw';
-const NULLCLAW_TIMEOUT = 300_000; // 5 min — Opus cold-start + complex tool calls can take 2-3 min
+const NULLCLAW_TIMEOUT = 90_000; // 90s — was 300s, NullClaw hangs caught faster
 
 /**
  * Deployment mode: 'hosted' (sandbox all users) or 'selfhosted' (no restrictions).
@@ -119,7 +119,7 @@ const MEMORY_TOP_K = 5;
 const MAX_MESSAGE_SIZE = 100 * 1024;
 
 /** Abort SSE stream if no data received for this duration */
-const STREAM_INACTIVITY_TIMEOUT = 180_000; // 3 min — Opus TTFT can be 2+ min for complex tool calls
+const STREAM_INACTIVITY_TIMEOUT = 30_000; // 30s — was 180s, Sonnet TTFT should be <15s
 
 /** Max concurrent requests per user */
 const MAX_CONCURRENT_PER_USER = 3;
