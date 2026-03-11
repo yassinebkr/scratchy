@@ -96,6 +96,16 @@ export function createChatRoutes({ authenticate, getDb }) {
         // Reverse to chronological order
         rows.reverse();
 
+        // Include canvas state for inline tile restoration
+        let canvasOps = [];
+        try {
+          const canvasState = await import('../../state/canvas.js');
+          const ops = canvasState.getCanvasState(user.id);
+          if (ops && ops.length > 0) canvasOps = ops;
+        } catch (canvasErr) {
+          console.warn('[chat/history] Failed to load canvas state:', canvasErr.message);
+        }
+
         jsonRes(res, 200, {
           messages: rows.map(r => ({
             id: r.id,
@@ -105,6 +115,7 @@ export function createChatRoutes({ authenticate, getDb }) {
             model: r.model,
             createdAt: r.createdAt,
           })),
+          canvasOps,
           hasMore: rows.length === limit,
           cursor: rows.length > 0 ? rows[0].id : null,
         });
