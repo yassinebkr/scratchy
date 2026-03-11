@@ -2385,9 +2385,10 @@ async function init() {
         if (overlay) overlay.remove();
       }
     });
-    $chatSurface.addEventListener('dragover', (e) => {
-      if (_isFileDrag(e)) e.preventDefault();
-    });
+    // Always preventDefault on dragover — required for BOTH file drops AND widget DnD.
+    // Shadow DOM dragover preventDefault doesn't cross the boundary reliably,
+    // so we must also allow drops at the light DOM level.
+    $chatSurface.addEventListener('dragover', (e) => e.preventDefault());
     $chatSurface.addEventListener('drop', (e) => {
       if (!_isFileDrag(e)) return; // Widget DnD — let it pass through
       e.preventDefault();
