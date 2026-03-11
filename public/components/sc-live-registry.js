@@ -361,6 +361,32 @@ function createWidgetClass(definition, widgetId) {
           continue;
         }
 
+        // ── Form element input/change handling ──
+        const isFormEl = el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT';
+        if (isFormEl && actionName !== 'click' && actionName !== 'dragstart' && actionName !== 'drop') {
+          const evtType = el.tagName === 'SELECT' ? 'change' : 'input';
+          el.addEventListener(evtType, (e) => {
+            e.stopPropagation();
+            const payload = { ...el.dataset };
+            delete payload.action;
+            payload.value = el.type === 'checkbox' ? String(el.checked) : el.value;
+            this._handleAction(actionName, payload);
+          });
+          // Enter key → fires enterAction
+          if (el.dataset.enterAction) {
+            el.addEventListener('keydown', (e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                const payload = { ...el.dataset, value: el.value };
+                delete payload.action;
+                delete payload.enterAction;
+                this._handleAction(el.dataset.enterAction, payload);
+              }
+            });
+          }
+          continue;
+        }
+
         // ── Standard click ──
         el.addEventListener('click', (e) => {
           e.stopPropagation();
