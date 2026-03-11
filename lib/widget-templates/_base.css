@@ -1,0 +1,152 @@
+/* ═══════════════════════════════════════════════════════════
+   Scratchy v2 Widget Templates — Shared Design Tokens
+   Art direction: warm dark, gold accent, compact, readable
+   ═══════════════════════════════════════════════════════════ */
+
+:host {
+  --wt-bg: var(--bg, #0d0b07);
+  --wt-surface: var(--surface, #1a1610);
+  --wt-surface-hover: var(--surface-hover, #242016);
+  --wt-text: var(--text, #f0ead6);
+  --wt-text-muted: var(--text-muted, #8a7e6a);
+  --wt-text-dim: #5c5447;
+  --wt-accent: var(--accent, #F9A602);
+  --wt-accent-hover: #DAA520;
+  --wt-accent-dim: rgba(249, 166, 2, 0.15);
+  --wt-border: var(--border, rgba(255, 255, 255, 0.06));
+  --wt-border-strong: rgba(255, 255, 255, 0.12);
+  --wt-radius: var(--radius, 8px);
+  --wt-radius-sm: 4px;
+  --wt-radius-pill: 99px;
+  --wt-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --wt-font: var(--font, 'Geist', -apple-system, BlinkMacSystemFont, system-ui, sans-serif);
+  --wt-mono: var(--mono, 'Geist Mono', 'SF Mono', monospace);
+  --wt-transition: 0.2s ease;
+
+  /* Priority colors */
+  --wt-priority-high: #ef4444;
+  --wt-priority-medium: #f59e0b;
+  --wt-priority-low: #22c55e;
+
+  /* Status colors */
+  --wt-success: #22c55e;
+  --wt-warning: #f59e0b;
+  --wt-error: #ef4444;
+  --wt-info: #3b82f6;
+
+  display: block;
+  contain: content;
+  font-family: var(--wt-font);
+  font-size: 14px;
+  color: var(--wt-text);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* ── Shared utility classes ── */
+
+.wt-header {
+  font-size: 0.75rem;
+  color: var(--wt-text-muted);
+  letter-spacing: 0.02em;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.wt-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: var(--wt-radius);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--wt-border);
+  background: transparent;
+  color: var(--wt-text);
+  transition: all var(--wt-transition);
+  user-select: none;
+}
+.wt-btn:hover {
+  background: var(--wt-surface-hover);
+  border-color: var(--wt-border-strong);
+}
+.wt-btn:active { opacity: 0.85; }
+.wt-btn.primary {
+  background: var(--wt-accent);
+  color: var(--wt-bg);
+  border-color: transparent;
+  font-weight: 600;
+}
+.wt-btn.primary:hover { background: var(--wt-accent-hover); }
+.wt-btn.ghost {
+  border-color: transparent;
+  color: var(--wt-text-muted);
+}
+.wt-btn.ghost:hover { color: var(--wt-text); background: var(--wt-surface); }
+.wt-btn.sm { padding: 3px 8px; font-size: 0.75rem; }
+.wt-btn.icon-only { padding: 4px; width: 28px; height: 28px; }
+
+.wt-badge {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: var(--wt-radius-pill);
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.wt-input {
+  width: 100%;
+  padding: 6px 10px;
+  border-radius: var(--wt-radius);
+  font: inherit;
+  font-size: 0.85rem;
+  background: var(--wt-bg);
+  color: var(--wt-text);
+  border: 1px solid var(--wt-border);
+  outline: none;
+  transition: border-color var(--wt-transition);
+}
+.wt-input::placeholder { color: var(--wt-text-dim); }
+.wt-input:focus { border-color: var(--wt-accent); }
+
+.wt-card {
+  background: var(--wt-bg);
+  border: 1px solid var(--wt-border);
+  border-radius: var(--wt-radius);
+  padding: 10px 12px;
+  transition: all var(--wt-transition);
+}
+.wt-card:hover {
+  border-color: var(--wt-border-strong);
+}
+
+.wt-empty {
+  text-align: center;
+  padding: 20px;
+  color: var(--wt-text-dim);
+  font-size: 0.82rem;
+  font-style: italic;
+}
+
+.wt-divider {
+  border: none;
+  border-top: 1px solid var(--wt-border);
+  margin: 8px 0;
+}
+
+/* ── Scrollbar (webkit) ── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--wt-border-strong); border-radius: 2px; }
