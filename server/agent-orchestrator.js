@@ -58,13 +58,47 @@ import {
   recordStats, recordBlock, recordSanitize, getStats,
 } from '../lib/proteclaw-lite.js';
 import { mapTypedCanvasTool, TYPED_TOOL_NAMES } from '../lib/canvas-typed-tools.js';
+import * as canvasMod from '../state/canvas.js';
+
+/* ------------------------------------------------------------------ */
+/*  Canvas state persistence helper                                   */
+/* ------------------------------------------------------------------ */
+
+/** Persist canvas ops to SQLite (survives WS disconnects + reconnects). */
+function persistCanvasOps(userId, ops) {
+  try {
+    const existing = canvasMod.getCanvasState(userId);
+    let merged = [...existing];
+    for (const op of ops) {
+      if (op.op === 'clear') { merged = []; continue; }
+      if (op.op === 'remove') { merged = merged.filter(o => o.id !== op.id); continue; }
+      if (op.op === 'define') {
+        const idx = merged.findIndex(o => o.op === 'define' && o.id === op.id);
+        if (idx >= 0) merged[idx] = op; else merged.push(op);
+        continue;
+      }
+      if (op.op === 'undefine') {
+        merged = merged.filter(o => !(o.op === 'define' && o.id === op.id));
+        continue;
+      }
+      // upsert / patch
+      const idx = merged.findIndex(o => o.id === op.id && o.op !== 'define');
+      if (idx >= 0) { merged[idx] = { ...merged[idx], ...op }; } else { merged.push(op); }
+    }
+    // Sort: defines first (for replay ordering)
+    merged.sort((a, b) => (a.op === 'define' ? 0 : 1) - (b.op === 'define' ? 0 : 1));
+    canvasMod.setCanvasState(userId, merged);
+  } catch (err) {
+    console.warn('[orchestrator] Failed to persist canvas state:', err.message);
+  }
+}
 
 /* ------------------------------------------------------------------ */
 /*  Constants                                                         */
 /* ------------------------------------------------------------------ */
 
 const NULLCLAW_BIN = '/home/nonbios/nullclaw-gateway-streaming/zig-out/bin/nullclaw';
-const NULLCLAW_TIMEOUT = 120_000;
+const NULLCLAW_TIMEOUT = 300_000; // 5 min — Opus cold-start + complex tool calls can take 2-3 min
 
 /**
  * Deployment mode: 'hosted' (sandbox all users) or 'selfhosted' (no restrictions).
@@ -85,7 +119,7 @@ const MEMORY_TOP_K = 5;
 const MAX_MESSAGE_SIZE = 100 * 1024;
 
 /** Abort SSE stream if no data received for this duration */
-const STREAM_INACTIVITY_TIMEOUT = 90_000;
+const STREAM_INACTIVITY_TIMEOUT = 180_000; // 3 min — Opus TTFT can be 2+ min for complex tool calls
 
 /** Max concurrent requests per user */
 const MAX_CONCURRENT_PER_USER = 3;
@@ -735,6 +769,12 @@ function buildAugmentedPrompt(userMessage, agentConfig, history, contextBlock, t
     parts.push(`[System]\n${agentConfig.systemPrompt}\n`);
   }
 
+  // ── GenUI canvas instructions ──
+  // Tell agents how to use canvas tools and limit verbosity after tool calls
+  if (tools.some(t => t.name && t.name.startsWith('mcp_canvas_'))) {
+    parts.push(`[Canvas] You have canvas tools for rendering visual UI. After calling ANY canvas tool, reply with max 1 sentence of chat text. Never describe or list what the component shows — the UI speaks for itself. create_live_widget automatically defines AND renders the widget in one step — do NOT call render_custom after it. To update a live widget later, use the update tool with id "lw-{widgetId}". IMPORTANT: In create_live_widget HTML templates, NEVER use inline event handlers (onclick, ondragover, etc.) — they are stripped. Use data-action="actionName" for clicks, data-action="dragstart" for draggable items, and data-action="drop" for drop zones. The runtime handles drag-and-drop natively.\n`);
+  }
+
   // ── MCP tool bridge ──
   // NullClaw has its own built-in tools (shell, file_read, file_write, file_edit,
   // git, memory_recall, etc.) — those are NOT listed here.
@@ -1250,11 +1290,44 @@ export async function routeMessage(userId, agentId, message, ws) {
     let canvasGateSentenceCount = 0;
     let canvasGateBuffer = '';
 
+    // ── Canvas ops deduplication: track tool call IDs that already
+    //    emitted canvas ops (prevents double-send from detector + adapter) ──
+    const _canvasOpsSentFor = new Set();
+
     // ── Tool call detector: parses tool calls from streaming output
     //    and forwards them as WebSocket events so the client-side
     //    surface-manager can auto-activate surfaces (Terminal, Editor, etc.)
     const toolDetector = createToolCallDetector({
       onToolCall: (tc) => {
+        // ── Canvas gate: also activate from XML-parsed tool calls
+        //    (covers runNullClawDirect path where onToolEvent is absent)
+        if (tc.name && tc.name.startsWith('mcp_canvas_')) {
+          if (!canvasToolFired) {
+            canvasToolFired = true;
+            canvasGateSentenceCount = 0;
+            canvasGateBuffer = '';
+          }
+          // Map canvas ops for direct path (adapter path handles this in onToolEvent)
+          // Dedup: generate a key from tool name + widgetId to avoid double-send
+          const shortName = tc.name.replace('mcp_canvas_', '');
+          let args;
+          try {
+            args = typeof tc.args === 'string' ? JSON.parse(tc.args) : (tc.args || {});
+          } catch { args = {}; }
+          const dedupKey = `${shortName}:${args.widgetId || args.id || tc.id || ''}`;
+
+          if (TYPED_TOOL_NAMES.has(shortName) && !_canvasOpsSentFor.has(dedupKey)) {
+            _canvasOpsSentFor.add(dedupKey);
+            const ops = mapTypedCanvasTool(shortName, args);
+            if (ops.length > 0) {
+              sendJson(ws, { type: 'genui-pending', count: ops.length, ts: Date.now() });
+              sendJson(ws, { type: 'canvas-ops', ops, source: 'genui-tool', ts: Date.now() });
+              persistCanvasOps(userId, ops);
+              console.log(`[orchestrator] Canvas tool (detector): ${shortName} → ${ops.length} ops for ${userId}`);
+            }
+          }
+        }
+
         sendJson(ws, {
           type: 'tool_call',
           tool: tc.name,
@@ -1314,13 +1387,17 @@ export async function routeMessage(userId, agentId, message, ws) {
     });
 
     if (_adapter) {
-      // NullClaw call timeout (120s) + stream inactivity guard (60s no data)
+      // NullClaw call timeout (5 min) + stream inactivity guard (3 min)
       let _inactTimer, _rejectTimeout;
       const _timeoutPromise = new Promise((_, reject) => {
         _rejectTimeout = reject;
         _inactTimer = setTimeout(() => reject(new Error('__stream_inactive__')), STREAM_INACTIVITY_TIMEOUT);
       });
       const _hardTimer = setTimeout(() => _rejectTimeout(new Error('__nc_timeout__')), NULLCLAW_TIMEOUT);
+      // WS keepalive: send typing pulses every 20s to keep Cloudflare tunnel alive
+      const _wsKeepAlive = setInterval(() => {
+        try { sendJson(ws, { type: 'typing', status: 'start', agentId: effectiveAgentId, ts: Date.now() }); } catch {}
+      }, 20_000);
       const _resetInact = () => {
         clearTimeout(_inactTimer);
         _inactTimer = setTimeout(() => _rejectTimeout(new Error('__stream_inactive__')), STREAM_INACTIVITY_TIMEOUT);
@@ -1371,7 +1448,8 @@ export async function routeMessage(userId, agentId, message, ws) {
               }
 
               // ── Canvas MCP tool interception ──
-              // Intercept mcp_canvas_* tool calls and push as canvas-ops
+              // Intercept mcp_canvas_* tool calls and push as canvas-ops.
+              // Dedup: skip if XML detector already emitted ops for this tool call.
               if (evt.name && evt.name.startsWith('mcp_canvas_')) {
                 canvasToolFired = true;
                 canvasGateSentenceCount = 0;
@@ -1381,23 +1459,28 @@ export async function routeMessage(userId, agentId, message, ws) {
                 try {
                   args = typeof evt.arguments === 'string' ? JSON.parse(evt.arguments) : (evt.arguments || {});
                 } catch { args = {}; }
+                const dedupKey = `${shortName}:${args.widgetId || args.id || evt.id || ''}`;
 
-                let ops = [];
-                if (shortName === 'render' && args.components) {
-                  ops = args.components.map(c => ({ op: 'upsert', id: c.id || `auto-${Date.now()}`, type: c.type || 'card', data: c.data || {} }));
-                } else if (shortName === 'update') {
-                  ops = [{ op: 'patch', id: args.id, data: args.data || {} }];
-                } else if (shortName === 'remove') {
-                  ops = [{ op: 'remove', id: args.id }];
-                } else if (shortName === 'clear') {
-                  ops = [{ op: 'clear' }];
-                } else if (TYPED_TOOL_NAMES.has(shortName)) {
-                  ops = mapTypedCanvasTool(shortName, args);
-                }
-                if (ops.length > 0) {
-                  sendJson(ws, { type: 'genui-pending', count: ops.length, ts: Date.now() });
-                  sendJson(ws, { type: 'canvas-ops', ops, source: 'genui-tool', ts: Date.now() });
-                  console.log(`[orchestrator] Canvas tool: ${shortName} → ${ops.length} ops for ${userId}`);
+                if (!_canvasOpsSentFor.has(dedupKey)) {
+                  _canvasOpsSentFor.add(dedupKey);
+                  let ops = [];
+                  if (shortName === 'render' && args.components) {
+                    ops = args.components.map(c => ({ op: 'upsert', id: c.id || `auto-${Date.now()}`, type: c.type || 'card', data: c.data || {} }));
+                  } else if (shortName === 'update') {
+                    ops = [{ op: 'patch', id: args.id, data: args.data || {} }];
+                  } else if (shortName === 'remove') {
+                    ops = [{ op: 'remove', id: args.id }];
+                  } else if (shortName === 'clear') {
+                    ops = [{ op: 'clear' }];
+                  } else if (TYPED_TOOL_NAMES.has(shortName)) {
+                    ops = mapTypedCanvasTool(shortName, args);
+                  }
+                  if (ops.length > 0) {
+                    sendJson(ws, { type: 'genui-pending', count: ops.length, ts: Date.now() });
+                    sendJson(ws, { type: 'canvas-ops', ops, source: 'genui-tool', ts: Date.now() });
+                    persistCanvasOps(userId, ops);
+                    console.log(`[orchestrator] Canvas tool: ${shortName} → ${ops.length} ops for ${userId}`);
+                  }
                 }
               }
 
@@ -1477,7 +1560,7 @@ export async function routeMessage(userId, agentId, message, ws) {
         ), _timeoutPromise]);
         usedAdapter = true;
       } catch (adapterErr) {
-        clearTimeout(_hardTimer); clearTimeout(_inactTimer);
+        clearTimeout(_hardTimer); clearTimeout(_inactTimer); clearInterval(_wsKeepAlive);
         if (adapterErr.message === '__nc_timeout__' || adapterErr.message === '__stream_inactive__') {
           throw new Error('Request timed out — the AI took too long to respond.');
         }
@@ -1486,7 +1569,7 @@ export async function routeMessage(userId, agentId, message, ws) {
           `falling back to direct spawn:`, adapterErr.message
         );
       } finally {
-        clearTimeout(_hardTimer); clearTimeout(_inactTimer);
+        clearTimeout(_hardTimer); clearTimeout(_inactTimer); clearInterval(_wsKeepAlive);
       }
     }
 
@@ -1547,21 +1630,7 @@ export async function routeMessage(userId, agentId, message, ws) {
         console.log(`[orchestrator] GenUI: ${ops.length} canvas ops extracted for ${userId}`, JSON.stringify(ops[0]).slice(0, 200));
 
         // Persist canvas ops for restore on reconnect
-        try {
-          const canvasMod = await import('../state/canvas.js');
-          const existing = canvasMod.getCanvasState(userId);
-          // Apply ops: upsert/patch merge, remove deletes, clear wipes
-          let merged = [...existing];
-          for (const op of ops) {
-            if (op.op === 'clear') { merged = []; continue; }
-            if (op.op === 'remove') { merged = merged.filter(o => o.id !== op.id); continue; }
-            const idx = merged.findIndex(o => o.id === op.id);
-            if (idx >= 0) { merged[idx] = { ...merged[idx], ...op }; } else { merged.push(op); }
-          }
-          canvasMod.setCanvasState(userId, merged);
-        } catch (err) {
-          console.warn('[orchestrator] Failed to persist canvas state:', err.message);
-        }
+        persistCanvasOps(userId, ops);
 
         // Use cleaned text (without code blocks) for history storage
         response = cleanText;
@@ -1617,6 +1686,7 @@ export async function routeMessage(userId, agentId, message, ws) {
 
   } catch (err) {
     console.error(`[orchestrator] Error for ${userId}:${effectiveAgentId}:`, err.message);
+    sendJson(ws, { type: 'chat-stream-end', agentId: effectiveAgentId, ts: Date.now() });
     sendJson(ws, { type: 'typing', status: 'stop', agentId: effectiveAgentId, ts: Date.now() });
     // Sanitize: only show safe messages to client, never internal errors
     const safeMsg = err.message?.startsWith('Request timed out')
