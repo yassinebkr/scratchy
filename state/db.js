@@ -302,6 +302,12 @@ export function initSchema(db) {
   if (!agentCols.some(c => c.name === 'tokensPerDay')) {
     db.exec(`ALTER TABLE agents ADD COLUMN tokensPerDay INTEGER DEFAULT NULL`);
   }
+  if (!agentCols.some(c => c.name === 'hidden')) {
+    db.exec(`ALTER TABLE agents ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0`);
+    // Mark team worker agents as hidden
+    db.exec(`UPDATE agents SET hidden = 1 WHERE name IN ('Architect','Sys','Api','Data','Scout','QA','Director','Component','Layout','Interact','Visualizer')`);
+    console.log('[db] Migration: added hidden column to agents, marked team workers as hidden');
+  }
 
   // Migrate users table: add accessTier column
   const userCols = db.pragma('table_info(users)');

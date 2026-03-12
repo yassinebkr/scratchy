@@ -413,49 +413,89 @@ function escapeHtml(s) {
  * @returns {HTMLElement} The empty state container element
  */
 function renderEmptyState(agentName, agentType = 'default') {
-    const suggestionsMap = {
-        code: ["Review my code", "Explain this error", "Write a function"],
-        designer: ["Design a landing page", "Suggest colors", "Review my UI"],
-        researcher: ["Summarize this article", "Compare X vs Y", "Find papers on..."],
-        writer: ["Draft an email", "Improve this text", "Write docs"],
-        default: ["Review my code", "Explain this error", "Write a function"],
+    const agentPersonas = {
+      Atlas: {
+        greeting: "Hey! I'm Atlas — your code companion.",
+        subtitle: "I write, debug, and review code. Drop me a problem.",
+        suggestions: ["Review my code", "Explain this error", "Build a REST API", "Debug this function"],
+        emoji: '🏛️',
+      },
+      Iris: {
+        greeting: "Hi! I'm Iris — I think in pixels.",
+        subtitle: "UI mockups, design systems, color palettes — let's make it beautiful.",
+        suggestions: ["Design a dashboard", "Suggest a color palette", "Review my UI", "Create a component"],
+        emoji: '🎨',
+      },
+      Nova: {
+        greeting: "Hey there! I'm Nova — the research nerd.",
+        subtitle: "I dig through data, compare options, and find answers.",
+        suggestions: ["Compare X vs Y", "Summarize this article", "Research best practices", "Analyze this data"],
+        emoji: '🔭',
+      },
+      Echo: {
+        greeting: "Hello! I'm Echo — words are my thing.",
+        subtitle: "Emails, docs, blog posts, copy — I'll draft it, you ship it.",
+        suggestions: ["Draft an email", "Write documentation", "Improve this text", "Create a blog post"],
+        emoji: '✍️',
+      },
+    };
+
+    const persona = agentPersonas[agentName] || {
+      greeting: `Hey! I'm ${agentName}.`,
+      subtitle: "Ask me anything — I'm here to help.",
+      suggestions: ["Help me with code", "Explain something", "Write a draft", "Research a topic"],
+      emoji: '✨',
     };
 
     const agent = $agentSwitcher?._agents?.find(a => a.name === agentName);
-    const agentEmoji = agent?.emoji || '✨';
-    const effectiveType = agent?.role?.toLowerCase() || agentType;
-    const suggestions = suggestionsMap[effectiveType] || suggestionsMap.default;
+    const agentSlug = agentName.toLowerCase().replace(/\s+/g, '-');
 
     const container = document.createElement('div');
     container.id = 'empty-state';
     container.style.cssText = `
         display: flex; flex-direction: column; align-items: center; justify-content: center;
         flex-grow: 1; height: 100%; text-align: center; color: #f0ead6;
-        font-family: 'Geist', sans-serif;
+        font-family: 'Geist', sans-serif; padding: 32px; gap: 0;
     `;
 
-    const emojiDiv = document.createElement('div');
-    emojiDiv.textContent = agentEmoji;
-    emojiDiv.style.cssText = `font-size: 48px; opacity: 0.3; margin-bottom: 16px;`;
+    // Avatar — try persona photo first, fallback to emoji
+    const avatarDiv = document.createElement('div');
+    avatarDiv.style.cssText = `width: 72px; height: 72px; border-radius: 50%; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; overflow: hidden; background: rgba(249,166,2,0.08); border: 2px solid rgba(249,166,2,0.15);`;
+    const avatarImg = document.createElement('img');
+    avatarImg.src = `/assets/agents/${agentSlug}.png`;
+    avatarImg.alt = agentName;
+    avatarImg.style.cssText = `width: 100%; height: 100%; object-fit: cover;`;
+    avatarImg.onerror = () => {
+      avatarImg.style.display = 'none';
+      const emojiSpan = document.createElement('span');
+      emojiSpan.textContent = persona.emoji;
+      emojiSpan.style.cssText = `font-size: 32px;`;
+      avatarDiv.appendChild(emojiSpan);
+    };
+    avatarDiv.appendChild(avatarImg);
 
-    const textP = document.createElement('p');
-    textP.textContent = `Ask ${agentName} anything`;
-    textP.style.cssText = `color: #8a7e6a; font-size: 1.1em; margin: 0 0 24px;`;
+    const greetingH = document.createElement('h2');
+    greetingH.textContent = persona.greeting;
+    greetingH.style.cssText = `color: #f0ead6; font-size: 1.3em; margin: 0 0 6px; font-weight: 600;`;
+
+    const subtitleP = document.createElement('p');
+    subtitleP.textContent = persona.subtitle;
+    subtitleP.style.cssText = `color: #8a7e6a; font-size: 0.95em; margin: 0 0 28px; max-width: 400px;`;
 
     const chipsContainer = document.createElement('div');
-    chipsContainer.style.cssText = `display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;`;
+    chipsContainer.style.cssText = `display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; max-width: 480px;`;
 
-    suggestions.forEach(text => {
+    persona.suggestions.forEach(text => {
         const chip = document.createElement('button');
         chip.textContent = text;
         chip.style.cssText = `
-            background: #1a1610; border: 1px solid rgba(240, 234, 214, 0.1);
-            color: #f0ead6; padding: 8px 16px; border-radius: 8px;
+            background: rgba(26,22,16,0.6); border: 1px solid rgba(240, 234, 214, 0.08);
+            color: #c4b99a; padding: 10px 18px; border-radius: 12px;
             cursor: pointer; transition: all 0.2s ease; font-family: 'Geist', sans-serif;
-            font-size: 14px;
+            font-size: 13px; backdrop-filter: blur(4px);
         `;
-        chip.onmouseenter = () => { chip.style.borderColor = '#F9A602'; chip.style.color = '#F9A602'; };
-        chip.onmouseleave = () => { chip.style.borderColor = 'rgba(240, 234, 214, 0.1)'; chip.style.color = '#f0ead6'; };
+        chip.onmouseenter = () => { chip.style.borderColor = 'rgba(249,166,2,0.4)'; chip.style.color = '#F9A602'; chip.style.background = 'rgba(249,166,2,0.06)'; };
+        chip.onmouseleave = () => { chip.style.borderColor = 'rgba(240, 234, 214, 0.08)'; chip.style.color = '#c4b99a'; chip.style.background = 'rgba(26,22,16,0.6)'; };
         chip.onclick = () => {
             if ($msgInput) {
                 $msgInput.value = text;
@@ -467,8 +507,9 @@ function renderEmptyState(agentName, agentType = 'default') {
         chipsContainer.appendChild(chip);
     });
 
-    container.appendChild(emojiDiv);
-    container.appendChild(textP);
+    container.appendChild(avatarDiv);
+    container.appendChild(greetingH);
+    container.appendChild(subtitleP);
     container.appendChild(chipsContainer);
     return container;
 }
@@ -1851,12 +1892,37 @@ function wireNewUIModules() {
         break;
       }
       case 'open-teams': {
-        let teams = document.querySelector('sc-teams');
-        if (!teams) {
-          teams = document.createElement('sc-teams');
-          document.body.appendChild(teams);
+        // Admin gets full teams UI; everyone else sees "coming soon"
+        if (state.user?.role === 'admin') {
+          let teams = document.querySelector('sc-teams');
+          if (!teams) {
+            teams = document.createElement('sc-teams');
+            document.body.appendChild(teams);
+          }
+          teams.setAttribute('open', '');
+        } else {
+          // Show a "Coming Soon" toast/overlay
+          const toast = document.createElement('div');
+          toast.style.cssText = `
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(20,17,12,0.95); border: 1px solid rgba(249,166,2,0.3);
+            color: #f0ead6; padding: 40px 48px; border-radius: 16px; z-index: 10000;
+            text-align: center; font-family: 'Geist', sans-serif;
+            backdrop-filter: blur(12px); animation: fadeIn 0.2s ease;
+          `;
+          toast.innerHTML = `
+            <div style="font-size: 48px; margin-bottom: 16px;">👥</div>
+            <h3 style="margin: 0 0 8px; font-size: 1.3em;">Teams — Coming Soon</h3>
+            <p style="color: #8a7e6a; margin: 0 0 20px; font-size: 0.9em;">Multi-agent collaboration is being polished.<br>Stay tuned!</p>
+            <button style="background: rgba(249,166,2,0.15); border: 1px solid rgba(249,166,2,0.3); color: #F9A602; padding: 8px 24px; border-radius: 8px; cursor: pointer; font-family: 'Geist', sans-serif; font-size: 14px;" onclick="this.parentElement.remove()">Got it</button>
+          `;
+          // Click backdrop to dismiss
+          const backdrop = document.createElement('div');
+          backdrop.style.cssText = `position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 9999;`;
+          backdrop.onclick = () => { toast.remove(); backdrop.remove(); };
+          document.body.appendChild(backdrop);
+          document.body.appendChild(toast);
         }
-        teams.setAttribute('open', '');
         break;
       }
       case 'open-workspaces': {

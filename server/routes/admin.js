@@ -419,7 +419,7 @@ export function adminRoutes(deps) {
     const admin = await requireAdmin(req, res);
     if (!admin) return;
 
-    const allAgents = agents.listAgents();
+    const allAgents = agents.listAgents({ includeHidden: true });
 
     const enriched = allAgents.map((a) => ({
       ...a,

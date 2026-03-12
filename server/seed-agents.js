@@ -46,9 +46,10 @@ const AGENT_DEFS = [
     rolePrompt: `\n## Role: Writer\nYou are Echo, a content writing agent. Use \`card\` for drafts, \`accordion\` for structured outlines, \`tabs\` for variations, and \`checklist\` for editorial checklists. Prefer plain text for short-form; canvas for structured long-form content.`,
   },
 
-  // ── Backend Dev Team specialists ──
+  // ── Backend Dev Team specialists (hidden from agent picker — team workers) ──
   {
     name: 'Architect',
+    hidden: true,
     model: 'sonnet',
     temperature: 0.5,
     avatar: '📐',
@@ -102,6 +103,7 @@ Context about what to look for.
   },
   {
     name: 'Sys',
+    hidden: true,
     model: 'sonnet',
     temperature: 0.3,
     avatar: '⚙️',
@@ -128,6 +130,7 @@ When delivering code, use \`code\` components with the language tag. Include inl
   },
   {
     name: 'Api',
+    hidden: true,
     model: 'sonnet',
     temperature: 0.4,
     avatar: '🔌',
@@ -155,6 +158,7 @@ Present endpoints as \`code\` blocks. Include the route registration + handler f
   },
   {
     name: 'Data',
+    hidden: true,
     model: 'sonnet',
     temperature: 0.3,
     avatar: '🗄️',
@@ -183,6 +187,7 @@ Present schema + CRUD functions as \`code\` blocks. Include the migration SQL an
   },
   {
     name: 'Scout',
+    hidden: true,
     model: 'sonnet',
     temperature: 0.6,
     avatar: '🔍',
@@ -218,6 +223,7 @@ data:
   },
   {
     name: 'QA',
+    hidden: true,
     model: 'sonnet',
     temperature: 0.2,
     avatar: '🛡️',
@@ -264,6 +270,7 @@ If any BLOCK issues exist, return them immediately. Do NOT approve code with BLO
   // ── Design Team specialists ──
   {
     name: 'Director',
+    hidden: true,
     model: 'sonnet',
     temperature: 0.7,
     avatar: '🎬',
@@ -307,6 +314,7 @@ Present design briefs using TOON canvas components. Use \`kv\` for specs, \`card
   },
   {
     name: 'Component',
+    hidden: true,
     model: 'sonnet',
     temperature: 0.4,
     avatar: '🧩',
@@ -335,6 +343,7 @@ Deliver complete .js files with the Web Component class, internal styles, and re
   },
   {
     name: 'Layout',
+    hidden: true,
     model: 'sonnet',
     temperature: 0.4,
     avatar: '📏',
@@ -373,6 +382,7 @@ Deliver CSS inside shadow DOM \`<style>\` blocks. Include mobile + desktop versi
   },
   {
     name: 'Interact',
+    hidden: true,
     model: 'sonnet',
     temperature: 0.5,
     avatar: '👆',
@@ -406,6 +416,7 @@ Deliver JavaScript event handlers + CSS state styles. Include ARIA attributes in
   },
   {
     name: 'Visualizer',
+    hidden: true,
     model: 'sonnet',
     temperature: 0.7,
     avatar: '📊',
@@ -462,8 +473,8 @@ export function seedAgents(db) {
 
     const now = new Date().toISOString();
     const insert = db.prepare(`
-      INSERT INTO agents (id, name, systemPrompt, model, temperature, surfaces, mcpServers, skills, avatar, enabled, isBuiltin, userId, createdAt, updatedAt)
-      VALUES (?, ?, ?, ?, ?, '[]', '[]', ?, ?, 1, 1, NULL, ?, ?)
+      INSERT INTO agents (id, name, systemPrompt, model, temperature, surfaces, mcpServers, skills, avatar, enabled, isBuiltin, hidden, userId, createdAt, updatedAt)
+      VALUES (?, ?, ?, ?, ?, '[]', '[]', ?, ?, 1, 1, ?, NULL, ?, ?)
     `);
 
     let added = 0;
@@ -474,7 +485,7 @@ export function seedAgents(db) {
           const skillPrompt = getSkillPrompt(def.name);
           const systemPrompt = basePrompt + def.rolePrompt + skillPrompt;
           const skillIds = getSkillsForAgent(def.name).map(s => s.id);
-          insert.run(id, def.name, systemPrompt, def.model, def.temperature, JSON.stringify(skillIds), def.avatar, now, now);
+          insert.run(id, def.name, systemPrompt, def.model, def.temperature, JSON.stringify(skillIds), def.avatar, def.hidden ? 1 : 0, now, now);
           added++;
         }
       }
@@ -500,8 +511,8 @@ export function seedAgents(db) {
 
   const now = new Date().toISOString();
   const insert = db.prepare(`
-    INSERT INTO agents (id, name, systemPrompt, model, temperature, surfaces, mcpServers, skills, avatar, enabled, isBuiltin, userId, createdAt, updatedAt)
-    VALUES (?, ?, ?, ?, ?, '[]', '[]', ?, ?, 1, 1, NULL, ?, ?)
+    INSERT INTO agents (id, name, systemPrompt, model, temperature, surfaces, mcpServers, skills, avatar, enabled, isBuiltin, hidden, userId, createdAt, updatedAt)
+    VALUES (?, ?, ?, ?, ?, '[]', '[]', ?, ?, 1, 1, ?, NULL, ?, ?)
   `);
 
   const tx = db.transaction(() => {
@@ -519,6 +530,7 @@ export function seedAgents(db) {
         def.temperature,
         JSON.stringify(skillIds),
         def.avatar,
+        def.hidden ? 1 : 0,
         now,
         now
       );

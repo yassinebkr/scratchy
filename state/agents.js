@@ -121,6 +121,10 @@ export function listAgents(opts = {}) {
     clauses.push('enabled = ?');
     params.push(opts.enabled ? 1 : 0);
   }
+  // By default, exclude hidden agents (team workers). Pass includeHidden: true to see all.
+  if (!opts.includeHidden) {
+    clauses.push('(hidden = 0 OR hidden IS NULL)');
+  }
 
   const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
   const rows = d().prepare(`SELECT * FROM agents ${where} ORDER BY createdAt ASC`).all(...params);
@@ -195,6 +199,6 @@ export function listByUser(userId) {
  * @returns {Object[]}
  */
 export function getBuiltinAgents() {
-  const rows = d().prepare('SELECT * FROM agents WHERE isBuiltin = 1 ORDER BY createdAt ASC').all();
+  const rows = d().prepare('SELECT * FROM agents WHERE isBuiltin = 1 AND (hidden = 0 OR hidden IS NULL) ORDER BY createdAt ASC').all();
   return rows.map(parseRow);
 }
