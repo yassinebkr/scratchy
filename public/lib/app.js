@@ -1592,18 +1592,25 @@ async function enterApp() {
     return;
   }
 
-  // Check if setup wizard needs to be shown
-  try {
-    const res = await fetch('/api/setup/status');
-    if (res.ok) {
-      const data = await res.json();
-      if (!data.complete) {
-        showWizard();
-        return;
+  // Per-user setup: check if user needs to set up BYOK (non-admin without API key)
+  if (state.user?.role !== 'admin') {
+    try {
+      const token = localStorage.getItem('scratchy_token') || '';
+      const res = await fetch('/api/byok/keys', {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const keys = data.keys || data || [];
+        // If user has no API keys configured, show setup wizard
+        if (!Array.isArray(keys) || keys.length === 0) {
+          showWizard();
+          return;
+        }
       }
+    } catch {
+      // Can't check — proceed to app, chat will fail gracefully
     }
-  } catch {
-    // If we can't check, proceed to app
   }
 
   showApp();

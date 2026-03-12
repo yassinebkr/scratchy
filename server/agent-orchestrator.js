@@ -47,6 +47,8 @@ import * as memory from '../state/memory.js';
 import * as contextIndex from '../state/context-index.js';
 import { getUsageTracker } from '../lib/usage-tracker.js';
 import { routeTeamMessage } from '../lib/team-router.js';
+import { getBYOK } from '../lib/byok.js';
+import { getDb as _getDb } from '../state/db.js';
 import { broadcastToUser } from './ws.js';
 import * as secureKeys from '../lib/secure-keys.js';
 import { checkEmbeddingQuota, recordEmbeddingUsage } from '../lib/embedding-quota.js';
@@ -959,15 +961,33 @@ function ensureUserSandbox(userId) {
     return { role: 'user', homeDir };
   }
 
-  // Read API key from default NullClaw config
+  // Determine API key: BYOK users use their own key, never the admin's.
+  // Admin's key stays in the admin NullClaw config only.
   let apiKey = '';
   try {
-    const config = JSON.parse(readFileSync(pathJoin(homedir(), '.nullclaw', 'config.json'), 'utf8'));
-    apiKey = config?.models?.providers?.anthropic?.api_key || '';
-  } catch { /* no config — key will be empty */ }
+    // Try BYOK key first (user's own key from encrypted storage)
+    const byok = getBYOK();
+    const userKey = byok.getKey(userId, 'anthropic');
+    if (userKey) {
+      apiKey = userKey;
+      console.log(`[orchestrator] Using BYOK key for ${userId}`);
+    }
+  } catch { /* no BYOK key — that's OK */ }
 
-  // Check if user has BYOK (their own API key) — they get a different workspace
-  // but still sandboxed. BYOK users bypass quotas, not security.
+  // If no BYOK key, check if user is admin — only admin gets the shared key
+  if (!apiKey) {
+    try {
+      const userRecord = _getDb().prepare('SELECT role FROM users WHERE id = ?').get(userId);
+      if (userRecord?.role === 'admin') {
+        const config = JSON.parse(readFileSync(pathJoin(homedir(), '.nullclaw', 'config.json'), 'utf8'));
+        apiKey = config?.models?.providers?.anthropic?.api_key || '';
+        console.log(`[orchestrator] Using admin key for ${userId} (admin role)`);
+      } else {
+        // Regular user without BYOK — no API key. Chat will fail gracefully.
+        console.warn(`[orchestrator] No API key for ${userId} — user needs BYOK setup`);
+      }
+    } catch { /* no config */ }
+  }
 
   const homeDir = generateConfig(userId, 'user', {
     apiKey,

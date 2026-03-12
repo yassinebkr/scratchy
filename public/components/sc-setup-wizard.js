@@ -2052,17 +2052,23 @@ export class ScSetupWizard extends HTMLElement {
     const headers = { 'Content-Type': 'application/json' };
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
-    // Save API key if present
+    // Save API key via BYOK system (upgrades accessTier)
     if (this._data.apiKey.key) {
       try {
-        await fetch('/api/users/me/apikeys', {
+        const res = await fetch('/api/byok/keys', {
           method: 'POST',
           headers,
           body: JSON.stringify({
-            provider: this._data.apiKey.provider,
             key: this._data.apiKey.key,
+            label: this._data.apiKey.provider || 'default',
           }),
         });
+        if (res.ok) {
+          console.log('[wizard] API key saved via BYOK');
+        } else {
+          const err = await res.json().catch(() => ({}));
+          console.warn('[wizard] BYOK save failed:', err.error);
+        }
       } catch { /* skip */ }
     }
 
