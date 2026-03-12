@@ -8,6 +8,87 @@ const RESEND_API_KEY = process.env.RESEND_API_KEY || 're_VoMtaw4k_DED8N7CEeroGdY
 const FROM_EMAIL = process.env.FROM_EMAIL || 'Scratchy <no_reply@clawos.fr>';
 
 /**
+ * Build the verification email HTML.
+ * Table-based layout, inline styles, dark mode safe.
+ */
+function buildVerificationHtml(code, name) {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="color-scheme" content="dark">
+    <meta name="supported-color-schemes" content="dark">
+    <title>Scratchy Verification</title>
+    <style>
+        body, table, td, div, p, a {
+            margin: 0; padding: 0; border: none; border-spacing: 0; border-collapse: collapse;
+            font-family: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%;
+        }
+        a { text-decoration: none; color: #F9A602; }
+        :root { color-scheme: dark; supported-color-schemes: dark; }
+        @media (prefers-color-scheme: dark) {
+            body { background-color: #0d0b08 !important; }
+            .main-bg { background-color: #0d0b08 !important; }
+            .card-bg { background-color: #1a1610 !important; }
+        }
+    </style>
+</head>
+<body style="margin:0;padding:0;background-color:#0d0b08;font-family:'Geist',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;" class="main-bg">
+    <center>
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-spacing:0;border-collapse:collapse;margin:0 auto;">
+            <tr>
+                <td align="center" style="padding:20px 0;">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-spacing:0;border-collapse:collapse;max-width:480px;background-color:#1a1610;border-radius:12px;" class="card-bg">
+                        <tr>
+                            <td style="padding:24px 24px 16px;text-align:left;">
+                                <p style="margin:0;font-size:24px;line-height:28px;font-weight:700;color:#F9A602;">
+                                    🐱 Scratchy
+                                </p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding:0 24px 8px;text-align:left;">
+                                <p style="margin:0;font-size:18px;line-height:24px;color:#f0ead6;">
+                                    Hey ${name},
+                                </p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding:0 24px 16px;text-align:center;">
+                                <p style="margin:0;font-size:16px;line-height:24px;color:#f0ead6;">
+                                    Your verification code is:
+                                </p>
+                                <p style="margin:16px 0;font-family:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,Courier,monospace;font-size:48px;line-height:56px;font-weight:700;color:#F9A602;letter-spacing:4px;">
+                                    ${code}
+                                </p>
+                                <p style="margin:0;font-size:14px;line-height:20px;color:#8a7e6a;">
+                                    This code expires in 15 minutes.
+                                </p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding:16px 24px 24px;text-align:center;">
+                                <p style="margin:0;font-size:12px;line-height:18px;color:#8a7e6a;">
+                                    If you didn't create a Scratchy account, please ignore this email.
+                                </p>
+                                <p style="margin:10px 0 0;font-size:12px;line-height:18px;color:#8a7e6a;">
+                                    Scratchy — Your AI agents remember yesterday.
+                                </p>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
+    </center>
+</body>
+</html>`;
+}
+
+/**
  * Send a verification code email.
  * @param {string} to - Recipient email
  * @param {string} code - 6-digit verification code
@@ -16,24 +97,7 @@ const FROM_EMAIL = process.env.FROM_EMAIL || 'Scratchy <no_reply@clawos.fr>';
  */
 export async function sendVerificationEmail(to, code, username) {
   const name = username || 'there';
-  const html = `
-    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
-      <div style="text-align: center; margin-bottom: 32px;">
-        <h1 style="color: #f0ead6; font-size: 24px; margin: 0;">🐱 Scratchy</h1>
-      </div>
-      <div style="background: #1a1610; border: 1px solid rgba(249,166,2,0.2); border-radius: 12px; padding: 32px; text-align: center;">
-        <p style="color: #c4b99a; font-size: 16px; margin: 0 0 8px;">Hey ${name},</p>
-        <p style="color: #8a7e6a; font-size: 14px; margin: 0 0 24px;">Here's your verification code:</p>
-        <div style="background: #0d0b08; border: 2px solid #F9A602; border-radius: 8px; padding: 16px 24px; display: inline-block; margin-bottom: 24px;">
-          <span style="color: #F9A602; font-size: 32px; letter-spacing: 8px; font-weight: 700; font-family: monospace;">${code}</span>
-        </div>
-        <p style="color: #8a7e6a; font-size: 13px; margin: 0;">This code expires in 15 minutes.</p>
-      </div>
-      <p style="color: #555; font-size: 12px; text-align: center; margin-top: 24px;">
-        If you didn't create a Scratchy account, you can ignore this email.
-      </p>
-    </div>
-  `;
+  const html = buildVerificationHtml(code, name);
 
   try {
     const res = await fetch('https://api.resend.com/emails', {
@@ -70,6 +134,5 @@ export async function sendVerificationEmail(to, code, username) {
  * @returns {string}
  */
 export function generateVerificationCode() {
-  const code = Math.floor(100000 + Math.random() * 900000).toString();
-  return code;
+  return Math.floor(100000 + Math.random() * 900000).toString();
 }
