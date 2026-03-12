@@ -279,9 +279,13 @@ class ScAuth extends HTMLElement {
           <label>Name <span style="color:#555">(optional)</span></label>
           <input type="text" name="name" placeholder="Your name" autocomplete="name">
         </div>
+        <div class="field" id="email-field" style="display:none">
+          <label>Email</label>
+          <input type="email" name="email" placeholder="you@example.com" required autocomplete="email">
+        </div>
         <div class="field">
           <label>Username</label>
-          <input type="email" name="email" placeholder="you@example.com" required autocomplete="email">
+          <input type="text" name="username" placeholder="cooluser42" required autocomplete="username" minlength="2" maxlength="64" pattern="[a-zA-Z0-9_.\-]+">
         </div>
         <div class="field">
           <label>Password</label>
@@ -323,22 +327,28 @@ class ScAuth extends HTMLElement {
       const nameField = $('#name-field');
       const strength = $('#strength');
       const label = $('#submit-btn .btn-label');
+      const emailField = $('#email-field');
       if (this._mode === 'signup') {
         nameField.style.display = 'block';
+        emailField.style.display = 'block';
         strength.style.display = 'flex';
         label.textContent = 'Create Account';
         $('[name=password]').autocomplete = 'new-password';
+        $('[name=email]').required = true;
       } else {
         nameField.style.display = 'none';
+        emailField.style.display = 'none';
         strength.style.display = 'none';
         label.textContent = 'Sign In';
         $('[name=password]').autocomplete = 'current-password';
+        $('[name=email]').required = false;
       }
       this._error = null;
       this._updateError();
     }));
-    // Default: show name field for signup
+    // Default: show name + email fields for signup
     $('#name-field').style.display = 'block';
+    $('#email-field').style.display = 'block';
     $('#strength').style.display = 'flex';
 
     // OAuth
@@ -369,17 +379,19 @@ class ScAuth extends HTMLElement {
     $('#form').addEventListener('submit', (e) => {
       e.preventDefault();
       if (this._loading) return;
-      const email = $('[name=email]').value.trim();
+      const username = $('[name=username]').value.trim();
       const password = $('[name=password]').value;
+      const email = $('[name=email]')?.value?.trim() || '';
       const name = $('[name=name]')?.value?.trim() || '';
-      if (!email || !password) { this.error = 'Email and password required.'; return; }
+      if (!username || !password) { this.error = 'Username and password required.'; return; }
       if (password.length < 8) { this.error = 'Password must be at least 8 characters.'; return; }
+      if (this._mode === 'signup' && !email) { this.error = 'Email is required for signup.'; return; }
       this._error = null;
       this._updateError();
       if (this._mode === 'signup') {
-        this._emit('auth-signup', { email, password, name });
+        this._emit('auth-signup', { email, password, name, username });
       } else {
-        this._emit('auth-login', { email, password });
+        this._emit('auth-login', { email: username, password }); // login uses username, keep 'email' key for backward compat
       }
     });
 

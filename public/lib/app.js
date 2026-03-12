@@ -2004,7 +2004,7 @@ async function init() {
   });
 
   document.addEventListener('auth-signup', async (e) => {
-    const { email, password, name } = e.detail;
+    const { email, password, name, username } = e.detail;
     const authEl = document.querySelector('sc-auth');
     if (authEl) authEl.loading = true;
 
@@ -2012,7 +2012,7 @@ async function init() {
       const res = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: email, password, displayName: name }),
+        body: JSON.stringify({ username, password, displayName: name, email }),
       });
       const data = await res.json();
       if (!res.ok) {

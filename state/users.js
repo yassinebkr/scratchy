@@ -8,7 +8,7 @@ import crypto from 'node:crypto';
 import { getDb } from './db.js';
 
 /** Safe column list — excludes passwordHash and apiKey from public queries */
-const SAFE_COLS = 'id, username, displayName, role, plan, accessTier, capabilities, createdAt, updatedAt';
+const SAFE_COLS = 'id, username, displayName, email, role, plan, accessTier, capabilities, createdAt, updatedAt';
 /** All columns — only for auth-internal queries (login, password verify) */
 const ALL_COLS = '*';
 /** Username constraints */
@@ -80,6 +80,7 @@ export function createUser(username, passwordHash, opts = {}) {
   const now = new Date().toISOString();
   const {
     displayName = null,
+    email = null,
     role = 'user',
     plan = 'free',
     accessTier = 'none',
@@ -88,9 +89,9 @@ export function createUser(username, passwordHash, opts = {}) {
   } = opts;
 
   d().prepare(`
-    INSERT INTO users (id, username, passwordHash, displayName, role, plan, accessTier, apiKey, capabilities, createdAt, updatedAt)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(id, username, passwordHash, displayName, role, plan, accessTier, apiKey, JSON.stringify(capabilities), now, now);
+    INSERT INTO users (id, username, passwordHash, displayName, email, role, plan, accessTier, apiKey, capabilities, createdAt, updatedAt)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, username, passwordHash, displayName, email, role, plan, accessTier, apiKey, JSON.stringify(capabilities), now, now);
 
   return getUser(id);
 }

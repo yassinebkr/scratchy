@@ -115,13 +115,13 @@ export async function login(username, password) {
  * @returns {Promise<{token:string, user:{id:string, username:string, displayName:string|null}}>}
  * @throws {Error} If username already exists
  */
-export async function signup(username, password, displayName) {
+export async function signup(username, password, displayName, email) {
   const existing = getUserByUsername(username);
   if (existing) {
     throw Object.assign(new Error('Username already taken'), { status: 409 });
   }
   const hash = await hashPassword(password);
-  const user = createUser(username, hash, { displayName: displayName || null });
+  const user = createUser(username, hash, { displayName: displayName || null, email: email || null });
   const token = generateToken();
   createSession(user.id, token);
   return {

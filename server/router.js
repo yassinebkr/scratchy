@@ -513,9 +513,12 @@ export function createRouter(opts = {}) {
       if (method === 'POST' && pathname === '/api/auth/signup') {
         if (!auth) return json(res, 501, { error: 'Auth not configured' });
         const body = await parseJsonBody(req);
-        const { username, password, displayName } = body;
+        const { username, password, displayName, email } = body;
         if (!username || !password) {
           return json(res, 400, { error: 'username and password required' });
+        }
+        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          return json(res, 400, { error: 'A valid email address is required' });
         }
         if (password.length < 8) {
           return json(res, 400, { error: 'Password must be at least 8 characters' });
@@ -525,6 +528,7 @@ export function createRouter(opts = {}) {
             String(username),
             String(password),
             displayName ? String(displayName) : undefined,
+            email ? String(email) : undefined,
           );
           res.setHeader('Set-Cookie', `token=${result.token}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=2592000`);
           return json(res, 201, result);

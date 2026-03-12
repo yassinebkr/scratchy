@@ -309,6 +309,12 @@ export function initSchema(db) {
     console.log('[db] Migration: added hidden column to agents, marked team workers as hidden');
   }
 
+  // Migrate users table: add email column
+  if (!userCols.some(c => c.name === 'email')) {
+    db.exec(`ALTER TABLE users ADD COLUMN email TEXT DEFAULT NULL`);
+    console.log('[db] Migration: added email column to users');
+  }
+
   // Migrate users table: add accessTier column
   const userCols = db.pragma('table_info(users)');
   if (!userCols.some(c => c.name === 'accessTier')) {
