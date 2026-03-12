@@ -117,7 +117,7 @@ export function getToken() { return state.token; }
 /*  DOM refs (resolved after DOMContentLoaded)                        */
 /* ------------------------------------------------------------------ */
 
-let $loadingScreen, $landingScreen, $authScreen, $appScreen, $wizardScreen, $plansScreen;
+let $loadingScreen, $landingScreen, $authScreen, $appScreen, $wizardScreen, $plansScreen, $verifyScreen;
 let $messages, $msgInput, $sendBtn;
 const inlineTileRegistry = new Map();
 let $statusDot, $statusText, $statusBadge, $topbarUser, $logoutBtn, $userMenuBtn, $userMenu, $settingsBtn, $adminBtn;
@@ -136,6 +136,7 @@ function resolveDOM() {
   $authScreen   = document.getElementById('auth-screen');
   $appScreen    = document.getElementById('app-screen');
   $wizardScreen = document.getElementById('wizard-screen');
+  $verifyScreen = document.getElementById('verify-screen');
   $plansScreen  = document.getElementById('plans-screen');
   $messages     = document.getElementById('messages');
   $msgInput     = document.getElementById('msg-input');
@@ -166,7 +167,7 @@ function hideAllScreens() {
   // Always hide loading screen once we've routed
   if ($loadingScreen) $loadingScreen.classList.add('hidden');
   const $signupCheckoutScreen = document.getElementById('signup-checkout-screen');
-  [$landingScreen, $authScreen, $appScreen, $wizardScreen, $plansScreen, $signupCheckoutScreen]
+  [$landingScreen, $authScreen, $appScreen, $wizardScreen, $verifyScreen, $plansScreen, $signupCheckoutScreen]
     .forEach(el => el?.classList.add('hidden'));
   if ($workspaceBar) $workspaceBar.style.display = 'none';
 }
@@ -198,6 +199,15 @@ function showPlans() {
   hideAllScreens();
   if ($plansScreen) $plansScreen.classList.remove('hidden');
   else showApp(); // skip if no plans screen
+}
+
+function showVerify(email) {
+  hideAllScreens();
+  if ($verifyScreen) {
+    $verifyScreen.classList.remove('hidden');
+    const comp = $verifyScreen.querySelector('sc-verify-email');
+    if (comp && email) comp.setAttribute('email', email);
+  }
 }
 
 function showWizard() {
@@ -1576,6 +1586,12 @@ async function enterApp() {
     }
   }
 
+  // Check email verification (skip for admin / already verified)
+  if (state.user && !state.user.emailVerified && state.user.role !== 'admin') {
+    showVerify(state.user.email || '');
+    return;
+  }
+
   // Check if setup wizard needs to be shown
   try {
     const res = await fetch('/api/setup/status');
@@ -2078,6 +2094,12 @@ async function init() {
     showApp();
     setConnectionStatus('reconnecting');
     connect(state.token);
+  });
+
+  // Listen for email verification completion
+  document.addEventListener('verify-complete', () => {
+    if (state.user) state.user.emailVerified = true;
+    enterApp(); // re-enter app flow (will now pass verification check)
   });
 
   // Listen for setup wizard completion

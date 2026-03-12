@@ -40,12 +40,12 @@
   </script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/geist@1.3.1/dist/fonts/geist-sans/style.css">
   <noscript><style>sc-landing .section { opacity: 1 !important; transform: none !important; }</style></noscript>
-  <link rel="stylesheet" href="styles/tokens.css?v=2.1.141">
-  <link rel="stylesheet" href="styles/main.css?v=2.1.141">
-  <link rel="stylesheet" href="styles/chat.css?v=2.1.141">
-  <link rel="stylesheet" href="styles/tiles.css?v=2.1.141">
-  <link rel="stylesheet" href="app.css?v=2.1.141">
-  <link rel="stylesheet" href="css/mobile.css?v=2.1.141">
+  <link rel="stylesheet" href="styles/tokens.css?v=2.1.142">
+  <link rel="stylesheet" href="styles/main.css?v=2.1.142">
+  <link rel="stylesheet" href="styles/chat.css?v=2.1.142">
+  <link rel="stylesheet" href="styles/tiles.css?v=2.1.142">
+  <link rel="stylesheet" href="app.css?v=2.1.142">
+  <link rel="stylesheet" href="css/mobile.css?v=2.1.142">
   <style>
     /* Agent-driven UI: Chat header — compact */
     .chat-header {
@@ -190,6 +190,11 @@
     <sc-plans></sc-plans>
   </div>
 
+  <!-- Email verification screen (shown after signup) -->
+  <div id="verify-screen" class="screen hidden">
+    <sc-verify-email></sc-verify-email>
+  </div>
+
   <!-- Setup wizard screen (shown on first run) -->
   <div id="wizard-screen" class="screen hidden">
     <sc-setup-wizard></sc-setup-wizard>
@@ -283,47 +288,48 @@
   <sc-workspaces></sc-workspaces>
 
   <!-- Scripts (ESM) -->
-  <script type="module" src="components/sc-landing.js?v=2.1.141"></script>
-  <script type="module" src="components/sc-auth.js?v=2.1.141"></script>
-  <script type="module" src="components/sc-signup-checkout.js?v=2.1.141"></script>
-  <script type="module" src="components/sc-plans.js?v=2.1.141"></script>
-  <script type="module" src="components/sc-agent-switcher.js?v=2.1.141"></script>
-  <script type="module" src="components/sc-setup-wizard.js?v=2.1.141"></script>
-  <script type="module" src="components/sc-chat.js?v=2.1.141"></script>
-  <script type="module" src="components/sc-canvas.js?v=2.1.141"></script>
-  <script type="module" src="components/sc-tile.js?v=2.1.141"></script>
-  <script type="module" src="components/sc-live-registry.js?v=2.1.141"></script>
-  <script type="module" src="components/sc-admin.js?v=2.1.141"></script>
-  <script type="module" src="components/sc-settings.js?v=2.1.141"></script>
-  <script type="module" src="components/sc-agent-config.js?v=2.1.141"></script>
-  <script type="module" src="components/sc-terminal.js?v=2.1.141"></script>
-  <script type="module" src="components/sc-filetree.js?v=2.1.141"></script>
-  <script type="module" src="components/sc-editor.js?v=2.1.141"></script>
-  <script type="module" src="components/sc-search.js?v=2.1.141"></script>
-  <script type="module" src="components/sc-workspace-bar.js?v=2.1.141"></script>
-  <script type="module" src="components/sc-webapp.js?v=2.1.141"></script>
-  <script type="module" src="components/sc-agent-wizard.js?v=2.1.141"></script>
-  <script type="module" src="components/sc-onboarding.js?v=2.1.141"></script>
-  <script type="module" src="components/sc-dashboard.js?v=2.1.141"></script>
-  <script type="module" src="components/sc-worker-bubble.js?v=2.1.141"></script>
-  <script type="module" src="components/sc-access-gate.js?v=2.1.141"></script>
-  <script type="module" src="components/sc-notes.js?v=2.1.141"></script>
-  <script type="module" src="components/sc-calendar.js?v=2.1.141"></script>
-  <script type="module" src="components/sc-email.js?v=2.1.141"></script>
-  <script type="module" src="components/sc-billing.js?v=2.1.141"></script>
-  <script type="module" src="components/sc-widget-store.js?v=2.1.141"></script>
-  <script type="module" src="components/sc-teams.js?v=2.1.141"></script>
-  <script type="module" src="components/sc-workspaces.js?v=2.1.141"></script>
-  <script type="module" src="components/sc-command-palette.js?v=2.1.141"></script>
-  <script type="module" src="lib/ws-client.js?v=2.1.141"></script>
-  <script type="module" src="lib/surface-manager.js?v=2.1.141"></script>
-  <script type="module" src="lib/activity-monitor.js?v=2.1.141"></script>
-  <script type="module" src="lib/agent-presence.js?v=2.1.141"></script>
-  <script type="module" src="lib/virtual-scroller.js?v=2.1.141"></script>
-  <script type="module" src="lib/mobile-ux.js?v=2.1.141"></script>
-  <script type="module" src="lib/mobile-surface-stack.js?v=2.1.141"></script>
-  <script type="module" src="lib/agent-orchestrator.js?v=2.1.141"></script>
-  <script type="module" src="lib/performance.js?v=2.1.141"></script>
-  <script type="module" src="lib/app.js?v=2.1.141"></script>
+  <script type="module" src="components/sc-landing.js?v=2.1.142"></script>
+  <script type="module" src="components/sc-auth.js?v=2.1.142"></script>
+  <script type="module" src="components/sc-signup-checkout.js?v=2.1.142"></script>
+  <script type="module" src="components/sc-plans.js?v=2.1.142"></script>
+  <script type="module" src="components/sc-agent-switcher.js?v=2.1.142"></script>
+  <script type="module" src="components/sc-verify-email.js?v=2.1.142"></script>
+  <script type="module" src="components/sc-setup-wizard.js?v=2.1.142"></script>
+  <script type="module" src="components/sc-chat.js?v=2.1.142"></script>
+  <script type="module" src="components/sc-canvas.js?v=2.1.142"></script>
+  <script type="module" src="components/sc-tile.js?v=2.1.142"></script>
+  <script type="module" src="components/sc-live-registry.js?v=2.1.142"></script>
+  <script type="module" src="components/sc-admin.js?v=2.1.142"></script>
+  <script type="module" src="components/sc-settings.js?v=2.1.142"></script>
+  <script type="module" src="components/sc-agent-config.js?v=2.1.142"></script>
+  <script type="module" src="components/sc-terminal.js?v=2.1.142"></script>
+  <script type="module" src="components/sc-filetree.js?v=2.1.142"></script>
+  <script type="module" src="components/sc-editor.js?v=2.1.142"></script>
+  <script type="module" src="components/sc-search.js?v=2.1.142"></script>
+  <script type="module" src="components/sc-workspace-bar.js?v=2.1.142"></script>
+  <script type="module" src="components/sc-webapp.js?v=2.1.142"></script>
+  <script type="module" src="components/sc-agent-wizard.js?v=2.1.142"></script>
+  <script type="module" src="components/sc-onboarding.js?v=2.1.142"></script>
+  <script type="module" src="components/sc-dashboard.js?v=2.1.142"></script>
+  <script type="module" src="components/sc-worker-bubble.js?v=2.1.142"></script>
+  <script type="module" src="components/sc-access-gate.js?v=2.1.142"></script>
+  <script type="module" src="components/sc-notes.js?v=2.1.142"></script>
+  <script type="module" src="components/sc-calendar.js?v=2.1.142"></script>
+  <script type="module" src="components/sc-email.js?v=2.1.142"></script>
+  <script type="module" src="components/sc-billing.js?v=2.1.142"></script>
+  <script type="module" src="components/sc-widget-store.js?v=2.1.142"></script>
+  <script type="module" src="components/sc-teams.js?v=2.1.142"></script>
+  <script type="module" src="components/sc-workspaces.js?v=2.1.142"></script>
+  <script type="module" src="components/sc-command-palette.js?v=2.1.142"></script>
+  <script type="module" src="lib/ws-client.js?v=2.1.142"></script>
+  <script type="module" src="lib/surface-manager.js?v=2.1.142"></script>
+  <script type="module" src="lib/activity-monitor.js?v=2.1.142"></script>
+  <script type="module" src="lib/agent-presence.js?v=2.1.142"></script>
+  <script type="module" src="lib/virtual-scroller.js?v=2.1.142"></script>
+  <script type="module" src="lib/mobile-ux.js?v=2.1.142"></script>
+  <script type="module" src="lib/mobile-surface-stack.js?v=2.1.142"></script>
+  <script type="module" src="lib/agent-orchestrator.js?v=2.1.142"></script>
+  <script type="module" src="lib/performance.js?v=2.1.142"></script>
+  <script type="module" src="lib/app.js?v=2.1.142"></script>
 </body>
 </html>

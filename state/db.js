@@ -315,6 +315,15 @@ export function initSchema(db) {
     console.log('[db] Migration: added email column to users');
   }
 
+  // Migrate users table: add email verification columns
+  if (!userCols.some(c => c.name === 'emailVerified')) {
+    db.exec(`ALTER TABLE users ADD COLUMN emailVerified INTEGER NOT NULL DEFAULT 0`);
+    db.exec(`ALTER TABLE users ADD COLUMN verificationCode TEXT DEFAULT NULL`);
+    db.exec(`ALTER TABLE users ADD COLUMN verificationExpiry TEXT DEFAULT NULL`);
+    db.exec(`UPDATE users SET emailVerified = 1 WHERE role = 'admin'`);
+    console.log('[db] Migration: added email verification columns to users');
+  }
+
   // Migrate users table: add accessTier column
   const userCols = db.pragma('table_info(users)');
   if (!userCols.some(c => c.name === 'accessTier')) {

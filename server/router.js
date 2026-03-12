@@ -530,23 +530,106 @@ export function createRouter(opts = {}) {
             displayName ? String(displayName) : undefined,
             email ? String(email) : undefined,
           );
+
+          // Send verification email
+          try {
+            const { generateVerificationCode, sendVerificationEmail } = await import('./email.js');
+            const code = generateVerificationCode();
+            const expiry = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+            const { getDb } = await import('../state/db.js');
+            const db = getDb();
+            db.prepare('UPDATE users SET verificationCode = ?, verificationExpiry = ? WHERE id = ?')
+              .run(code, expiry, result.user.id);
+            const emailResult = await sendVerificationEmail(email, code, displayName || username);
+            if (!emailResult.ok) {
+              console.warn(`[auth] Verification email failed for ${email}: ${emailResult.error}`);
+            }
+          } catch (emailErr) {
+            console.warn('[auth] Could not send verification email:', emailErr.message);
+          }
+
           res.setHeader('Set-Cookie', `token=${result.token}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=2592000`);
-          return json(res, 201, result);
+          return json(res, 201, { ...result, emailVerified: false });
         } catch (err) {
           const status = err.status ?? 400;
           return json(res, status, { error: err.message ?? 'Signup failed' });
         }
       }
 
+      // Auth: verify email code
+      if (method === 'POST' && pathname === '/api/auth/verify-email') {
+        const user = await requireAuth(req, res);
+        if (!user) return;
+        const body = await parseJsonBody(req);
+        const { code } = body;
+        if (!code) return json(res, 400, { error: 'Verification code required' });
+
+        const { getDb } = await import('../state/db.js');
+        const db = getDb();
+        const row = db.prepare('SELECT verificationCode, verificationExpiry, emailVerified FROM users WHERE id = ?').get(user.id);
+
+        if (!row) return json(res, 404, { error: 'User not found' });
+        if (row.emailVerified) return json(res, 200, { ok: true, alreadyVerified: true });
+        if (!row.verificationCode) return json(res, 400, { error: 'No verification pending. Request a new code.' });
+        if (new Date(row.verificationExpiry) < new Date()) {
+          return json(res, 400, { error: 'Code expired. Request a new one.' });
+        }
+        if (String(code).trim() !== row.verificationCode) {
+          return json(res, 400, { error: 'Invalid code. Please try again.' });
+        }
+
+        // Mark as verified
+        db.prepare('UPDATE users SET emailVerified = 1, verificationCode = NULL, verificationExpiry = NULL, accessTier = ? WHERE id = ?')
+          .run(user.accessTier === 'none' ? 'free' : user.accessTier, user.id);
+
+        return json(res, 200, { ok: true, verified: true });
+      }
+
+      // Auth: resend verification code
+      if (method === 'POST' && pathname === '/api/auth/resend-verification') {
+        const user = await requireAuth(req, res);
+        if (!user) return;
+
+        const { getDb } = await import('../state/db.js');
+        const db = getDb();
+        const row = db.prepare('SELECT email, emailVerified, username FROM users WHERE id = ?').get(user.id);
+
+        if (!row) return json(res, 404, { error: 'User not found' });
+        if (row.emailVerified) return json(res, 200, { ok: true, alreadyVerified: true });
+        if (!row.email) return json(res, 400, { error: 'No email address on file' });
+
+        const { generateVerificationCode, sendVerificationEmail } = await import('./email.js');
+        const code = generateVerificationCode();
+        const expiry = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+        db.prepare('UPDATE users SET verificationCode = ?, verificationExpiry = ? WHERE id = ?')
+          .run(code, expiry, user.id);
+
+        const result = await sendVerificationEmail(row.email, code, row.username);
+        if (!result.ok) {
+          return json(res, 500, { error: 'Failed to send email. Try again later.' });
+        }
+
+        return json(res, 200, { ok: true, sent: true });
+      }
+
       // Auth: me (who am I?)
       if (method === 'GET' && pathname === '/api/auth/me') {
         const user = await requireAuth(req, res);
         if (!user) return; // 401 already sent
+        // Fetch emailVerified from DB (not in session cache)
+        let emailVerified = true;
+        try {
+          const { getDb } = await import('../state/db.js');
+          const row = getDb().prepare('SELECT emailVerified FROM users WHERE id = ?').get(user.id);
+          emailVerified = !!(row?.emailVerified);
+        } catch { /* default to true if column missing */ }
         return json(res, 200, {
           id: user.id,
           username: user.username,
           displayName: user.displayName,
+          email: user.email,
           role: user.role,
+          emailVerified,
         });
       }
 
