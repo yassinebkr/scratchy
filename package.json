@@ -1,6 +1,6 @@
 {
   "name": "scratchy-par",
-  "version": "2.0.0-alpha.1",
+  "version": "2.0.0-alpha.2",
   "type": "module",
   "description": "Scratchy v2 — Contextual AI interface with multi-user isolation",
   "main": "server/index.js",

@@ -428,6 +428,11 @@ scratchy/
 4. ESM imports only (no CommonJS)
 5. Components are declarative — agents describe, clients render
 
+## Changelog
+
+### 2.0.0-alpha.2 (2026-04-19)
+- **Fixed:** Race condition in chat streaming — late deltas arriving after `chat-stream-end` no longer create orphaned message bubbles or append to finalized messages. Added `_streamFinalized` guard in `public/lib/app.js`.
+
 ---
 
 Built by [Yassine](https://github.com/yassinebkr) • [Discord](https://discord.gg/clawd) • [MIT License](LICENSE)

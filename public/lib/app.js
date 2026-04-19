@@ -1109,6 +1109,7 @@ function wireWsEvents() {
       _streamDiv = null;
     }
     _streamRaw = '';
+    _streamFinalized = false;
     // Reset history flag so reconnect reloads messages
     _historyLoadedForAgent = null;
 
@@ -1132,9 +1133,13 @@ function wireWsEvents() {
   let _streamDiv = null;
   // Raw stream buffer — holds unfiltered text; _streamDiv shows filtered version
   let _streamRaw = '';
+  // Guard against late streaming deltas after finalization
+  let _streamFinalized = false;
 
   on('chat-stream', (msg) => {
     if (!$messages) return;
+    // Guard: ignore streaming deltas that arrive after the stream has been finalized
+    if (_streamFinalized) return;
     // Remove empty state and typing dots once real content arrives
     removeEmptyState();
     $messages.querySelectorAll('.typing-indicator').forEach(el => el.remove());
@@ -1144,6 +1149,7 @@ function wireWsEvents() {
       _streamRaw = '';
     }
     if (!_streamDiv) {
+      _streamFinalized = false; // Reset for new stream
       _streamDiv = document.createElement('div');
       _streamDiv.className = 'msg msg-assistant streaming';
       _streamDiv.textContent = '';
@@ -1158,6 +1164,8 @@ function wireWsEvents() {
   });
 
   on('chat-stream-end', () => {
+    // Mark stream as finalized to prevent late deltas from creating new bubbles
+    _streamFinalized = true;
     if (_streamDiv) {
       _streamDiv.classList.remove('streaming');
       let raw = _streamRaw || _streamDiv.textContent;
